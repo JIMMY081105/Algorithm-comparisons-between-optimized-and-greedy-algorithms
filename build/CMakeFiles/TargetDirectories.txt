@@ -1,5 +1,0 @@
-C:/Users/User/OneDrive - University of Nottingham Malaysia/Documents/year 2 sem 2/c++/cw2/build/CMakeFiles/glad.dir
-C:/Users/User/OneDrive - University of Nottingham Malaysia/Documents/year 2 sem 2/c++/cw2/build/CMakeFiles/imgui.dir
-C:/Users/User/OneDrive - University of Nottingham Malaysia/Documents/year 2 sem 2/c++/cw2/build/CMakeFiles/SmartWasteClearance.dir
-C:/Users/User/OneDrive - University of Nottingham Malaysia/Documents/year 2 sem 2/c++/cw2/build/CMakeFiles/edit_cache.dir
-C:/Users/User/OneDrive - University of Nottingham Malaysia/Documents/year 2 sem 2/c++/cw2/build/CMakeFiles/rebuild_cache.dir
