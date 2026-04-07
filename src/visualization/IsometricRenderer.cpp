@@ -3,6 +3,7 @@
 // We need the OpenGL headers for drawing
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -18,7 +19,7 @@ void IsometricRenderer::render(const MapGraph& graph, const Truck& truck,
     animationTime += deltaTime;
 
     // Draw layers from back to front to get correct visual overlap
-    drawGroundPlane();
+    drawGroundPlane(graph);
 
     if (showGrid) {
         drawRoadConnections(graph);
@@ -45,16 +46,35 @@ void IsometricRenderer::render(const MapGraph& graph, const Truck& truck,
     }
 }
 
-void IsometricRenderer::drawGroundPlane() {
+void IsometricRenderer::drawGroundPlane(const MapGraph& graph) {
     // Draw an isometric ground area as a series of diamond tiles.
     // This creates the visual "floor" that the map sits on.
-    Color groundColor(0.18f, 0.22f, 0.16f, 0.3f);
     Color gridColor = RenderUtils::getGridLineColor();
     const auto& projection = RenderUtils::getProjection();
+    const auto& nodes = graph.getNodes();
+
+    if (nodes.empty()) return;
+
+    float minWorldX = nodes.front().getWorldX();
+    float maxWorldX = nodes.front().getWorldX();
+    float minWorldY = nodes.front().getWorldY();
+    float maxWorldY = nodes.front().getWorldY();
+
+    for (const auto& node : nodes) {
+        minWorldX = std::min(minWorldX, node.getWorldX());
+        maxWorldX = std::max(maxWorldX, node.getWorldX());
+        minWorldY = std::min(minWorldY, node.getWorldY());
+        maxWorldY = std::max(maxWorldY, node.getWorldY());
+    }
+
+    const int startX = static_cast<int>(std::floor(minWorldX)) - 2;
+    const int endX = static_cast<int>(std::ceil(maxWorldX)) + 2;
+    const int startY = static_cast<int>(std::floor(minWorldY)) - 2;
+    const int endY = static_cast<int>(std::ceil(maxWorldY)) + 2;
 
     // Draw a large ground diamond covering the map area
-    for (int gx = -1; gx <= 12; gx++) {
-        for (int gy = -1; gy <= 12; gy++) {
+    for (int gx = startX; gx <= endX; gx++) {
+        for (int gy = startY; gy <= endY; gy++) {
             IsoCoord iso = RenderUtils::worldToIso(
                 static_cast<float>(gx), static_cast<float>(gy));
 
@@ -72,7 +92,7 @@ void IsometricRenderer::drawRoadConnections(const MapGraph& graph) {
     // In our fully-connected graph this shows the road network.
     // We only draw connections shorter than a threshold to avoid visual clutter.
     Color roadColor = RenderUtils::getRoadColor();
-    float maxVisibleDist = 25.0f;  // only show "nearby" road connections
+    float maxVisibleDist = 48.75f;  // scaled for the wider explicit coordinate layout
 
     for (int i = 0; i < graph.getNodeCount(); i++) {
         for (int j = i + 1; j < graph.getNodeCount(); j++) {

@@ -1,4 +1,5 @@
 #include "visualization/RenderUtils.h"
+#include "core/MapGraph.h"
 #include <algorithm>
 #include <cmath>
 
@@ -8,7 +9,7 @@ namespace {
 constexpr float kSidebarWidth = 320.0f;
 constexpr float kPanelMargin = 10.0f;
 constexpr float kMapZoom = 1.12f;
-constexpr float kMapVerticalBias = 0.30f;
+constexpr float kMapVerticalBias = 0.40f;
 
 ProjectionState gProjection{
     BASE_TILE_WIDTH * kMapZoom,
@@ -16,9 +17,38 @@ ProjectionState gProjection{
     450.0f,
     80.0f
 };
+
+struct WorldBounds {
+    float minX;
+    float maxX;
+    float minY;
+    float maxY;
+};
+
+WorldBounds getWorldBounds(const MapGraph& graph) {
+    const auto& nodes = graph.getNodes();
+    if (nodes.empty()) {
+        return {0.0f, 0.0f, 0.0f, 0.0f};
+    }
+
+    WorldBounds bounds{
+        nodes.front().getWorldX(), nodes.front().getWorldX(),
+        nodes.front().getWorldY(), nodes.front().getWorldY()
+    };
+
+    for (const auto& node : nodes) {
+        bounds.minX = std::min(bounds.minX, node.getWorldX());
+        bounds.maxX = std::max(bounds.maxX, node.getWorldX());
+        bounds.minY = std::min(bounds.minY, node.getWorldY());
+        bounds.maxY = std::max(bounds.maxY, node.getWorldY());
+    }
+
+    return bounds;
+}
 }
 
-void updateProjection(float viewportWidth, float viewportHeight) {
+void updateProjection(float viewportWidth, float viewportHeight,
+                      const MapGraph& graph) {
     gProjection.tileWidth = BASE_TILE_WIDTH * kMapZoom;
     gProjection.tileHeight = BASE_TILE_HEIGHT * kMapZoom;
 
@@ -29,12 +59,17 @@ void updateProjection(float viewportWidth, float viewportHeight) {
     const float contentRight = std::max(contentLeft, sidebarLeft - kPanelMargin);
     const float targetCenterX = (contentLeft + contentRight) * 0.5f;
     const float targetCenterY = viewportHeight * kMapVerticalBias;
+    const WorldBounds bounds = getWorldBounds(graph);
+    const float paddedMinX = bounds.minX - 2.0f;
+    const float paddedMaxX = bounds.maxX + 2.0f;
+    const float paddedMinY = bounds.minY - 2.0f;
+    const float paddedMaxY = bounds.maxY + 2.0f;
 
     const IsoCoord corners[] = {
-        {(-1.0f - -1.0f) * halfW, (-1.0f + -1.0f) * halfH},
-        {(-1.0f - 12.0f) * halfW, (-1.0f + 12.0f) * halfH},
-        {(12.0f - -1.0f) * halfW, (12.0f + -1.0f) * halfH},
-        {(12.0f - 12.0f) * halfW, (12.0f + 12.0f) * halfH}
+        {(paddedMinX - paddedMinY) * halfW, (paddedMinX + paddedMinY) * halfH},
+        {(paddedMinX - paddedMaxY) * halfW, (paddedMinX + paddedMaxY) * halfH},
+        {(paddedMaxX - paddedMinY) * halfW, (paddedMaxX + paddedMinY) * halfH},
+        {(paddedMaxX - paddedMaxY) * halfW, (paddedMaxX + paddedMaxY) * halfH}
     };
 
     float minX = corners[0].x;

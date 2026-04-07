@@ -3036,14 +3036,14 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/DashboardUI.cpp.obj: C:/Use
   C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/xmmintrin.h
 
 CMakeFiles/SmartWasteClearance.dir/src/visualization/IsometricRenderer.cpp.obj: C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/visualization/IsometricRenderer.cpp \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/KHR/khrplatform.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/glad/glad.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/MapGraph.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/RouteResult.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/Truck.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/IsometricRenderer.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/RenderUtils.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/KHR/khrplatform.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/glad/glad.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/MapGraph.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/RouteResult.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/Truck.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteNode.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/IsometricRenderer.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/RenderUtils.h \
   C:/msys64/mingw64/include/GLFW/glfw3.h \
   C:/msys64/mingw64/include/_mingw.h \
   C:/msys64/mingw64/include/_mingw_mac.h \
@@ -3056,9 +3056,11 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/IsometricRenderer.cpp.obj: 
   C:/msys64/mingw64/include/apisetcconv.h \
   C:/msys64/mingw64/include/basetsd.h \
   C:/msys64/mingw64/include/bemapiset.h \
+  C:/msys64/mingw64/include/c++/15.2.0/algorithm \
   C:/msys64/mingw64/include/c++/15.2.0/array \
   C:/msys64/mingw64/include/c++/15.2.0/backward/binders.h \
   C:/msys64/mingw64/include/c++/15.2.0/bit \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/algorithmfwd.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/alloc_traits.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/allocator.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/basic_string.h \
@@ -3088,18 +3090,22 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/IsometricRenderer.cpp.obj: 
   C:/msys64/mingw64/include/c++/15.2.0/bits/requires_hosted.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/specfun.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/std_abs.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/stl_algo.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_algobase.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_bvector.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_construct.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_function.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/stl_heap.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_iterator.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_iterator_base_funcs.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_iterator_base_types.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_pair.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/stl_tempbuf.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_uninitialized.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_vector.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/string_view.tcc \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stringfwd.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/uniform_int_dist.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator_args.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/utility.h \
@@ -3125,6 +3131,8 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/IsometricRenderer.cpp.obj: 
   C:/msys64/mingw64/include/c++/15.2.0/iosfwd \
   C:/msys64/mingw64/include/c++/15.2.0/limits \
   C:/msys64/mingw64/include/c++/15.2.0/new \
+  C:/msys64/mingw64/include/c++/15.2.0/pstl/execution_defs.h \
+  C:/msys64/mingw64/include/c++/15.2.0/pstl/glue_algorithm_defs.h \
   C:/msys64/mingw64/include/c++/15.2.0/pstl/pstl_config.h \
   C:/msys64/mingw64/include/c++/15.2.0/stdlib.h \
   C:/msys64/mingw64/include/c++/15.2.0/string \
@@ -3372,8 +3380,9 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/IsometricRenderer.cpp.obj: 
   C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/xtestintrin.h
 
 CMakeFiles/SmartWasteClearance.dir/src/visualization/RenderUtils.cpp.obj: C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/visualization/RenderUtils.cpp \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h \
-  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/RenderUtils.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/MapGraph.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteNode.h \
+  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/RenderUtils.h \
   C:/msys64/mingw64/include/_mingw.h \
   C:/msys64/mingw64/include/_mingw_mac.h \
   C:/msys64/mingw64/include/_mingw_off_t.h \
@@ -3415,6 +3424,7 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/RenderUtils.cpp.obj: C:/Use
   C:/msys64/mingw64/include/c++/15.2.0/bits/std_abs.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_algo.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_algobase.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/stl_bvector.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_construct.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_function.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_heap.h \
@@ -3423,12 +3433,15 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/RenderUtils.cpp.obj: C:/Use
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_iterator_base_types.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_pair.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stl_tempbuf.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/stl_uninitialized.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/stl_vector.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/string_view.tcc \
   C:/msys64/mingw64/include/c++/15.2.0/bits/stringfwd.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/uniform_int_dist.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator_args.h \
   C:/msys64/mingw64/include/c++/15.2.0/bits/utility.h \
+  C:/msys64/mingw64/include/c++/15.2.0/bits/vector.tcc \
   C:/msys64/mingw64/include/c++/15.2.0/bits/version.h \
   C:/msys64/mingw64/include/c++/15.2.0/cctype \
   C:/msys64/mingw64/include/c++/15.2.0/cerrno \
@@ -3470,6 +3483,7 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/RenderUtils.cpp.obj: C:/Use
   C:/msys64/mingw64/include/c++/15.2.0/tr1/special_function_util.h \
   C:/msys64/mingw64/include/c++/15.2.0/tuple \
   C:/msys64/mingw64/include/c++/15.2.0/type_traits \
+  C:/msys64/mingw64/include/c++/15.2.0/vector \
   C:/msys64/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/c++allocator.h \
   C:/msys64/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/c++config.h \
   C:/msys64/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/c++locale.h \
@@ -3503,14 +3517,6 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/RenderUtils.cpp.obj: C:/Use
 
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/visualization/RenderUtils.cpp:
-
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/RenderUtils.h:
-
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/RouteResult.h:
-
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/MapGraph.h:
-
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/glad/glad.h:
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/visualization/AnimationController.cpp:
 
@@ -3677,8 +3683,6 @@ C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxtf32intrin.h:
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxmovrsintrin.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxint8intrin.h:
-
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/IsometricRenderer.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avxintrin.h:
 
@@ -4002,8 +4006,6 @@ C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator_args.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/cstdint:
 
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h:
-
 C:/msys64/mingw64/include/c++/15.2.0/bits/allocated_ptr.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/ammintrin.h:
@@ -4243,8 +4245,6 @@ C:/msys64/mingw64/include/c++/15.2.0/tr1/exp_integral.tcc:
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/wbnoinvdintrin.h:
 
 C:/msys64/mingw64/include/assert.h:
-
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/KHR/khrplatform.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/unique_ptr.h:
 

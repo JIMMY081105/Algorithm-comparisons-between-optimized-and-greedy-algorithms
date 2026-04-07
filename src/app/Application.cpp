@@ -30,6 +30,10 @@ bool Application::init() {
         if (!initOpenGL()) return false;
         initImGui();
         initSimulation();
+        renderFrame();
+        glfwSwapBuffers(window);
+        glfwShowWindow(window);
+        glfwFocusWindow(window);
         initialized = true;
         return true;
     } catch (const std::exception& e) {
@@ -51,22 +55,26 @@ bool Application::initWindow() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* videoMode =
-        (primaryMonitor != nullptr) ? glfwGetVideoMode(primaryMonitor) : nullptr;
+    if (primaryMonitor != nullptr) {
+        int workX = 0;
+        int workY = 0;
+        int workWidth = 0;
+        int workHeight = 0;
+        glfwGetMonitorWorkarea(primaryMonitor, &workX, &workY,
+                               &workWidth, &workHeight);
+        if (workWidth > 0 && workHeight > 0) {
+            windowWidth = workWidth;
+            windowHeight = workHeight;
+        }
+    }
 
     const char* title = "Smart Waste Clearance System - EcoRoute Solutions";
-    if (primaryMonitor != nullptr && videoMode != nullptr) {
-        windowWidth = videoMode->width;
-        windowHeight = videoMode->height;
-        window = glfwCreateWindow(windowWidth, windowHeight, title,
-                                  primaryMonitor, nullptr);
-    } else {
-        window = glfwCreateWindow(windowWidth, windowHeight, title,
-                                  nullptr, nullptr);
-    }
+    window = glfwCreateWindow(windowWidth, windowHeight, title, nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -194,7 +202,8 @@ void Application::renderFrame() {
     glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
     glViewport(0, 0, windowWidth, windowHeight);
     RenderUtils::updateProjection(static_cast<float>(windowWidth),
-                                  static_cast<float>(windowHeight));
+                                  static_cast<float>(windowHeight),
+                                  wasteSystem.getGraph());
 
     // Clear with dark background
     auto bg = RenderUtils::getBackgroundColor();

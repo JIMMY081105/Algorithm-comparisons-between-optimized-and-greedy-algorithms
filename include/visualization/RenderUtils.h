@@ -4,6 +4,8 @@
 #include "core/WasteNode.h"
 #include <array>
 
+class MapGraph;
+
 // Color represented as RGBA floats (0.0 to 1.0)
 struct Color {
     float r, g, b, a;
@@ -35,7 +37,8 @@ namespace RenderUtils {
     IsoCoord worldToIso(float worldX, float worldY);
 
     // Recompute the active projection for the current window size.
-    void updateProjection(float viewportWidth, float viewportHeight);
+    void updateProjection(float viewportWidth, float viewportHeight,
+                          const MapGraph& graph);
     const ProjectionState& getProjection();
 
     // Urgency color mapping for waste nodes

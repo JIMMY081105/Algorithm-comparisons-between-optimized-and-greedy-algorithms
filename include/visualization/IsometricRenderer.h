@@ -18,7 +18,7 @@ private:
     bool showGrid;
 
     // Internal drawing helpers
-    void drawGroundPlane();
+    void drawGroundPlane(const MapGraph& graph);
     void drawRoadConnections(const MapGraph& graph);
     void drawRouteHighlight(const MapGraph& graph, const RouteResult& route,
                             int segmentsToShow);

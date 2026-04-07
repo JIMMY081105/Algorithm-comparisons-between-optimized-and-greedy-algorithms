@@ -102,6 +102,13 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/RenderUtils.cpp.obj: \
  C:/msys64/mingw64/include/c++/15.2.0/tuple \
  C:/msys64/mingw64/include/c++/15.2.0/array \
  C:/msys64/mingw64/include/c++/15.2.0/compare \
+ C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/MapGraph.h \
+ C:/msys64/mingw64/include/c++/15.2.0/vector \
+ C:/msys64/mingw64/include/c++/15.2.0/bits/stl_uninitialized.h \
+ C:/msys64/mingw64/include/c++/15.2.0/bits/stl_vector.h \
+ C:/msys64/mingw64/include/c++/15.2.0/bits/stl_bvector.h \
+ C:/msys64/mingw64/include/c++/15.2.0/bits/vector.tcc \
+ C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h \
  C:/msys64/mingw64/include/c++/15.2.0/algorithm \
  C:/msys64/mingw64/include/c++/15.2.0/bits/stl_algo.h \
  C:/msys64/mingw64/include/c++/15.2.0/bits/algorithmfwd.h \

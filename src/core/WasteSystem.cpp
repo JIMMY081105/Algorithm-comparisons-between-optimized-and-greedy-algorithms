@@ -21,16 +21,16 @@ void WasteSystem::initializeMap() {
     // around a central HQ, simulating a typical urban district.
 
     //                          ID  Name                    X     Y    Capacity(kg)  isHQ
-    graph.addNode(WasteNode(    0, "HQ Depot",            5.0f, 5.0f,  0.0f,      true));
-    graph.addNode(WasteNode(    1, "Factory Zone",        2.0f, 1.0f,  500.0f,    false));
-    graph.addNode(WasteNode(    2, "Residential Block A", 8.0f, 2.0f,  300.0f,    false));
-    graph.addNode(WasteNode(    3, "Residential Block B", 9.0f, 6.0f,  300.0f,    false));
-    graph.addNode(WasteNode(    4, "Food Street",         3.0f, 8.0f,  400.0f,    false));
-    graph.addNode(WasteNode(    5, "Market Area",         1.0f, 5.0f,  450.0f,    false));
-    graph.addNode(WasteNode(    6, "School Compound",     7.0f, 9.0f,  250.0f,    false));
-    graph.addNode(WasteNode(    7, "Office Park",         6.0f, 1.0f,  350.0f,    false));
-    graph.addNode(WasteNode(    8, "Apartment Cluster",   10.0f,4.0f,  380.0f,    false));
-    graph.addNode(WasteNode(    9, "Industrial Yard",     1.0f, 9.0f,  550.0f,    false));
+    graph.addNode(WasteNode(    0, "HQ Depot",            9.75f,  9.75f,  0.0f,      true));
+    graph.addNode(WasteNode(    1, "Factory Zone",        3.90f,  1.95f,  500.0f,    false));
+    graph.addNode(WasteNode(    2, "Residential Block A", 15.60f, 3.90f,  300.0f,    false));
+    graph.addNode(WasteNode(    3, "Residential Block B", 17.55f, 11.70f, 300.0f,    false));
+    graph.addNode(WasteNode(    4, "Food Street",         5.85f,  15.60f, 400.0f,    false));
+    graph.addNode(WasteNode(    5, "Market Area",         1.95f,  9.75f,  450.0f,    false));
+    graph.addNode(WasteNode(    6, "School Compound",     13.65f, 17.55f, 250.0f,    false));
+    graph.addNode(WasteNode(    7, "Office Park",         11.70f, 1.95f,  350.0f,    false));
+    graph.addNode(WasteNode(    8, "Apartment Cluster",   19.50f, 7.80f,  380.0f,    false));
+    graph.addNode(WasteNode(    9, "Industrial Yard",     1.95f,  17.55f, 550.0f,    false));
 
     // Build the complete distance matrix so all routing algorithms
     // can query distances between any pair of locations
