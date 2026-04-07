@@ -18,13 +18,22 @@ private:
     bool showGrid;
 
     // Internal drawing helpers
-    void drawGroundPlane(const MapGraph& graph);
+    void drawGroundPlane(const MapGraph& graph, const Truck& truck,
+                         const RouteResult& currentRoute);
     void drawRoadConnections(const MapGraph& graph);
     void drawRouteHighlight(const MapGraph& graph, const RouteResult& route,
                             int segmentsToShow);
+    void drawCornTile(float cx, float cy, float w, float h,
+                      int gx, int gy, float clearAmount);
     void drawWasteNode(const WasteNode& node, float time);
     void drawHQNode(const WasteNode& node);
-    void drawTruck(const Truck& truck);
+    void drawTruck(const MapGraph& graph, const Truck& truck,
+                   const RouteResult& currentRoute);
+    void drawTruckSprite(float cx, float cy, float scale, const Color& bodyColor,
+                         float headingX, float headingY, float wheelSpin);
+    void drawWasteBinSprite(float cx, float cy, float scale,
+                            const Color& bodyColor, const Color& accentColor,
+                            bool collected, float fillRatio);
     void drawNodeLabel(const WasteNode& node);
 
     // Low-level shape drawing using OpenGL
@@ -33,6 +42,11 @@ private:
     void drawLine(float x1, float y1, float x2, float y2,
                   const Color& color, float width);
     void drawDiamond(float cx, float cy, float w, float h, const Color& color);
+    void drawDiamondOutline(float cx, float cy, float w, float h,
+                            const Color& color, float width);
+    void drawTileStripe(float cx, float cy, float w, float h, bool alongX,
+                        float offset, float extent, const Color& color,
+                        float width);
     void drawIsometricBlock(float cx, float cy, float w, float h,
                             float depth, const Color& topColor, const Color& sideColor);
 

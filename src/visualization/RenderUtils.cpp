@@ -114,7 +114,7 @@ IsoCoord worldToIso(float worldX, float worldY) {
 Color getUrgencyColor(UrgencyLevel urgency) {
     switch (urgency) {
         case UrgencyLevel::LOW:
-            return Color(0.30f, 0.78f, 0.35f);   // green
+            return Color(0.18f, 0.78f, 0.96f);   // cyan-blue
         case UrgencyLevel::MEDIUM:
             return Color(0.95f, 0.75f, 0.15f);   // yellow-amber
         case UrgencyLevel::HIGH:
@@ -141,7 +141,7 @@ Color getRoadColor() {
 }
 
 Color getTruckColor() {
-    return Color(1.0f, 0.85f, 0.20f);  // bright yellow
+    return Color(0.25f, 0.63f, 0.35f);  // eco green for the garbage truck body
 }
 
 Color getRouteHighlightColor() {

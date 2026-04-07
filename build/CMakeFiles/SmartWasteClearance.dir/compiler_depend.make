@@ -764,28 +764,28 @@ CMakeFiles/SmartWasteClearance.dir/src/algorithms/TSPRoute.cpp.obj: C:/Users/Use
   C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/syslimits.h
 
 CMakeFiles/SmartWasteClearance.dir/src/app/Application.cpp.obj: C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/app/Application.cpp \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/KHR/khrplatform.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/glad/glad.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/imgui/imconfig.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/imgui/imgui.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/imgui/imgui_impl_glfw.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/imgui/imgui_impl_opengl3.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/algorithms/ComparisonManager.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/algorithms/RouteAlgorithm.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/app/Application.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/CostModel.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/EventLog.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/MapGraph.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/RouteResult.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/Truck.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteNode.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteSystem.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/FileExporter.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/ResultLogger.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/AnimationController.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/DashboardUI.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/IsometricRenderer.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/RenderUtils.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/KHR/khrplatform.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/glad/glad.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imconfig.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imgui.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imgui_impl_glfw.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imgui_impl_opengl3.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/algorithms/ComparisonManager.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/algorithms/RouteAlgorithm.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/app/Application.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/CostModel.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/EventLog.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/MapGraph.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/RouteResult.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/Truck.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteSystem.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/persistence/FileExporter.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/persistence/ResultLogger.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/AnimationController.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/DashboardUI.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/IsometricRenderer.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/RenderUtils.h \
   C:/msys64/mingw64/include/GLFW/glfw3.h \
   C:/msys64/mingw64/include/_mingw.h \
   C:/msys64/mingw64/include/_mingw_mac.h \
@@ -2047,22 +2047,22 @@ CMakeFiles/SmartWasteClearance.dir/src/core/WasteSystem.cpp.obj: C:/Users/User/O
   C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/xmmintrin.h
 
 CMakeFiles/SmartWasteClearance.dir/src/main.cpp.obj: C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/main.cpp \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/algorithms/ComparisonManager.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/algorithms/RouteAlgorithm.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/app/Application.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/CostModel.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/EventLog.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/MapGraph.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/RouteResult.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/Truck.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteNode.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteSystem.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/FileExporter.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/ResultLogger.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/AnimationController.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/DashboardUI.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/IsometricRenderer.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/RenderUtils.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/algorithms/ComparisonManager.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/algorithms/RouteAlgorithm.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/app/Application.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/CostModel.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/EventLog.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/MapGraph.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/RouteResult.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/Truck.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteSystem.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/persistence/FileExporter.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/persistence/ResultLogger.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/AnimationController.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/DashboardUI.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/IsometricRenderer.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/RenderUtils.h \
   C:/msys64/mingw64/include/_mingw.h \
   C:/msys64/mingw64/include/_mingw_mac.h \
   C:/msys64/mingw64/include/_mingw_off_t.h \
@@ -3036,14 +3036,14 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/DashboardUI.cpp.obj: C:/Use
   C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/xmmintrin.h
 
 CMakeFiles/SmartWasteClearance.dir/src/visualization/IsometricRenderer.cpp.obj: C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/visualization/IsometricRenderer.cpp \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/KHR/khrplatform.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/glad/glad.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/MapGraph.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/RouteResult.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/Truck.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteNode.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/IsometricRenderer.h \
-  C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/RenderUtils.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/KHR/khrplatform.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/glad/glad.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/MapGraph.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/RouteResult.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/Truck.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/IsometricRenderer.h \
+  C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/RenderUtils.h \
   C:/msys64/mingw64/include/GLFW/glfw3.h \
   C:/msys64/mingw64/include/_mingw.h \
   C:/msys64/mingw64/include/_mingw_mac.h \
@@ -3518,6 +3518,14 @@ CMakeFiles/SmartWasteClearance.dir/src/visualization/RenderUtils.cpp.obj: C:/Use
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/visualization/RenderUtils.cpp:
 
+C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/DashboardUI.h:
+
+C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/RenderUtils.h:
+
+C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/AnimationController.h:
+
+C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/ResultLogger.h:
+
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/visualization/AnimationController.cpp:
 
 C:/msys64/mingw64/include/c++/15.2.0/fstream:
@@ -3539,8 +3547,6 @@ C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/core/WasteSystem.cpp:
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/core/WasteNode.cpp:
-
-C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/Truck.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/time_members.h:
 
@@ -3678,15 +3684,9 @@ C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx10_2-512mediaintr
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxtileintrin.h:
 
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxtf32intrin.h:
-
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxmovrsintrin.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxint8intrin.h:
-
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avxintrin.h:
-
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxfp8intrin.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx512vlbwintrin.h:
 
@@ -3735,10 +3735,6 @@ C:/msys64/mingw64/include/threadpoolapiset.h:
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/bmiintrin.h:
 
 C:/msys64/mingw64/include/systemtopologyapi.h:
-
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx512vnnivlintrin.h:
-
-C:/msys64/mingw64/include/synchapi.h:
 
 C:/msys64/mingw64/include/string.h:
 
@@ -3792,6 +3788,8 @@ C:/msys64/mingw64/include/memoryapi.h:
 
 C:/msys64/mingw64/include/libloaderapi.h:
 
+C:/msys64/mingw64/include/ktmtypes.h:
+
 C:/msys64/mingw64/include/jobapi.h:
 
 C:/msys64/mingw64/include/ioapiset.h:
@@ -3810,6 +3808,10 @@ C:/msys64/mingw64/include/fltwinerror.h:
 
 C:/msys64/mingw64/include/float.h:
 
+C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/FileExporter.h:
+
+C:/msys64/mingw64/include/fileapi.h:
+
 C:/msys64/mingw64/include/fibersapi.h:
 
 C:/msys64/mingw64/include/excpt.h:
@@ -3826,11 +3828,25 @@ C:/msys64/mingw64/include/datetimeapi.h:
 
 C:/msys64/mingw64/include/consoleapi3.h:
 
+C:/msys64/mingw64/include/consoleapi2.h:
+
+C:/msys64/mingw64/include/concurrencysal.h:
+
+C:/msys64/mingw64/include/c++/15.2.0/array:
+
+C:/msys64/mingw64/include/bemapiset.h:
+
 C:/msys64/mingw64/include/c++/15.2.0/memory:
 
 C:/msys64/mingw64/include/c++/15.2.0/istream:
 
 C:/msys64/mingw64/include/c++/15.2.0/debug/assertions.h:
+
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx10_2-512convertintrin.h:
+
+C:/msys64/mingw64/include/c++/15.2.0/compare:
+
+C:/msys64/mingw64/include/c++/15.2.0/ext/numeric_traits.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/ratio:
 
@@ -3870,6 +3886,12 @@ C:/msys64/mingw64/include/c++/15.2.0/bits/string_view.tcc:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/alloc_traits.h:
 
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx512vnnivlintrin.h:
+
+C:/msys64/mingw64/include/synchapi.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteSystem.h:
+
 C:/msys64/mingw64/include/windows.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/streambuf_iterator.h:
@@ -3890,10 +3912,6 @@ C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/tbmintrin.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/parse_numbers.h:
 
-C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator.h:
-
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/app/Application.h:
-
 C:/msys64/mingw64/include/c++/15.2.0/bits/stl_numeric.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/cldemoteintrin.h:
@@ -3908,9 +3926,11 @@ C:/msys64/mingw64/include/c++/15.2.0/bits/vector.tcc:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/stl_raw_storage_iter.h:
 
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/mwaitintrin.h:
-
 C:/msys64/mingw64/include/c++/15.2.0/bits/sstream.tcc:
+
+C:/msys64/mingw64/include/basetsd.h:
+
+C:/msys64/mingw64/include/c++/15.2.0/bits/requires_hosted.h:
 
 C:/msys64/mingw64/include/securityappcontainer.h:
 
@@ -3940,6 +3960,8 @@ C:/msys64/mingw64/include/c++/15.2.0/limits:
 
 C:/msys64/mingw64/include/stdint.h:
 
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/MapGraph.h:
+
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/popcntintrin.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/cwchar:
@@ -3966,8 +3988,6 @@ C:/msys64/mingw64/include/c++/15.2.0/bits/allocator.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/debug/debug.h:
 
-C:/msys64/mingw64/include/bemapiset.h:
-
 C:/msys64/mingw64/include/c++/15.2.0/backward/auto_ptr.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/basic_ios.h:
@@ -3992,8 +4012,6 @@ C:/msys64/mingw64/include/c++/15.2.0/ext/string_conversions.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/utility.h:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/KHR/khrplatform.h:
-
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxtransposeintrin.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/charconv.h:
@@ -4005,8 +4023,6 @@ C:/msys64/mingw64/include/realtimeapiset.h:
 C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator_args.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/cstdint:
-
-C:/msys64/mingw64/include/c++/15.2.0/bits/allocated_ptr.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/ammintrin.h:
 
@@ -4036,15 +4052,17 @@ C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/movrsintrin.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/mmintrin.h:
 
-C:/msys64/mingw64/include/c++/15.2.0/bits/stl_tempbuf.h:
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/glad/glad.h:
 
-C:/msys64/mingw64/include/c++/15.2.0/pstl/glue_memory_defs.h:
+C:/msys64/mingw64/include/c++/15.2.0/bits/stl_tempbuf.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/ostream_insert.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/locale_facets.h:
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/CostModel.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/CostModel.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/basic_string.tcc:
 
@@ -4074,8 +4092,6 @@ C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx10_2-512bf16intri
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/EventLog.h:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/AnimationController.h:
-
 C:/msys64/mingw64/include/c++/15.2.0/bits/locale_classes.tcc:
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/algorithms/MSTRoute.cpp:
@@ -4094,13 +4110,11 @@ C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/chrono.h:
 
-C:/msys64/mingw64/include/c++/15.2.0/bits/cxxabi_init_exception.h:
-
 C:/msys64/mingw64/include/c++/15.2.0/bits/functional_hash.h:
 
-C:/msys64/mingw64/include/c++/15.2.0/bits/ios_base.h:
-
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/imgui/imconfig.h:
+
+C:/msys64/mingw64/include/c++/15.2.0/bits/ios_base.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/move.h:
 
@@ -4118,6 +4132,10 @@ C:/msys64/mingw64/include/c++/15.2.0/cstddef:
 
 C:/msys64/mingw64/include/pthread_time.h:
 
+C:/msys64/mingw64/include/c++/15.2.0/bits/uses_allocator.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/algorithms/RouteAlgorithm.h:
+
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/uintrintrin.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/stl_vector.h:
@@ -4134,7 +4152,9 @@ C:/msys64/mingw64/include/c++/15.2.0/bits/postypes.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/pstl/glue_numeric_defs.h:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/imgui/imgui_impl_opengl3.h:
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxtf32intrin.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/AnimationController.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/basic_string.h:
 
@@ -4186,10 +4206,6 @@ C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/ostream.tcc:
 
-C:/msys64/mingw64/include/c++/15.2.0/bits/requires_hosted.h:
-
-C:/msys64/mingw64/include/basetsd.h:
-
 C:/msys64/mingw64/include/c++/15.2.0/bits/memoryfwd.h:
 
 C:/msys64/mingw64/include/corecrt_wstdlib.h:
@@ -4197,6 +4213,10 @@ C:/msys64/mingw64/include/corecrt_wstdlib.h:
 C:/msys64/mingw64/include/heapapi.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/pstl/execution_defs.h:
+
+C:/msys64/mingw64/include/c++/15.2.0/bits/allocated_ptr.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/WasteNode.h:
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteNode.h:
 
@@ -4211,10 +4231,6 @@ C:/msys64/mingw64/include/c++/15.2.0/random:
 C:/msys64/mingw64/include/c++/15.2.0/stdlib.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/streambuf:
-
-C:/msys64/mingw64/include/fileapi.h:
-
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/FileExporter.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/adxintrin.h:
 
@@ -4246,23 +4262,15 @@ C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/wbnoinvdintrin.h:
 
 C:/msys64/mingw64/include/assert.h:
 
-C:/msys64/mingw64/include/c++/15.2.0/bits/unique_ptr.h:
-
-C:/msys64/mingw64/include/c++/15.2.0/tr1/gamma.tcc:
-
-C:/msys64/mingw64/include/concurrencysal.h:
-
-C:/msys64/mingw64/include/locale.h:
-
-C:/msys64/mingw64/include/c++/15.2.0/tr1/beta_function.tcc:
-
-C:/msys64/mingw64/include/c++/15.2.0/tr1/hypergeometric.tcc:
-
 C:/msys64/mingw64/include/c++/15.2.0/tr1/legendre_function.tcc:
 
 C:/msys64/mingw64/include/c++/15.2.0/tr1/poly_hermite.tcc:
 
 C:/msys64/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/ctype_base.h:
+
+C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/Truck.h:
+
+C:/msys64/mingw64/include/c++/15.2.0/tr1/poly_laguerre.tcc:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx10_2minmaxintrin.h:
 
@@ -4346,13 +4354,19 @@ C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/src/algorithms/GreedyRoute.cpp:
 
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imgui_impl_opengl3.h:
+
 C:/msys64/mingw64/include/math.h:
 
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/cetintrin.h:
+
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx2intrin.h:
+
+C:/msys64/mingw64/include/consoleapi.h:
+
+C:/msys64/mingw64/include/pthread.h:
+
 C:/msys64/mingw64/include/pthread_compat.h:
-
-C:/msys64/mingw64/include/c++/15.2.0/tr1/poly_laguerre.tcc:
-
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/Truck.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/ostream:
 
@@ -4362,7 +4376,11 @@ C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 
 
 C:/msys64/mingw64/include/sec_api/stdio_s.h:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/imgui/imgui_impl_glfw.h:
+C:/msys64/mingw64/include/c++/15.2.0/pstl/glue_memory_defs.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/app/Application.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/RouteResult.h:
 
 C:/msys64/mingw64/include/sec_api/stdlib_s.h:
 
@@ -4371,6 +4389,8 @@ C:/msys64/mingw64/include/sec_api/sys/timeb_s.h:
 C:/msys64/mingw64/include/_timeval.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/syslimits.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imgui.h:
 
 C:/msys64/mingw64/include/sec_api/wchar_s.h:
 
@@ -4410,19 +4430,23 @@ C:/msys64/mingw64/include/c++/15.2.0/bits/stl_construct.h:
 
 C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/core/WasteSystem.h:
 
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/persistence/FileExporter.h:
+
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/stdint.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx512fp16intrin.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/xmmintrin.h:
 
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/EventLog.h:
+
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avxvnniint8intrin.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/algorithmfwd.h:
 
-C:/msys64/mingw64/include/ktmtypes.h:
+C:/msys64/mingw64/include/c++/15.2.0/bits/cxxabi_init_exception.h:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/external/glad/include/glad/glad.h:
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/persistence/ResultLogger.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/bits/cxxabi_forced.h:
 
@@ -4438,38 +4462,44 @@ C:/msys64/mingw64/include/c++/15.2.0/bits/nested_exception.h:
 
 C:/msys64/mingw64/include/c++/15.2.0/ctime:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/persistence/ResultLogger.h:
+C:/msys64/mingw64/include/c++/15.2.0/bits/unique_ptr.h:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/DashboardUI.h:
+C:/msys64/mingw64/include/c++/15.2.0/tr1/gamma.tcc:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/IsometricRenderer.h:
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/glad/include/KHR/khrplatform.h:
 
-C:/Users/User/OneDrive\ -\ University\ of\ Nottingham\ Malaysia/Documents/year\ 2\ sem\ 2/c++/cw2/include/visualization/RenderUtils.h:
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imconfig.h:
+
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/mwaitintrin.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/external/imgui/imgui_impl_glfw.h:
+
+C:/msys64/mingw64/include/apiset.h:
+
+C:/msys64/mingw64/include/locale.h:
+
+C:/msys64/mingw64/include/c++/15.2.0/tr1/beta_function.tcc:
+
+C:/msys64/mingw64/include/c++/15.2.0/tr1/hypergeometric.tcc:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/algorithms/ComparisonManager.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/core/Truck.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/DashboardUI.h:
+
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avxintrin.h:
+
+C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/amxfp8intrin.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/IsometricRenderer.h:
+
+C:/Users/User/ONEDRI~1/DOCUME~1/YEAR2S~2/C__~1/cw2/include/visualization/RenderUtils.h:
 
 C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/pmmintrin.h:
 
 C:/msys64/mingw64/include/GLFW/glfw3.h:
 
-C:/msys64/mingw64/include/apiset.h:
-
 C:/msys64/mingw64/include/wctype.h:
 
 C:/msys64/mingw64/include/apisetcconv.h:
-
-C:/msys64/mingw64/include/c++/15.2.0/array:
-
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx10_2-512convertintrin.h:
-
-C:/msys64/mingw64/include/c++/15.2.0/ext/numeric_traits.h:
-
-C:/msys64/mingw64/include/c++/15.2.0/compare:
-
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/cetintrin.h:
-
-C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/avx2intrin.h:
-
-C:/msys64/mingw64/include/pthread.h:
-
-C:/msys64/mingw64/include/consoleapi.h:
-
-C:/msys64/mingw64/include/consoleapi2.h:
