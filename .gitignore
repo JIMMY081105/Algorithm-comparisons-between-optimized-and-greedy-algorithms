@@ -1,0 +1,11 @@
+# Build output
+build/
+
+# External dependencies (downloaded by setup script)
+external/
+
+# Runtime output files
+output/
+
+# ImGui config (generated at runtime)
+imgui.ini
