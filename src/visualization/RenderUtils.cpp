@@ -6,14 +6,15 @@
 namespace RenderUtils {
 
 namespace {
-constexpr float kSidebarWidth = 320.0f;
+constexpr float kSidebarWidth = 290.0f;
 constexpr float kPanelMargin = 10.0f;
-constexpr float kMapZoom = 1.12f;
-constexpr float kMapVerticalBias = 0.40f;
+constexpr float kWorldPadding = 3.2f;
+constexpr float kTallStructureAllowanceTop = 112.0f;
+constexpr float kTallStructureAllowanceBottom = 30.0f;
 
 ProjectionState gProjection{
-    BASE_TILE_WIDTH * kMapZoom,
-    BASE_TILE_HEIGHT * kMapZoom,
+    BASE_TILE_WIDTH,
+    BASE_TILE_HEIGHT,
     450.0f,
     80.0f
 };
@@ -49,27 +50,33 @@ WorldBounds getWorldBounds(const MapGraph& graph) {
 
 void updateProjection(float viewportWidth, float viewportHeight,
                       const MapGraph& graph) {
-    gProjection.tileWidth = BASE_TILE_WIDTH * kMapZoom;
-    gProjection.tileHeight = BASE_TILE_HEIGHT * kMapZoom;
+    if (graph.getNodes().empty()) {
+        gProjection.tileWidth = BASE_TILE_WIDTH;
+        gProjection.tileHeight = BASE_TILE_HEIGHT;
+        gProjection.offsetX = viewportWidth * 0.5f;
+        gProjection.offsetY = viewportHeight * 0.5f;
+        return;
+    }
 
-    const float halfW = gProjection.tileWidth * 0.5f;
-    const float halfH = gProjection.tileHeight * 0.5f;
     const float sidebarLeft = viewportWidth - kSidebarWidth - kPanelMargin;
     const float contentLeft = kPanelMargin;
     const float contentRight = std::max(contentLeft, sidebarLeft - kPanelMargin);
-    const float targetCenterX = (contentLeft + contentRight) * 0.5f;
-    const float targetCenterY = viewportHeight * kMapVerticalBias;
+    const float viewWidth = std::max(160.0f, contentRight - contentLeft);
+    const float viewHeight = std::max(160.0f, viewportHeight);
     const WorldBounds bounds = getWorldBounds(graph);
-    const float paddedMinX = bounds.minX - 2.0f;
-    const float paddedMaxX = bounds.maxX + 2.0f;
-    const float paddedMinY = bounds.minY - 2.0f;
-    const float paddedMaxY = bounds.maxY + 2.0f;
+    const float paddedMinX = bounds.minX - kWorldPadding;
+    const float paddedMaxX = bounds.maxX + kWorldPadding;
+    const float paddedMinY = bounds.minY - kWorldPadding;
+    const float paddedMaxY = bounds.maxY + kWorldPadding;
+
+    const float baseHalfW = BASE_TILE_WIDTH * 0.5f;
+    const float baseHalfH = BASE_TILE_HEIGHT * 0.5f;
 
     const IsoCoord corners[] = {
-        {(paddedMinX - paddedMinY) * halfW, (paddedMinX + paddedMinY) * halfH},
-        {(paddedMinX - paddedMaxY) * halfW, (paddedMinX + paddedMaxY) * halfH},
-        {(paddedMaxX - paddedMinY) * halfW, (paddedMaxX + paddedMinY) * halfH},
-        {(paddedMaxX - paddedMaxY) * halfW, (paddedMaxX + paddedMaxY) * halfH}
+        {(paddedMinX - paddedMinY) * baseHalfW, (paddedMinX + paddedMinY) * baseHalfH},
+        {(paddedMinX - paddedMaxY) * baseHalfW, (paddedMinX + paddedMaxY) * baseHalfH},
+        {(paddedMaxX - paddedMinY) * baseHalfW, (paddedMaxX + paddedMinY) * baseHalfH},
+        {(paddedMaxX - paddedMaxY) * baseHalfW, (paddedMaxX + paddedMaxY) * baseHalfH}
     };
 
     float minX = corners[0].x;
@@ -84,17 +91,50 @@ void updateProjection(float viewportWidth, float viewportHeight,
         maxY = std::max(maxY, corner.y);
     }
 
-    // Expand the bounds to account for tile extents and the tallest blocks.
-    minX -= halfW;
-    maxX += halfW;
-    minY -= halfH + 24.0f;
-    maxY += halfH + 12.0f;
+    minX -= baseHalfW;
+    maxX += baseHalfW;
+    minY -= baseHalfH + kTallStructureAllowanceTop;
+    maxY += baseHalfH + kTallStructureAllowanceBottom;
 
-    const float rawCenterX = (minX + maxX) * 0.5f;
-    const float rawCenterY = (minY + maxY) * 0.5f;
+    const float worldWidth = std::max(1.0f, maxX - minX);
+    const float worldHeight = std::max(1.0f, maxY - minY);
+    const float mapZoom = std::min(viewWidth / worldWidth,
+                                   viewHeight / worldHeight) * 0.9f;
 
-    gProjection.offsetX = targetCenterX - rawCenterX;
-    gProjection.offsetY = targetCenterY - rawCenterY;
+    gProjection.tileWidth = BASE_TILE_WIDTH * mapZoom;
+    gProjection.tileHeight = BASE_TILE_HEIGHT * mapZoom;
+
+    const float halfW = gProjection.tileWidth * 0.5f;
+    const float halfH = gProjection.tileHeight * 0.5f;
+    const auto scaledIso = [&](float worldX, float worldY) {
+        return IsoCoord{
+            (worldX - worldY) * halfW,
+            (worldX + worldY) * halfH
+        };
+    };
+
+    const IsoCoord scaledCorners[] = {
+        scaledIso(paddedMinX, paddedMinY),
+        scaledIso(paddedMinX, paddedMaxY),
+        scaledIso(paddedMaxX, paddedMinY),
+        scaledIso(paddedMaxX, paddedMaxY)
+    };
+
+    minX = scaledCorners[0].x;
+    maxX = scaledCorners[0].x;
+    minY = scaledCorners[0].y;
+    maxY = scaledCorners[0].y;
+    for (const IsoCoord& corner : scaledCorners) {
+        minX = std::min(minX, corner.x);
+        maxX = std::max(maxX, corner.x);
+        minY = std::min(minY, corner.y);
+        maxY = std::max(maxY, corner.y);
+    }
+
+    const float targetCenterX = contentLeft + viewWidth * 0.5f;
+    const float targetCenterY = viewportHeight * 0.5f;
+    gProjection.offsetX = targetCenterX - (minX + maxX) * 0.5f;
+    gProjection.offsetY = targetCenterY - (minY + maxY) * 0.5f;
 }
 
 const ProjectionState& getProjection() {
@@ -129,27 +169,27 @@ Color getCollectedColor() {
 }
 
 Color getHQColor() {
-    return Color(0.20f, 0.50f, 0.85f);  // strong blue
+    return Color(0.55f, 0.42f, 0.28f);  // dock/harbor brown
 }
 
 Color getBackgroundColor() {
-    return Color(0.12f, 0.14f, 0.18f);  // dark charcoal
+    return Color(0.03f, 0.06f, 0.14f);  // deep ocean dark
 }
 
 Color getRoadColor() {
-    return Color(0.35f, 0.35f, 0.40f, 0.5f);  // subtle grey
+    return Color(0.20f, 0.35f, 0.50f, 0.45f);  // ocean lane markers
 }
 
 Color getTruckColor() {
-    return Color(0.25f, 0.63f, 0.35f);  // eco green for the garbage truck body
+    return Color(0.20f, 0.55f, 0.75f);  // boat hull blue
 }
 
 Color getRouteHighlightColor() {
-    return Color(0.0f, 0.85f, 1.0f, 0.8f);  // cyan glow
+    return Color(0.0f, 0.90f, 0.80f, 0.75f);  // aqua/teal glow
 }
 
 Color getGridLineColor() {
-    return Color(0.22f, 0.24f, 0.28f, 0.4f);
+    return Color(0.10f, 0.18f, 0.28f, 0.35f);
 }
 
 float getUrgencyPulse(float time) {

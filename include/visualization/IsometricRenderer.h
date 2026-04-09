@@ -5,6 +5,7 @@
 #include "core/Truck.h"
 #include "core/RouteResult.h"
 #include "visualization/RenderUtils.h"
+#include "visualization/OceanShader.h"
 #include <vector>
 
 // Handles all OpenGL drawing for the isometric map view.
@@ -16,6 +17,7 @@ private:
     float animationTime;    // accumulated time for pulsing effects
     int routeDrawProgress;  // how many segments of the route to show (for progressive drawing)
     bool showGrid;
+    OceanShader oceanShader; // GPU-accelerated ocean background
 
     // Internal drawing helpers
     void drawGroundPlane(const MapGraph& graph, const Truck& truck,
@@ -23,18 +25,20 @@ private:
     void drawRoadConnections(const MapGraph& graph);
     void drawRouteHighlight(const MapGraph& graph, const RouteResult& route,
                             int segmentsToShow);
-    void drawCornTile(float cx, float cy, float w, float h,
-                      int gx, int gy, float clearAmount);
+    void drawWaterTile(float cx, float cy, float w, float h,
+                       int gx, int gy);
     void drawWasteNode(const WasteNode& node, float time);
     void drawHQNode(const WasteNode& node);
     void drawTruck(const MapGraph& graph, const Truck& truck,
                    const RouteResult& currentRoute);
-    void drawTruckSprite(float cx, float cy, float scale, const Color& bodyColor,
-                         float headingX, float headingY, float wheelSpin);
-    void drawWasteBinSprite(float cx, float cy, float scale,
-                            const Color& bodyColor, const Color& accentColor,
-                            bool collected, float fillRatio);
+    void drawBoatSprite(float cx, float cy, float scale, const Color& bodyColor,
+                        float headingX, float headingY, float bobPhase);
+    void drawGarbagePatchSprite(float cx, float cy, float scale,
+                                const Color& bodyColor, const Color& accentColor,
+                                bool collected, float fillRatio);
     void drawNodeLabel(const WasteNode& node);
+    void drawDecorativeIslets(const MapGraph& graph);
+    void drawAtmosphericEffects(const MapGraph& graph);
 
     // Low-level shape drawing using OpenGL
     void drawFilledCircle(float cx, float cy, float radius, const Color& color);
@@ -66,6 +70,9 @@ public:
 
     // Reset visual state for a new route animation
     void resetAnimation();
+
+    // Release GPU resources (call before GL context destruction)
+    void cleanup();
 };
 
 #endif // ISOMETRIC_RENDERER_H

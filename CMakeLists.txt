@@ -71,6 +71,7 @@ set(ALGORITHM_SOURCES
 set(VISUALIZATION_SOURCES
     src/visualization/RenderUtils.cpp
     src/visualization/IsometricRenderer.cpp
+    src/visualization/OceanShader.cpp
     src/visualization/AnimationController.cpp
     src/visualization/DashboardUI.cpp
 )

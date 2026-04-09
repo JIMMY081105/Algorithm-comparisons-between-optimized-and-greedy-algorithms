@@ -6,16 +6,16 @@
 #include <iomanip>
 
 namespace {
-constexpr float kPanelMargin = 10.0f;
-constexpr float kSidebarWidth = 320.0f;
-constexpr float kHeaderHeight = 70.0f;
-constexpr float kExportHeight = 120.0f;
-constexpr float kLegendHeight = 120.0f;
-constexpr float kEventLogWidth = 300.0f;
-constexpr float kEventLogHeight = 200.0f;
-constexpr float kRouteOrderWidth = 300.0f;
-constexpr float kRouteOrderHeight = 250.0f;
-constexpr float kComparisonHeight = 240.0f;
+constexpr float kPanelMargin = 8.0f;
+constexpr float kSidebarWidth = 290.0f;
+constexpr float kHeaderHeight = 56.0f;
+constexpr float kExportHeight = 90.0f;
+constexpr float kLegendHeight = 108.0f;
+constexpr float kEventLogWidth = 280.0f;
+constexpr float kEventLogHeight = 180.0f;
+constexpr float kRouteOrderWidth = 280.0f;
+constexpr float kRouteOrderHeight = 230.0f;
+constexpr float kComparisonHeight = 220.0f;
 constexpr float kComparisonMaxWidth = 620.0f;
 constexpr ImGuiWindowFlags kPinnedSidebarFlags =
     ImGuiWindowFlags_NoCollapse |
@@ -128,6 +128,51 @@ BottomOverlayLayout buildBottomOverlayLayout() {
 
     return layout;
 }
+
+void applyDashboardTheme() {
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowRounding = 12.0f;
+    style.ChildRounding = 10.0f;
+    style.FrameRounding = 7.0f;
+    style.GrabRounding = 7.0f;
+    style.ScrollbarRounding = 10.0f;
+    style.WindowPadding = ImVec2(14.0f, 12.0f);
+    style.FramePadding = ImVec2(10.0f, 6.0f);
+    style.ItemSpacing = ImVec2(9.0f, 8.0f);
+    style.ItemInnerSpacing = ImVec2(7.0f, 6.0f);
+    style.CellPadding = ImVec2(8.0f, 6.0f);
+    style.WindowBorderSize = 1.0f;
+    style.FrameBorderSize = 0.0f;
+    style.ScrollbarSize = 13.0f;
+
+    ImVec4* colors = style.Colors;
+    colors[ImGuiCol_WindowBg] = ImVec4(0.06f, 0.09f, 0.14f, 0.94f);
+    colors[ImGuiCol_PopupBg] = ImVec4(0.07f, 0.10f, 0.15f, 0.96f);
+    colors[ImGuiCol_Border] = ImVec4(0.18f, 0.29f, 0.37f, 0.74f);
+    colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.12f, 0.17f, 0.96f);
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.10f, 0.15f, 0.20f, 0.98f);
+    colors[ImGuiCol_Header] = ImVec4(0.13f, 0.23f, 0.29f, 0.76f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.18f, 0.33f, 0.41f, 0.86f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.16f, 0.30f, 0.38f, 0.92f);
+    colors[ImGuiCol_Button] = ImVec4(0.11f, 0.26f, 0.34f, 0.84f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.16f, 0.36f, 0.45f, 0.92f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.14f, 0.31f, 0.39f, 0.96f);
+    colors[ImGuiCol_FrameBg] = ImVec4(0.08f, 0.14f, 0.20f, 0.92f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.10f, 0.19f, 0.25f, 0.94f);
+    colors[ImGuiCol_FrameBgActive] = ImVec4(0.11f, 0.21f, 0.28f, 0.96f);
+    colors[ImGuiCol_CheckMark] = ImVec4(0.37f, 0.87f, 0.92f, 1.0f);
+    colors[ImGuiCol_SliderGrab] = ImVec4(0.30f, 0.82f, 0.88f, 0.94f);
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.48f, 0.91f, 0.96f, 1.0f);
+    colors[ImGuiCol_Separator] = ImVec4(0.18f, 0.31f, 0.39f, 0.74f);
+    colors[ImGuiCol_TableHeaderBg] = ImVec4(0.08f, 0.14f, 0.20f, 0.96f);
+    colors[ImGuiCol_TableBorderStrong] = ImVec4(0.18f, 0.28f, 0.36f, 0.76f);
+    colors[ImGuiCol_TableBorderLight] = ImVec4(0.14f, 0.23f, 0.30f, 0.50f);
+    colors[ImGuiCol_TableRowBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_TableRowBgAlt] = ImVec4(0.08f, 0.12f, 0.17f, 0.30f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(0.33f, 0.86f, 0.91f, 0.96f);
+    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.52f, 0.94f, 0.98f, 1.0f);
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(0.18f, 0.46f, 0.54f, 0.36f);
+}
 }  // namespace
 
 DashboardUI::DashboardUI()
@@ -138,6 +183,7 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
                                             ComparisonManager& compMgr,
                                             AnimationController& animCtrl,
                                             const RouteResult& currentResult) {
+    applyDashboardTheme();
     UIActions actions;
 
     drawHeaderPanel(system);
@@ -148,21 +194,21 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
         const SidebarLayout layout = buildSidebarLayout();
         ImGui::SetNextWindowPos(layout.controlsPos, ImGuiCond_Always);
         ImGui::SetNextWindowSize(layout.controlsSize, ImGuiCond_Always);
-        ImGui::Begin("Controls", nullptr, kPinnedSidebarFlags);
+        ImGui::Begin("Operations", nullptr, kPinnedSidebarFlags);
 
         // ---- Day generation ----
         ImGui::SeparatorText("Simulation");
-        if (ImGui::Button("Generate New Day", ImVec2(200, 30))) {
+        if (ImGui::Button("Generate New Day", ImVec2(-1, 28))) {
             actions.generateNewDay = true;
         }
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Randomize waste levels for all locations");
+            ImGui::SetTooltip("Randomize debris levels for all sea zones");
         }
 
+        ImGui::Spacing();
         float threshold = system.getCollectionThreshold();
-        if (ImGui::SliderFloat("Threshold %%", &threshold, 10.0f, 80.0f, "%.0f%%")) {
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderFloat("##threshold", &threshold, 10.0f, 80.0f, "Threshold: %.0f%%")) {
             system.setCollectionThreshold(threshold);
         }
 
@@ -174,55 +220,57 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
             if (i < 3) ImGui::SameLine();
         }
 
-        if (ImGui::Button("Run Selected Algorithm", ImVec2(200, 28))) {
+        ImGui::Spacing();
+        if (ImGui::Button("Run Selected", ImVec2(-1, 26))) {
             actions.runSelectedAlgorithm = true;
             actions.algorithmToRun = selectedAlgorithm;
         }
 
-        if (ImGui::Button("Compare All Algorithms", ImVec2(200, 28))) {
+        if (ImGui::Button("Compare All", ImVec2(-1, 26))) {
             actions.compareAll = true;
             showComparisonTable = true;
         }
 
         // ---- Playback controls ----
-        ImGui::SeparatorText("Animation");
+        ImGui::SeparatorText("Playback");
         auto playState = animCtrl.getState();
 
+        const float halfBtn = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (playState == AnimationController::PlaybackState::IDLE ||
             playState == AnimationController::PlaybackState::FINISHED) {
-            if (ImGui::Button("Play", ImVec2(90, 25))) {
+            if (ImGui::Button("Play", ImVec2(halfBtn, 24))) {
                 actions.playPause = true;
             }
         } else if (playState == AnimationController::PlaybackState::PLAYING) {
-            if (ImGui::Button("Pause", ImVec2(90, 25))) {
+            if (ImGui::Button("Pause", ImVec2(halfBtn, 24))) {
                 animCtrl.pause();
             }
         } else if (playState == AnimationController::PlaybackState::PAUSED) {
-            if (ImGui::Button("Resume", ImVec2(90, 25))) {
+            if (ImGui::Button("Resume", ImVec2(halfBtn, 24))) {
                 animCtrl.resume();
             }
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Replay", ImVec2(90, 25))) {
+        if (ImGui::Button("Replay", ImVec2(halfBtn, 24))) {
             actions.replay = true;
         }
 
-        // Speed slider
         float speed = animCtrl.getSpeed();
-        if (ImGui::SliderFloat("Speed", &speed, 0.1f, 5.0f, "%.1fx")) {
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderFloat("##speed", &speed, 0.1f, 5.0f, "Speed: %.1fx")) {
             animCtrl.setSpeed(speed);
         }
 
-        // Progress bar
+        ImGui::TextDisabled("Playback Progress");
         float progress = animCtrl.getProgress();
-        ImGui::ProgressBar(progress, ImVec2(-1, 0), "Route Progress");
+        ImGui::ProgressBar(progress, ImVec2(-1, 14));
 
         // ---- View toggles ----
         ImGui::SeparatorText("Panels");
-        ImGui::Checkbox("Comparison Table", &showComparisonTable);
+        ImGui::Checkbox("Comparison", &showComparisonTable);
         ImGui::SameLine();
-        ImGui::Checkbox("Event Log", &showEventLog);
+        ImGui::Checkbox("Log", &showEventLog);
         ImGui::Checkbox("Node Details", &showNodeDetails);
 
         ImGui::End();
@@ -249,10 +297,11 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
         ImGui::SetNextWindowSize(layout.exportSize, ImGuiCond_Always);
         ImGui::Begin("Export", nullptr, kPinnedSidebarFlags);
 
-        if (ImGui::Button("Export Summary (TXT)", ImVec2(200, 25))) {
+        if (ImGui::Button("Export Summary (TXT)", ImVec2(-1, 24))) {
             actions.exportResults = true;
         }
-        if (ImGui::Button("Export Comparison (CSV)", ImVec2(200, 25))) {
+        ImGui::Spacing();
+        if (ImGui::Button("Export Comparison (CSV)", ImVec2(-1, 24))) {
             actions.exportComparison = true;
         }
 
@@ -266,13 +315,19 @@ void DashboardUI::drawHeaderPanel(WasteSystem& system) {
     const SidebarLayout layout = buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.headerPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.headerSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.97f);
 
-    ImGui::Begin("Smart Waste Clearance System", nullptr,
-                 kPinnedSidebarFlags);
+    ImGui::Begin("##Header", nullptr,
+                 kPinnedSidebarFlags | ImGuiWindowFlags_NoTitleBar);
 
-    ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f),
-                       "EcoRoute Solutions Sdn Bhd");
-    ImGui::Text("Day %d | Seed: %u", system.getDayNumber(),
+    ImGui::SetWindowFontScale(1.05f);
+    ImGui::TextColored(ImVec4(0.15f, 0.72f, 0.94f, 1.0f),
+                       "ECOROUTE SOLUTIONS");
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::TextColored(ImVec4(0.64f, 0.78f, 0.84f, 1.0f),
+                       "Marine Cleanup Command");
+    ImGui::TextColored(ImVec4(0.45f, 0.50f, 0.58f, 1.0f),
+                       "Day %d  |  Seed %u", system.getDayNumber(),
                 system.getCurrentSeed());
 
     ImGui::End();
@@ -289,43 +344,62 @@ void DashboardUI::drawMetricsPanel(const RouteResult& currentResult,
     const SidebarLayout layout = buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.metricsPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.metricsSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.95f);
 
-    ImGui::Begin("Route Metrics", nullptr, kPinnedSidebarFlags);
+    ImGui::Begin("Metrics", nullptr, kPinnedSidebarFlags);
 
     if (!currentResult.isValid()) {
-        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
-                           "No route computed yet.\nGenerate a day and run an algorithm.");
+        ImGui::TextDisabled("Awaiting route plan");
+        ImGui::TextColored(ImVec4(0.45f, 0.50f, 0.55f, 1.0f),
+                           "No route computed yet.");
+        ImGui::TextColored(ImVec4(0.35f, 0.40f, 0.45f, 1.0f),
+                           "Generate a day and run an algorithm.");
     } else {
-        ImGui::TextColored(ImVec4(0.3f, 0.85f, 1.0f, 1.0f),
+        ImGui::TextDisabled("Active mission");
+        ImGui::SetWindowFontScale(1.03f);
+        ImGui::TextColored(ImVec4(0.15f, 0.72f, 0.94f, 1.0f),
                            "%s", currentResult.algorithmName.c_str());
-        ImGui::Separator();
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::TextColored(ImVec4(0.46f, 0.56f, 0.64f, 1.0f),
+                           "%d stops scheduled  |  Threshold %.0f%%",
+                           static_cast<int>(currentResult.visitOrder.size()),
+                           system.getCollectionThreshold());
+        ImGui::SeparatorText("Route Snapshot");
 
         ImGui::Columns(2, "metrics", false);
-        ImGui::SetColumnWidth(0, 160);
+        ImGui::SetColumnWidth(0, 130);
 
-        ImGui::Text("Distance:");     ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Distance");
+        ImGui::NextColumn();
         ImGui::Text("%.2f km", currentResult.totalDistance); ImGui::NextColumn();
 
-        ImGui::Text("Travel Time:");  ImGui::NextColumn();
-        ImGui::Text("%.2f hours", currentResult.travelTime); ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Travel Time");
+        ImGui::NextColumn();
+        ImGui::Text("%.2f hrs", currentResult.travelTime); ImGui::NextColumn();
 
-        ImGui::Text("Fuel Cost:");    ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Fuel Cost");
+        ImGui::NextColumn();
         ImGui::Text("RM %.2f", currentResult.fuelCost); ImGui::NextColumn();
 
-        ImGui::Text("Driver Wage:");  ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Driver Wage");
+        ImGui::NextColumn();
         ImGui::Text("RM %.2f", currentResult.wageCost); ImGui::NextColumn();
 
-        ImGui::Text("Total Cost:");   ImGui::NextColumn();
-        ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f),
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Total Cost");
+        ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.95f, 0.82f, 0.18f, 1.0f),
                            "RM %.2f", currentResult.totalCost); ImGui::NextColumn();
 
-        ImGui::Text("Waste Collected:"); ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Collected");
+        ImGui::NextColumn();
         ImGui::Text("%.1f kg", currentResult.wasteCollected); ImGui::NextColumn();
 
-        ImGui::Text("Nodes Visited:"); ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Nodes");
+        ImGui::NextColumn();
         ImGui::Text("%d", static_cast<int>(currentResult.visitOrder.size())); ImGui::NextColumn();
 
-        ImGui::Text("Compute Time:"); ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.55f, 0.60f, 0.68f, 1.0f), "Compute");
+        ImGui::NextColumn();
         ImGui::Text("%.3f ms", currentResult.runtimeMs); ImGui::NextColumn();
 
         ImGui::Columns(1);
@@ -338,19 +412,23 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr) {
     const BottomOverlayLayout layout = buildBottomOverlayLayout();
     ImGui::SetNextWindowPos(layout.comparisonPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.comparisonSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.94f);
 
     ImGui::Begin("Algorithm Comparison", &showComparisonTable,
                  kPinnedFloatingFlags);
 
     const auto& results = compMgr.getResults();
     if (results.empty()) {
-        ImGui::Text("Run 'Compare All Algorithms' to see results here.");
+        ImGui::TextColored(ImVec4(0.45f, 0.50f, 0.55f, 1.0f),
+                           "Run 'Compare All' to populate this table.");
     } else {
         int bestIdx = compMgr.getBestAlgorithmIndex();
+        ImGui::TextDisabled("Operational cost and runtime across current sea conditions.");
+        ImGui::Spacing();
 
         if (ImGui::BeginTable("CompTable", 8,
                 ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                ImGuiTableFlags_Resizable)) {
+                ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX)) {
 
             ImGui::TableSetupColumn("Algorithm");
             ImGui::TableSetupColumn("Distance (km)");
@@ -358,7 +436,7 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr) {
             ImGui::TableSetupColumn("Fuel (RM)");
             ImGui::TableSetupColumn("Wage (RM)");
             ImGui::TableSetupColumn("Total (RM)");
-            ImGui::TableSetupColumn("Waste (kg)");
+            ImGui::TableSetupColumn("Garbage (kg)");
             ImGui::TableSetupColumn("Runtime (ms)");
             ImGui::TableHeadersRow();
 
@@ -414,7 +492,7 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
             ImGuiTableFlags_ScrollY)) {
 
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Waste %", ImGuiTableColumnFlags_WidthFixed, 60);
+        ImGui::TableSetupColumn("Debris %", ImGuiTableColumnFlags_WidthFixed, 60);
         ImGui::TableSetupColumn("kg", ImGuiTableColumnFlags_WidthFixed, 50);
         ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 60);
         ImGui::TableHeadersRow();
@@ -428,7 +506,7 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
 
             ImGui::TableSetColumnIndex(1);
             if (node.getIsHQ()) {
-                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "HQ");
+                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "Dock");
             } else {
                 Color c = RenderUtils::getUrgencyColor(node.getUrgency());
                 ImGui::TextColored(ImVec4(c.r, c.g, c.b, 1.0f),
@@ -442,7 +520,7 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
 
             ImGui::TableSetColumnIndex(3);
             if (node.getIsHQ()) {
-                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "Depot");
+                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "Dock");
             } else if (node.isCollected()) {
                 ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Done");
             } else if (node.isEligible(system.getCollectionThreshold())) {
@@ -464,16 +542,20 @@ void DashboardUI::drawEventLogPanel(const WasteSystem& system) {
     const BottomOverlayLayout layout = buildBottomOverlayLayout();
     ImGui::SetNextWindowPos(layout.eventLogPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.eventLogSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.93f);
 
-    ImGui::Begin("Event Log", &showEventLog, kPinnedFloatingFlags);
+    ImGui::Begin("Activity Log", &showEventLog, kPinnedFloatingFlags);
+    ImGui::TextDisabled("Latest operations");
+    ImGui::Separator();
 
-    auto events = system.getEventLog().getRecentEvents(15);
+    auto events = system.getEventLog().getRecentEvents(12);
 
     for (const auto* entry : events) {
-        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f),
-                           "[%s]", entry->timestamp.c_str());
+        ImGui::TextColored(ImVec4(0.38f, 0.44f, 0.52f, 1.0f),
+                           "%s", entry->timestamp.c_str());
         ImGui::SameLine();
-        ImGui::TextWrapped("%s", entry->message.c_str());
+        ImGui::TextColored(ImVec4(0.72f, 0.76f, 0.80f, 1.0f),
+                           "%s", entry->message.c_str());
     }
 
     ImGui::End();
@@ -483,8 +565,10 @@ void DashboardUI::drawLegendPanel() {
     const SidebarLayout layout = buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.legendPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.legendSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.95f);
 
     ImGui::Begin("Legend", nullptr, kPinnedSidebarFlags);
+    ImGui::TextDisabled("Urgency and cleanup state");
 
     Color low = RenderUtils::getUrgencyColor(UrgencyLevel::LOW);
     Color med = RenderUtils::getUrgencyColor(UrgencyLevel::MEDIUM);
@@ -502,10 +586,10 @@ void DashboardUI::drawLegendPanel() {
     ImGui::SameLine(); ImGui::Text("High (70-100%%) - Pulsing");
 
     ImGui::ColorButton("##hq", ImVec4(hq.r, hq.g, hq.b, 1.0f));
-    ImGui::SameLine(); ImGui::Text("HQ / Depot");
+    ImGui::SameLine(); ImGui::Text("Dock / Harbor");
 
     ImGui::ColorButton("##done", ImVec4(collected.r, collected.g, collected.b, 1.0f));
-    ImGui::SameLine(); ImGui::Text("Collected");
+    ImGui::SameLine(); ImGui::Text("Cleaned Up");
 
     ImGui::End();
 }
@@ -517,11 +601,13 @@ void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
     const BottomOverlayLayout layout = buildBottomOverlayLayout();
     ImGui::SetNextWindowPos(layout.routeOrderPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.routeOrderSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.94f);
 
-    ImGui::Begin("Route Order", nullptr, kPinnedFloatingFlags);
+    ImGui::Begin("Mission Route", nullptr, kPinnedFloatingFlags);
 
-    ImGui::TextColored(ImVec4(0.3f, 0.85f, 1.0f, 1.0f),
+    ImGui::TextColored(ImVec4(0.15f, 0.72f, 0.94f, 1.0f),
                        "%s", result.algorithmName.c_str());
+    ImGui::TextDisabled("Visit order");
     ImGui::Separator();
 
     for (int i = 0; i < static_cast<int>(result.visitOrder.size()); i++) {
@@ -530,15 +616,17 @@ void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
         if (idx < 0) continue;
 
         const WasteNode& node = system.getGraph().getNode(idx);
+        ImGui::TextColored(ImVec4(0.46f, 0.80f, 0.88f, 1.0f), "%02d", i + 1);
+        ImGui::SameLine();
 
         if (node.getIsHQ()) {
             ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f),
-                               "%d. %s", i + 1, node.getName().c_str());
+                               "%s", node.getName().c_str());
         } else if (node.isCollected()) {
             ImGui::TextColored(ImVec4(0.4f, 0.4f, 0.4f, 1.0f),
-                               "%d. %s (collected)", i + 1, node.getName().c_str());
+                               "%s (cleaned)", node.getName().c_str());
         } else {
-            ImGui::Text("%d. %s (%.0f%%)", i + 1,
+            ImGui::Text("%s (%.0f%%)",
                         node.getName().c_str(), node.getWasteLevel());
         }
     }

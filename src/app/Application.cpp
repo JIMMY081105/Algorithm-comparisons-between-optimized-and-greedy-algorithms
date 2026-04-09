@@ -73,7 +73,7 @@ bool Application::initWindow() {
         }
     }
 
-    const char* title = "Smart Waste Clearance System - EcoRoute Solutions";
+    const char* title = "Ocean Cleanup System - EcoRoute Solutions";
     window = glfwCreateWindow(windowWidth, windowHeight, title, nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -93,6 +93,10 @@ bool Application::initOpenGL() {
         return false;
     }
 
+    std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
+    std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+    std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
+
     // Enable blending for transparency
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -111,32 +115,62 @@ void Application::initImGui() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    // Professional dark theme with teal/cyan accents
+    // Premium dark ocean theme — translucent panels with teal accents
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 6.0f;
-    style.FrameRounding = 4.0f;
-    style.GrabRounding = 3.0f;
-    style.ScrollbarRounding = 4.0f;
-    style.FramePadding = ImVec2(8, 4);
-    style.ItemSpacing = ImVec2(8, 6);
+    style.WindowRounding = 8.0f;
+    style.FrameRounding = 5.0f;
+    style.GrabRounding = 4.0f;
+    style.ScrollbarRounding = 6.0f;
+    style.TabRounding = 4.0f;
+    style.ChildRounding = 6.0f;
+    style.PopupRounding = 6.0f;
+    style.FramePadding = ImVec2(10, 5);
+    style.ItemSpacing = ImVec2(8, 5);
+    style.ItemInnerSpacing = ImVec2(6, 4);
+    style.WindowPadding = ImVec2(12, 10);
+    style.ScrollbarSize = 11.0f;
+    style.GrabMinSize = 10.0f;
+    style.WindowBorderSize = 1.0f;
+    style.FrameBorderSize = 0.0f;
+    style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
+    style.SeparatorTextBorderSize = 2.0f;
 
     ImVec4* colors = style.Colors;
-    colors[ImGuiCol_WindowBg]       = ImVec4(0.10f, 0.10f, 0.13f, 0.95f);
-    colors[ImGuiCol_TitleBg]        = ImVec4(0.08f, 0.08f, 0.10f, 1.00f);
-    colors[ImGuiCol_TitleBgActive]  = ImVec4(0.12f, 0.18f, 0.24f, 1.00f);
-    colors[ImGuiCol_Header]         = ImVec4(0.15f, 0.22f, 0.30f, 0.80f);
-    colors[ImGuiCol_HeaderHovered]  = ImVec4(0.20f, 0.30f, 0.40f, 0.80f);
-    colors[ImGuiCol_Button]         = ImVec4(0.15f, 0.25f, 0.35f, 1.00f);
-    colors[ImGuiCol_ButtonHovered]  = ImVec4(0.20f, 0.35f, 0.50f, 1.00f);
-    colors[ImGuiCol_ButtonActive]   = ImVec4(0.10f, 0.40f, 0.55f, 1.00f);
-    colors[ImGuiCol_FrameBg]        = ImVec4(0.12f, 0.14f, 0.18f, 1.00f);
-    colors[ImGuiCol_SliderGrab]     = ImVec4(0.20f, 0.60f, 0.80f, 1.00f);
-    colors[ImGuiCol_CheckMark]      = ImVec4(0.20f, 0.70f, 0.90f, 1.00f);
-    colors[ImGuiCol_SeparatorActive]= ImVec4(0.15f, 0.50f, 0.70f, 1.00f);
-    colors[ImGuiCol_Tab]            = ImVec4(0.12f, 0.18f, 0.24f, 1.00f);
-    colors[ImGuiCol_TabHovered]     = ImVec4(0.20f, 0.35f, 0.50f, 1.00f);
-    colors[ImGuiCol_TableHeaderBg]  = ImVec4(0.14f, 0.18f, 0.24f, 1.00f);
+    colors[ImGuiCol_WindowBg]            = ImVec4(0.05f, 0.07f, 0.11f, 0.90f);
+    colors[ImGuiCol_ChildBg]             = ImVec4(0.05f, 0.07f, 0.10f, 0.35f);
+    colors[ImGuiCol_PopupBg]             = ImVec4(0.05f, 0.07f, 0.11f, 0.95f);
+    colors[ImGuiCol_Border]              = ImVec4(0.10f, 0.20f, 0.30f, 0.45f);
+    colors[ImGuiCol_TitleBg]             = ImVec4(0.04f, 0.06f, 0.10f, 1.00f);
+    colors[ImGuiCol_TitleBgActive]       = ImVec4(0.06f, 0.12f, 0.20f, 1.00f);
+    colors[ImGuiCol_Header]              = ImVec4(0.08f, 0.16f, 0.26f, 0.72f);
+    colors[ImGuiCol_HeaderHovered]       = ImVec4(0.12f, 0.24f, 0.38f, 0.80f);
+    colors[ImGuiCol_HeaderActive]        = ImVec4(0.08f, 0.28f, 0.46f, 0.90f);
+    colors[ImGuiCol_Button]              = ImVec4(0.08f, 0.20f, 0.32f, 0.88f);
+    colors[ImGuiCol_ButtonHovered]       = ImVec4(0.12f, 0.30f, 0.48f, 1.00f);
+    colors[ImGuiCol_ButtonActive]        = ImVec4(0.06f, 0.36f, 0.54f, 1.00f);
+    colors[ImGuiCol_FrameBg]             = ImVec4(0.06f, 0.09f, 0.14f, 0.88f);
+    colors[ImGuiCol_FrameBgHovered]      = ImVec4(0.10f, 0.15f, 0.22f, 1.00f);
+    colors[ImGuiCol_FrameBgActive]       = ImVec4(0.08f, 0.18f, 0.28f, 1.00f);
+    colors[ImGuiCol_SliderGrab]          = ImVec4(0.14f, 0.52f, 0.74f, 1.00f);
+    colors[ImGuiCol_SliderGrabActive]    = ImVec4(0.18f, 0.60f, 0.84f, 1.00f);
+    colors[ImGuiCol_CheckMark]           = ImVec4(0.18f, 0.66f, 0.88f, 1.00f);
+    colors[ImGuiCol_Separator]           = ImVec4(0.10f, 0.18f, 0.28f, 0.55f);
+    colors[ImGuiCol_SeparatorHovered]    = ImVec4(0.14f, 0.32f, 0.50f, 0.78f);
+    colors[ImGuiCol_SeparatorActive]     = ImVec4(0.14f, 0.46f, 0.68f, 1.00f);
+    colors[ImGuiCol_Tab]                 = ImVec4(0.06f, 0.12f, 0.20f, 0.88f);
+    colors[ImGuiCol_TabHovered]          = ImVec4(0.12f, 0.28f, 0.44f, 1.00f);
+    colors[ImGuiCol_TableHeaderBg]       = ImVec4(0.06f, 0.10f, 0.16f, 1.00f);
+    colors[ImGuiCol_TableBorderStrong]   = ImVec4(0.10f, 0.18f, 0.28f, 0.65f);
+    colors[ImGuiCol_TableBorderLight]    = ImVec4(0.08f, 0.14f, 0.22f, 0.45f);
+    colors[ImGuiCol_TableRowBg]          = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_TableRowBgAlt]       = ImVec4(0.06f, 0.08f, 0.12f, 0.35f);
+    colors[ImGuiCol_TextSelectedBg]      = ImVec4(0.12f, 0.34f, 0.52f, 0.42f);
+    colors[ImGuiCol_ScrollbarBg]         = ImVec4(0.03f, 0.05f, 0.08f, 0.55f);
+    colors[ImGuiCol_ScrollbarGrab]       = ImVec4(0.12f, 0.20f, 0.30f, 0.76f);
+    colors[ImGuiCol_ScrollbarGrabHovered]= ImVec4(0.16f, 0.26f, 0.38f, 0.88f);
+    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.18f, 0.32f, 0.48f, 1.00f);
+    colors[ImGuiCol_PlotHistogram]       = ImVec4(0.14f, 0.52f, 0.74f, 0.88f);
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
@@ -189,7 +223,7 @@ void Application::update(float deltaTime) {
             const WasteNode& node = wasteSystem.getGraph().getNode(idx);
             if (!node.getIsHQ()) {
                 wasteSystem.getEventLog().addEvent(
-                    "Collected waste at " + node.getName());
+                    "Cleaned up garbage at " + node.getName());
             }
         }
     }
@@ -337,6 +371,8 @@ void Application::endImGuiFrame() {
 
 void Application::shutdown() {
     if (!initialized) return;
+
+    renderer.cleanup();  // Free GPU resources while GL context is alive
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
