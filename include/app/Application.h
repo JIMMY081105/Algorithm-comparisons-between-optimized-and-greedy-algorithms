@@ -1,31 +1,27 @@
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
-#include "core/WasteSystem.h"
 #include "algorithms/ComparisonManager.h"
-#include "visualization/IsometricRenderer.h"
+#include "core/WasteSystem.h"
+#include "persistence/ResultLogger.h"
 #include "visualization/AnimationController.h"
 #include "visualization/DashboardUI.h"
-#include "persistence/ResultLogger.h"
+#include "visualization/IsometricRenderer.h"
+
+#include <exception>
+#include <string>
 
 struct GLFWwindow;
 
-// The top-level application class that owns all subsystems and runs
-// the main loop. This is where initialization, input handling, updating,
-// and rendering are coordinated.
-//
-// Lifecycle:
-//   1. init() — create window, set up OpenGL, initialize subsystems
-//   2. run()  — main loop: poll events, update state, render frame
-//   3. shutdown() — clean up resources
+// Top-level coordinator for the coursework application.
+// Application owns the major subsystems and translates UI actions into changes
+// to simulation state, playback state, and exported results.
 class Application {
 private:
-    // Window
     GLFWwindow* window;
     int windowWidth;
     int windowHeight;
 
-    // Subsystems
     WasteSystem wasteSystem;
     ComparisonManager comparisonManager;
     IsometricRenderer renderer;
@@ -33,25 +29,27 @@ private:
     DashboardUI dashboardUI;
     ResultLogger resultLogger;
 
-    // Current state
     RouteResult currentResult;
     float lastFrameTime;
     bool initialized;
 
-    // Internal setup helpers
     bool initWindow();
     bool initOpenGL();
     void initImGui();
     void initSimulation();
 
-    // Per-frame processing
     void update(float deltaTime);
     void renderFrame();
+    void handleZoomInput();
+    void handleCollectedNode(int collectedNodeId);
 
-    // Handle UI action events from the dashboard
+    // Mission/session helpers keep UI event handling declarative.
+    void resetMissionSession();
+    void loadMissionRoute(const RouteResult& result, bool autoPlay);
+    void replayCurrentMission();
+    void logRuntimeError(const std::string& context, const std::exception& e);
     void handleUIActions(const DashboardUI::UIActions& actions);
 
-    // ImGui frame management
     void beginImGuiFrame();
     void endImGuiFrame();
 
@@ -59,11 +57,9 @@ public:
     Application();
     ~Application();
 
-    // Prevent copying — only one Application instance should exist
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
 
-    // Main lifecycle
     bool init();
     void run();
     void shutdown();

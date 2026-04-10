@@ -1,17 +1,56 @@
 #include "algorithms/ComparisonManager.h"
-#include "algorithms/RegularRoute.h"
+
 #include "algorithms/GreedyRoute.h"
 #include "algorithms/MSTRoute.h"
+#include "algorithms/RegularRoute.h"
 #include "algorithms/TSPRoute.h"
+
 #include <sstream>
+#include <stdexcept>
+
+namespace {
+struct RouteRequestContext {
+    std::vector<int> eligibleNodeIds;
+    int depotNodeId = -1;
+};
+
+RouteRequestContext buildRouteRequestContext(const WasteSystem& system) {
+    return RouteRequestContext{
+        system.getEligibleNodes(),
+        system.getGraph().getHQNode().getId()
+    };
+}
+
+RouteResult executeAlgorithm(RouteAlgorithm& algorithm,
+                             WasteSystem& system,
+                             const RouteRequestContext& request) {
+    // Each algorithm should evaluate the same simulated day from the same
+    // collection state, otherwise the comparison would be misleading.
+    system.resetCollectionStatus();
+
+    RouteResult result = algorithm.computeRoute(
+        system.getGraph(), request.eligibleNodeIds, request.depotNodeId);
+    system.populateCosts(result);
+    return result;
+}
+
+void logAlgorithmCompletion(WasteSystem& system,
+                            const RouteAlgorithm& algorithm,
+                            const RouteResult& result) {
+    std::ostringstream message;
+    message << algorithm.algorithmName() << " completed: "
+            << result.totalDistance << " km, RM " << result.totalCost;
+    system.getEventLog().addEvent(message.str());
+}
+} // namespace
 
 ComparisonManager::ComparisonManager() {}
 
 void ComparisonManager::initializeAlgorithms() {
-    // Register all four routing strategies.
-    // Using unique_ptr ensures proper cleanup and demonstrates
-    // modern C++ resource management.
     algorithms.clear();
+
+    // Keep registration centralized so the dashboard, comparison table, and
+    // execution order all rely on the same algorithm list.
     algorithms.push_back(std::make_unique<RegularRouteAlgorithm>());
     algorithms.push_back(std::make_unique<GreedyRouteAlgorithm>());
     algorithms.push_back(std::make_unique<MSTRouteAlgorithm>());
@@ -21,56 +60,32 @@ void ComparisonManager::initializeAlgorithms() {
 void ComparisonManager::runAllAlgorithms(WasteSystem& system) {
     lastResults.clear();
 
-    std::vector<int> eligible = system.getEligibleNodes();
-    int hqId = system.getGraph().getHQNode().getId();
-
-    for (auto& algo : algorithms) {
-        // Reset collection status before each algorithm runs,
-        // so each one starts from a clean state
-        system.resetCollectionStatus();
-
-        RouteResult result = algo->computeRoute(system.getGraph(), eligible, hqId);
-        system.populateCosts(result);
-
-        // Log the run in the event log
-        std::ostringstream msg;
-        msg << algo->algorithmName() << " completed: "
-            << result.totalDistance << " km, RM " << result.totalCost;
-        system.getEventLog().addEvent(msg.str());
-
+    const RouteRequestContext request = buildRouteRequestContext(system);
+    for (auto& algorithm : algorithms) {
+        RouteResult result = executeAlgorithm(*algorithm, system, request);
+        logAlgorithmCompletion(system, *algorithm, result);
         lastResults.push_back(result);
     }
 
     system.resetCollectionStatus();
 
-    // Identify and log the recommended algorithm
-    int bestIdx = getBestAlgorithmIndex();
-    if (bestIdx >= 0) {
+    const int bestIndex = getBestAlgorithmIndex();
+    if (bestIndex >= 0) {
         system.getEventLog().addEvent(
-            "Recommended: " + lastResults[bestIdx].algorithmName +
+            "Recommended: " + lastResults[bestIndex].algorithmName +
             " (lowest total cost)");
     }
 }
 
 RouteResult ComparisonManager::runSingleAlgorithm(int index, WasteSystem& system) {
     if (index < 0 || index >= static_cast<int>(algorithms.size())) {
-        throw std::out_of_range("ComparisonManager::runSingleAlgorithm — invalid index");
+        throw std::out_of_range(
+            "ComparisonManager::runSingleAlgorithm - invalid index");
     }
 
-    system.resetCollectionStatus();
-
-    std::vector<int> eligible = system.getEligibleNodes();
-    int hqId = system.getGraph().getHQNode().getId();
-
-    RouteResult result = algorithms[index]->computeRoute(
-        system.getGraph(), eligible, hqId);
-    system.populateCosts(result);
-
-    std::ostringstream msg;
-    msg << algorithms[index]->algorithmName() << " completed: "
-        << result.totalDistance << " km, RM " << result.totalCost;
-    system.getEventLog().addEvent(msg.str());
-
+    const RouteRequestContext request = buildRouteRequestContext(system);
+    RouteResult result = executeAlgorithm(*algorithms[index], system, request);
+    logAlgorithmCompletion(system, *algorithms[index], result);
     return result;
 }
 
@@ -83,29 +98,36 @@ int ComparisonManager::getAlgorithmCount() const {
 }
 
 std::string ComparisonManager::getAlgorithmName(int index) const {
-    if (index < 0 || index >= static_cast<int>(algorithms.size())) return "Unknown";
+    if (index < 0 || index >= static_cast<int>(algorithms.size())) {
+        return "Unknown";
+    }
     return algorithms[index]->algorithmName();
 }
 
 std::string ComparisonManager::getAlgorithmDescription(int index) const {
-    if (index < 0 || index >= static_cast<int>(algorithms.size())) return "";
+    if (index < 0 || index >= static_cast<int>(algorithms.size())) {
+        return "";
+    }
     return algorithms[index]->description();
 }
 
 int ComparisonManager::getBestAlgorithmIndex() const {
-    if (lastResults.empty()) return -1;
+    int bestIndex = -1;
+    float lowestCost = 0.0f;
 
-    int bestIdx = 0;
-    float bestCost = lastResults[0].totalCost;
+    for (int i = 0; i < static_cast<int>(lastResults.size()); ++i) {
+        const RouteResult& result = lastResults[i];
+        if (!result.isValid()) {
+            continue;
+        }
 
-    for (int i = 1; i < static_cast<int>(lastResults.size()); i++) {
-        if (lastResults[i].isValid() && lastResults[i].totalCost < bestCost) {
-            bestCost = lastResults[i].totalCost;
-            bestIdx = i;
+        if (bestIndex < 0 || result.totalCost < lowestCost) {
+            bestIndex = i;
+            lowestCost = result.totalCost;
         }
     }
 
-    return bestIdx;
+    return bestIndex;
 }
 
 void ComparisonManager::clearResults() {

@@ -73,6 +73,7 @@ set(VISUALIZATION_SOURCES
     src/visualization/IsometricRenderer.cpp
     src/visualization/OceanShader.cpp
     src/visualization/AnimationController.cpp
+    src/visualization/DashboardStyle.cpp
     src/visualization/DashboardUI.cpp
 )
 

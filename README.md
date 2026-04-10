@@ -1,118 +1,114 @@
-# Smart Waste Clearance and Management System
+# Ocean Cleanup System
 
-**EcoRoute Solutions Sdn Bhd** — A simulation and decision-support tool for smart waste collection route planning in Malaysia.
+**EcoRoute Solutions** is a C++ coursework project that simulates route planning for marine waste collection across a fixed Indian Ocean cleanup sector. The application combines an isometric visual map, animated route playback, algorithm comparison, and exportable summary reports.
 
 ## Overview
 
-This C++ application simulates waste collection operations for a fictitious Malaysian waste management company. It provides:
+The system models a central command depot and a set of offshore cleanup locations. Each simulation day assigns new waste levels to the non-HQ nodes, then compares multiple routing strategies against the same scenario.
 
-- A fixed map of 10 waste collection locations + 1 HQ/depot
-- Random waste level generation for each simulation day
-- Four routing algorithms (Regular, Greedy, MST, TSP) for comparison
-- An isometric 3D-style dashboard with route animation
-- Cost analysis: distance, time, fuel, wages, total operating cost
-- File export of results in TXT and CSV formats
+Key features:
 
-## Prerequisites
+- Fixed map of marine cleanup waypoints around a central command anchorage
+- Daily waste generation with reproducible seed support
+- Four route-planning algorithms: Regular, Greedy, MST, and TSP
+- Animated route playback on an isometric map
+- Side-by-side algorithm comparison with cost metrics
+- TXT and CSV export for summaries and comparison results
 
-- **C++17** compatible compiler (MSVC 2019+, GCC 9+, Clang 10+)
-- **CMake** 3.16 or later
-- **GLFW3** (window management)
-- **OpenGL** (system-provided)
-- **Dear ImGui** (downloaded by setup script)
-- **GLAD** (downloaded by setup script)
+## Architectural Layout
 
-## Quick Start
+The refactored codebase is organised by responsibility:
 
-### 1. Download Dependencies
-
-Run the setup script to download ImGui and GLAD:
-
-**Windows:**
-```
-setup_dependencies.bat
-```
-
-**Linux/macOS:**
-```
-chmod +x setup_dependencies.sh
-./setup_dependencies.sh
-```
-
-### 2. Install GLFW
-
-**Option A — vcpkg (recommended for Windows):**
-```
-vcpkg install glfw3:x64-windows
-```
-
-**Option B — System package manager:**
-```
-# Ubuntu/Debian
-sudo apt install libglfw3-dev
-
-# macOS
-brew install glfw
-```
-
-### 3. Build
-
-```
-mkdir build
-cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake
-cmake --build . --config Release
-```
-
-If not using vcpkg, just run `cmake ..` without the toolchain flag.
-
-### 4. Run
-
-```
-./SmartWasteClearance      # Linux/macOS
-SmartWasteClearance.exe    # Windows
-```
-
-## Project Structure
-
-```
+```text
 include/
-  core/           WasteNode, Truck, MapGraph, CostModel, RouteResult, WasteSystem, EventLog
-  algorithms/     RouteAlgorithm (abstract), Regular, Greedy, MST, TSP, ComparisonManager
-  visualization/  IsometricRenderer, AnimationController, DashboardUI, RenderUtils
-  persistence/    FileExporter, ResultLogger
-  app/            Application
+  algorithms/     RouteAlgorithm hierarchy and ComparisonManager
+  app/            Top-level application lifecycle and orchestration
+  core/           Simulation state, graph model, costs, nodes, event log
+  persistence/    Export and reporting helpers
+  visualization/  Rendering, animation, dashboard UI, styling
 
-src/              Corresponding .cpp implementations
-external/         ImGui, GLAD (downloaded by setup script)
-output/           Export files generated at runtime
+src/
+  algorithms/     Routing algorithm implementations
+  app/            Application loop and subsystem coordination
+  core/           Domain and simulation logic
+  persistence/    TXT / CSV output generation
+  visualization/  OpenGL map rendering and Dear ImGui dashboard
 ```
+
+### Separation of Concerns
+
+- `Application` coordinates the window, render loop, UI actions, and mission state.
+- `WasteSystem` owns the fixed map, current-day waste levels, threshold logic, and event log.
+- `ComparisonManager` runs algorithms through one shared comparison workflow.
+- `DashboardUI` renders the control panels, while `DashboardStyle` owns reusable layout and theme rules.
+- `FileExporter` handles file output only; `ResultLogger` sits one layer above it for application-facing export actions.
 
 ## Algorithms
 
-| Algorithm | Approach | Complexity |
-|-----------|----------|------------|
-| Regular   | Visit eligible nodes in default ID order | O(n) |
-| Greedy    | Nearest-neighbor heuristic | O(n^2) |
-| MST       | Prim's MST + DFS traversal | O(n^2) |
-| TSP       | Exact bitmask DP | O(n^2 * 2^n) |
+| Algorithm | Role in the coursework |
+|-----------|------------------------|
+| Regular   | Baseline route using the default visit order |
+| Greedy    | Nearest-neighbour heuristic for local cost reduction |
+| MST       | Tree-based route approximation |
+| TSP       | Exact bitmask dynamic-programming solver for small node counts |
 
-## How to Use
+## Build Requirements
 
-1. Click **Generate New Day** to randomize waste levels
-2. Select an algorithm and click **Run Selected Algorithm**
-3. Watch the animated route on the isometric map
-4. Use **Compare All Algorithms** to see side-by-side metrics
-5. Export results via the Export panel
+- C++17 compiler
+- CMake 3.16 or newer
+- GLFW 3.3
+- OpenGL
+- Dear ImGui and GLAD in the `external/` directory
 
-## C++ Concepts Demonstrated
+## Build
 
-- Classes and objects (all domain entities)
-- Inheritance and polymorphism (RouteAlgorithm hierarchy)
-- File I/O with exception handling (FileExporter)
-- Vectors and adjacency matrices (MapGraph)
-- Manual linked list (EventLog)
-- Structures (RouteResult, Color, IsoCoord)
-- Smart pointers (ComparisonManager owns algorithms via unique_ptr)
-- Random number generation (Mersenne Twister with seed control)
-- Modular multi-file architecture
+Windows example:
+
+```powershell
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release
+```
+
+If you manage GLFW through `vcpkg`, pass the vcpkg toolchain file when configuring CMake.
+
+## Running the Application
+
+After building:
+
+```powershell
+.\SmartWasteClearance.exe
+```
+
+## Using the Simulation
+
+1. Generate a new day to produce waste levels for all non-HQ nodes.
+2. Choose a routing algorithm or compare all algorithms.
+3. Play or replay the animated route.
+4. Review metrics, mission route order, and event log entries.
+5. Export the current route summary or the full comparison table.
+
+## Refactor Highlights
+
+The current codebase has been reorganised to improve maintainability without changing the coursework scope:
+
+- Dashboard styling and layout rules were extracted from the main UI implementation.
+- Mission-session control in the application layer was split into focused helper methods.
+- Algorithm comparison now follows one shared execution path for clearer, fairer orchestration.
+- Fixed map data and daily waste generation logic were separated inside `WasteSystem`.
+- Export code now uses clearer helper functions and consistent project terminology.
+
+## Output
+
+Runtime exports are written to:
+
+```text
+output/
+```
+
+Generated files include:
+
+- `summary_*.txt`
+- `comparison_*.csv`
+- `route_detail_*.txt`

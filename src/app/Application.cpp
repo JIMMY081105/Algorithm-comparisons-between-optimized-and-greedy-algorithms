@@ -6,6 +6,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 
@@ -211,21 +212,9 @@ void Application::run() {
 }
 
 void Application::update(float deltaTime) {
-    // Advance the truck along the current route
-    int collectedNodeId = animController.update(deltaTime);
-
-    // When the truck arrives at a node, mark it collected and log it
+    const int collectedNodeId = animController.update(deltaTime);
     if (collectedNodeId >= 0) {
-        wasteSystem.markNodeCollected(collectedNodeId);
-
-        int idx = wasteSystem.getGraph().findNodeIndex(collectedNodeId);
-        if (idx >= 0) {
-            const WasteNode& node = wasteSystem.getGraph().getNode(idx);
-            if (!node.getIsHQ()) {
-                wasteSystem.getEventLog().addEvent(
-                    "Cleaned up garbage at " + node.getName());
-            }
-        }
+        handleCollectedNode(collectedNodeId);
     }
 
     // Keep the renderer's route line progress in sync with animation
@@ -235,6 +224,8 @@ void Application::update(float deltaTime) {
 void Application::renderFrame() {
     glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
     glViewport(0, 0, windowWidth, windowHeight);
+    beginImGuiFrame();
+    handleZoomInput();
     RenderUtils::updateProjection(static_cast<float>(windowWidth),
                                   static_cast<float>(windowHeight),
                                   wasteSystem.getGraph());
@@ -257,8 +248,6 @@ void Application::renderFrame() {
                     animController.getCurrentRoute(), dt);
 
     // Render ImGui dashboard on top
-    beginImGuiFrame();
-
     auto actions = dashboardUI.render(wasteSystem, comparisonManager,
                                        animController, currentResult);
 
@@ -268,27 +257,92 @@ void Application::renderFrame() {
     endImGuiFrame();
 }
 
+void Application::handleZoomInput() {
+    ImGuiIO& io = ImGui::GetIO();
+
+    if (!io.WantCaptureMouse && std::abs(io.MouseWheel) > 0.001f) {
+        // Standard map behavior: wheel up zooms in, wheel down zooms out.
+        RenderUtils::adjustZoom(io.MouseWheel);
+    }
+
+    if (io.WantTextInput) return;
+
+    const bool zoomIn =
+        ImGui::IsKeyPressed(ImGuiKey_Equal, false) ||
+        ImGui::IsKeyPressed(ImGuiKey_KeypadAdd, false);
+    const bool zoomOut =
+        ImGui::IsKeyPressed(ImGuiKey_Minus, false) ||
+        ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract, false);
+    const bool resetZoom =
+        (io.KeyCtrl || io.KeySuper) && ImGui::IsKeyPressed(ImGuiKey_0, false);
+
+    if (zoomIn) RenderUtils::adjustZoom(1.0f);
+    if (zoomOut) RenderUtils::adjustZoom(-1.0f);
+    if (resetZoom) RenderUtils::resetZoom();
+}
+
+void Application::handleCollectedNode(int collectedNodeId) {
+    wasteSystem.markNodeCollected(collectedNodeId);
+
+    const int nodeIndex = wasteSystem.getGraph().findNodeIndex(collectedNodeId);
+    if (nodeIndex < 0) {
+        return;
+    }
+
+    const WasteNode& node = wasteSystem.getGraph().getNode(nodeIndex);
+    if (!node.getIsHQ()) {
+        wasteSystem.getEventLog().addEvent(
+            "Cleaned up garbage at " + node.getName());
+    }
+}
+
+void Application::resetMissionSession() {
+    currentResult = RouteResult();
+    animController.stop();
+    renderer.resetAnimation();
+    comparisonManager.clearResults();
+    wasteSystem.resetCollectionStatus();
+}
+
+void Application::loadMissionRoute(const RouteResult& result, bool autoPlay) {
+    currentResult = result;
+    animController.loadRoute(currentResult, wasteSystem.getGraph());
+    wasteSystem.resetCollectionStatus();
+
+    if (autoPlay) {
+        animController.play();
+    }
+}
+
+void Application::replayCurrentMission() {
+    if (!currentResult.isValid()) {
+        return;
+    }
+
+    wasteSystem.resetCollectionStatus();
+    animController.replay(wasteSystem.getGraph());
+}
+
+void Application::logRuntimeError(const std::string& context,
+                                  const std::exception& e) {
+    wasteSystem.getEventLog().addEvent(context + e.what());
+}
+
 void Application::handleUIActions(const DashboardUI::UIActions& actions) {
     // Generate New Day — randomize waste levels
     if (actions.generateNewDay) {
         wasteSystem.generateNewDay();
-        currentResult = RouteResult();
-        animController.stop();
-        renderer.resetAnimation();
-        comparisonManager.clearResults();
+        resetMissionSession();
     }
 
     // Run a single selected algorithm
     if (actions.runSelectedAlgorithm && actions.algorithmToRun >= 0) {
         try {
-            currentResult = comparisonManager.runSingleAlgorithm(
+            const RouteResult result = comparisonManager.runSingleAlgorithm(
                 actions.algorithmToRun, wasteSystem);
-            animController.loadRoute(currentResult, wasteSystem.getGraph());
-            animController.play();
-            wasteSystem.resetCollectionStatus();
+            loadMissionRoute(result, true);
         } catch (const std::exception& e) {
-            wasteSystem.getEventLog().addEvent(
-                std::string("Error: ") + e.what());
+            logRuntimeError("Error: ", e);
         }
     }
 
@@ -298,62 +352,52 @@ void Application::handleUIActions(const DashboardUI::UIActions& actions) {
             comparisonManager.runAllAlgorithms(wasteSystem);
 
             // Load the best algorithm's route for animation
-            int bestIdx = comparisonManager.getBestAlgorithmIndex();
+            const int bestIdx = comparisonManager.getBestAlgorithmIndex();
             if (bestIdx >= 0) {
                 const auto& results = comparisonManager.getResults();
-                currentResult = results[bestIdx];
-                animController.loadRoute(currentResult, wasteSystem.getGraph());
+                loadMissionRoute(results[bestIdx], false);
             }
         } catch (const std::exception& e) {
-            wasteSystem.getEventLog().addEvent(
-                std::string("Comparison error: ") + e.what());
+            logRuntimeError("Comparison error: ", e);
         }
     }
 
     // Play / start animation
-    if (actions.playPause) {
-        if (currentResult.isValid()) {
-            if (animController.isFinished()) {
-                animController.replay(wasteSystem.getGraph());
-                wasteSystem.resetCollectionStatus();
-            } else {
-                animController.play();
-                wasteSystem.resetCollectionStatus();
-            }
+    if (actions.playPause && currentResult.isValid()) {
+        if (animController.isFinished()) {
+            replayCurrentMission();
+        } else {
+            wasteSystem.resetCollectionStatus();
+            animController.play();
         }
     }
 
     // Replay animation from start
     if (actions.replay) {
-        if (currentResult.isValid()) {
-            wasteSystem.resetCollectionStatus();
-            animController.replay(wasteSystem.getGraph());
-        }
+        replayCurrentMission();
     }
 
     // Export summary to TXT
     if (actions.exportResults && currentResult.isValid()) {
         try {
-            std::string file = resultLogger.logCurrentResult(
+            const std::string file = resultLogger.logCurrentResult(
                 currentResult, wasteSystem);
             wasteSystem.getEventLog().addEvent("Saved: " + file);
         } catch (const std::exception& e) {
-            wasteSystem.getEventLog().addEvent(
-                std::string("Export error: ") + e.what());
+            logRuntimeError("Export error: ", e);
         }
     }
 
     // Export comparison to CSV
     if (actions.exportComparison) {
         try {
-            std::string file = resultLogger.logComparison(
+            const std::string file = resultLogger.logComparison(
                 comparisonManager, wasteSystem);
             if (!file.empty()) {
                 wasteSystem.getEventLog().addEvent("Saved: " + file);
             }
         } catch (const std::exception& e) {
-            wasteSystem.getEventLog().addEvent(
-                std::string("Export error: ") + e.what());
+            logRuntimeError("Export error: ", e);
         }
     }
 }

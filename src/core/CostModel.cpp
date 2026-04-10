@@ -1,20 +1,15 @@
 #include "core/CostModel.h"
 
-// Default values represent typical Malaysian operational costs
-// for a small-to-medium waste collection truck.
+// The defaults are intentionally simple and easy to justify in a coursework
+// report: one fuel rate, one wage rate, and one average travel speed.
 CostModel::CostModel()
-    : fuelCostPerKm(1.20f),        // RM 1.20 per km (diesel truck)
-      driverWagePerHour(15.00f),   // RM 15 per hour (local driver wage)
-      truckSpeedKmh(30.0f),       // 30 km/h average in urban areas
-      minutesPerKm(2.0f) {}       // derived: 60 / 30 = 2 min per km
+    : fuelCostPerKm(1.20f),
+      driverWagePerHour(15.00f),
+      truckSpeedKmh(30.0f) {}
 
 void CostModel::setFuelCostPerKm(float cost) { fuelCostPerKm = cost; }
 void CostModel::setDriverWagePerHour(float wage) { driverWagePerHour = wage; }
-void CostModel::setTruckSpeedKmh(float speed) {
-    truckSpeedKmh = speed;
-    // Keep the minutes-per-km in sync whenever speed changes
-    if (speed > 0) minutesPerKm = 60.0f / speed;
-}
+void CostModel::setTruckSpeedKmh(float speed) { truckSpeedKmh = speed; }
 
 float CostModel::getFuelCostPerKm() const { return fuelCostPerKm; }
 float CostModel::getDriverWagePerHour() const { return driverWagePerHour; }
@@ -25,14 +20,14 @@ float CostModel::calculateFuelCost(float distanceKm) const {
 }
 
 float CostModel::calculateTravelTime(float distanceKm) const {
-    // Returns travel time in hours
-    if (truckSpeedKmh <= 0) return 0.0f;
+    if (truckSpeedKmh <= 0.0f) {
+        return 0.0f;
+    }
     return distanceKm / truckSpeedKmh;
 }
 
 float CostModel::calculateWageCost(float distanceKm) const {
-    float hours = calculateTravelTime(distanceKm);
-    return hours * driverWagePerHour;
+    return calculateTravelTime(distanceKm) * driverWagePerHour;
 }
 
 float CostModel::calculateTotalCost(float distanceKm) const {

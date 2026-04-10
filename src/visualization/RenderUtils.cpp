@@ -11,6 +11,9 @@ constexpr float kPanelMargin = 10.0f;
 constexpr float kWorldPadding = 3.2f;
 constexpr float kTallStructureAllowanceTop = 112.0f;
 constexpr float kTallStructureAllowanceBottom = 30.0f;
+constexpr float kMinUserZoom = 0.55f;
+constexpr float kMaxUserZoom = 2.40f;
+constexpr float kZoomStepFactor = 1.12f;
 
 ProjectionState gProjection{
     BASE_TILE_WIDTH,
@@ -18,6 +21,7 @@ ProjectionState gProjection{
     450.0f,
     80.0f
 };
+float gUserZoom = 1.0f;
 
 struct WorldBounds {
     float minX;
@@ -51,8 +55,8 @@ WorldBounds getWorldBounds(const MapGraph& graph) {
 void updateProjection(float viewportWidth, float viewportHeight,
                       const MapGraph& graph) {
     if (graph.getNodes().empty()) {
-        gProjection.tileWidth = BASE_TILE_WIDTH;
-        gProjection.tileHeight = BASE_TILE_HEIGHT;
+        gProjection.tileWidth = BASE_TILE_WIDTH * gUserZoom;
+        gProjection.tileHeight = BASE_TILE_HEIGHT * gUserZoom;
         gProjection.offsetX = viewportWidth * 0.5f;
         gProjection.offsetY = viewportHeight * 0.5f;
         return;
@@ -98,8 +102,9 @@ void updateProjection(float viewportWidth, float viewportHeight,
 
     const float worldWidth = std::max(1.0f, maxX - minX);
     const float worldHeight = std::max(1.0f, maxY - minY);
-    const float mapZoom = std::min(viewWidth / worldWidth,
+    const float fitZoom = std::min(viewWidth / worldWidth,
                                    viewHeight / worldHeight) * 0.9f;
+    const float mapZoom = fitZoom * gUserZoom;
 
     gProjection.tileWidth = BASE_TILE_WIDTH * mapZoom;
     gProjection.tileHeight = BASE_TILE_HEIGHT * mapZoom;
@@ -141,6 +146,20 @@ const ProjectionState& getProjection() {
     return gProjection;
 }
 
+void adjustZoom(float zoomSteps) {
+    if (std::abs(zoomSteps) < 0.001f) return;
+    gUserZoom *= std::pow(kZoomStepFactor, zoomSteps);
+    gUserZoom = std::clamp(gUserZoom, kMinUserZoom, kMaxUserZoom);
+}
+
+void resetZoom() {
+    gUserZoom = 1.0f;
+}
+
+float getUserZoom() {
+    return gUserZoom;
+}
+
 IsoCoord worldToIso(float worldX, float worldY) {
     // Standard isometric projection:
     // Rotate the 2D grid 45 degrees and compress vertically by half.
@@ -173,7 +192,7 @@ Color getHQColor() {
 }
 
 Color getBackgroundColor() {
-    return Color(0.03f, 0.06f, 0.14f);  // deep ocean dark
+    return Color(0.05f, 0.28f, 0.39f);  // flat outer-sea color
 }
 
 Color getRoadColor() {

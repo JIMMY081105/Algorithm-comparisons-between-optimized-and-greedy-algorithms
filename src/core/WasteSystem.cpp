@@ -1,40 +1,68 @@
 #include "core/WasteSystem.h"
+
+#include <array>
 #include <chrono>
 #include <sstream>
-#include <iomanip>
+
+namespace {
+struct MapNodeDefinition {
+    int id;
+    const char* name;
+    float gridX;
+    float gridY;
+    float capacityKg;
+    bool isHeadquarters;
+};
+
+constexpr float kDefaultCollectionThreshold = 30.0f;
+constexpr float kDistanceScaleKmPerGridUnit = 1.5f;
+constexpr float kMinimumDailyWasteLevel = 5.0f;
+constexpr float kMaximumDailyWasteLevel = 100.0f;
+
+constexpr std::array<MapNodeDefinition, 10> kIndianOceanLocations{{
+    {0, "Command Anchorage",   11.50f, 11.25f,   0.0f, true},
+    {1, "Lakshadweep Current",  3.20f,  1.80f, 500.0f, false},
+    {2, "Andaman Passage",     20.80f,  3.10f, 300.0f, false},
+    {3, "Nicobar Drift",       22.90f, 14.80f, 300.0f, false},
+    {4, "Malacca Reach",        6.20f, 18.70f, 400.0f, false},
+    {5, "Arabian Shoal",        0.90f, 10.80f, 450.0f, false},
+    {6, "Cocos Corridor",      16.40f, 22.10f, 250.0f, false},
+    {7, "Bengal Gate",         12.20f,  0.90f, 350.0f, false},
+    {8, "Sunda Channel",       26.80f,  8.30f, 380.0f, false},
+    {9, "Monsoon Trench",       0.30f, 22.60f, 550.0f, false},
+}};
+
+unsigned int makeTimeSeed() {
+    return static_cast<unsigned int>(
+        std::chrono::steady_clock::now().time_since_epoch().count());
+}
+} // namespace
 
 WasteSystem::WasteSystem()
-    : currentSeed(0), dayNumber(0), collectionThreshold(30.0f) {
-    // Seed the RNG with system clock for genuine randomness on first use
-    auto timeSeed = static_cast<unsigned int>(
-        std::chrono::steady_clock::now().time_since_epoch().count());
-    rng.seed(timeSeed);
-    currentSeed = timeSeed;
+    : currentSeed(0),
+      dayNumber(0),
+      collectionThreshold(kDefaultCollectionThreshold) {
+    currentSeed = makeTimeSeed();
+    rng.seed(currentSeed);
+}
+
+void WasteSystem::addDefaultLocations() {
+    for (const MapNodeDefinition& location : kIndianOceanLocations) {
+        graph.addNode(WasteNode(location.id,
+                                location.name,
+                                location.gridX,
+                                location.gridY,
+                                location.capacityKg,
+                                location.isHeadquarters));
+    }
 }
 
 void WasteSystem::initializeMap() {
-    // Build the predefined map of a fictitious Malaysian city.
-    // Node positions are on a logical grid — the renderer will
-    // project them into isometric space for display.
-    //
-    // Layout designed to create an interesting spread of locations
-    // around a central HQ, simulating a typical urban district.
+    // The coursework uses one fixed sector so algorithm behaviour is easier to
+    // compare and explain during the demo and in the final report.
+    addDefaultLocations();
 
-    //                          ID  Name                    X     Y    Capacity(kg)  isHQ
-    graph.addNode(WasteNode(    0, "HQ Depot",            9.75f,  9.75f,  0.0f,      true));
-    graph.addNode(WasteNode(    1, "Factory Zone",        3.90f,  1.95f,  500.0f,    false));
-    graph.addNode(WasteNode(    2, "Residential Block A", 15.60f, 3.90f,  300.0f,    false));
-    graph.addNode(WasteNode(    3, "Residential Block B", 17.55f, 11.70f, 300.0f,    false));
-    graph.addNode(WasteNode(    4, "Food Street",         5.85f,  15.60f, 400.0f,    false));
-    graph.addNode(WasteNode(    5, "Market Area",         1.95f,  9.75f,  450.0f,    false));
-    graph.addNode(WasteNode(    6, "School Compound",     13.65f, 17.55f, 250.0f,    false));
-    graph.addNode(WasteNode(    7, "Office Park",         11.70f, 1.95f,  350.0f,    false));
-    graph.addNode(WasteNode(    8, "Apartment Cluster",   19.50f, 7.80f,  380.0f,    false));
-    graph.addNode(WasteNode(    9, "Industrial Yard",     1.95f,  17.55f, 550.0f,    false));
-
-    // Build the complete distance matrix so all routing algorithms
-    // can query distances between any pair of locations
-    graph.setDistanceScale(1.5f);  // 1 grid unit ~ 1.5 km
+    graph.setDistanceScale(kDistanceScaleKmPerGridUnit);
     graph.buildFullyConnectedGraph();
 
     eventLog.addEvent("Map initialized with " +
@@ -42,30 +70,33 @@ void WasteSystem::initializeMap() {
 }
 
 void WasteSystem::generateNewDay() {
-    auto timeSeed = static_cast<unsigned int>(
-        std::chrono::steady_clock::now().time_since_epoch().count());
-    generateNewDayWithSeed(timeSeed);
+    generateNewDayWithSeed(makeTimeSeed());
+}
+
+void WasteSystem::assignWasteLevelsForCurrentDay() {
+    std::uniform_real_distribution<float> wasteLevelDistribution(
+        kMinimumDailyWasteLevel, kMaximumDailyWasteLevel);
+
+    for (int i = 0; i < graph.getNodeCount(); ++i) {
+        WasteNode& node = graph.getNodeMutable(i);
+        node.resetForNewDay();
+
+        if (!node.getIsHQ()) {
+            node.setWasteLevel(wasteLevelDistribution(rng));
+        }
+    }
 }
 
 void WasteSystem::generateNewDayWithSeed(unsigned int seed) {
     currentSeed = seed;
     rng.seed(seed);
-    dayNumber++;
+    ++dayNumber;
 
-    // Assign random waste levels to every non-HQ node
-    std::uniform_real_distribution<float> wasteDist(5.0f, 100.0f);
+    assignWasteLevelsForCurrentDay();
 
-    for (int i = 0; i < graph.getNodeCount(); i++) {
-        WasteNode& node = graph.getNodeMutable(i);
-        node.resetForNewDay();
-        if (!node.getIsHQ()) {
-            node.setWasteLevel(wasteDist(rng));
-        }
-    }
-
-    std::ostringstream oss;
-    oss << "Day " << dayNumber << " generated (seed: " << seed << ")";
-    eventLog.addEvent(oss.str());
+    std::ostringstream message;
+    message << "Day " << dayNumber << " generated (seed: " << seed << ")";
+    eventLog.addEvent(message.str());
 }
 
 MapGraph& WasteSystem::getGraph() { return graph; }
@@ -76,49 +107,55 @@ EventLog& WasteSystem::getEventLog() { return eventLog; }
 const EventLog& WasteSystem::getEventLog() const { return eventLog; }
 
 float WasteSystem::getCollectionThreshold() const { return collectionThreshold; }
+
 void WasteSystem::setCollectionThreshold(float threshold) {
     collectionThreshold = threshold;
 }
 
 std::vector<int> WasteSystem::getEligibleNodes(float thresholdOverride) const {
-    float threshold = (thresholdOverride >= 0.0f)
-                      ? thresholdOverride
-                      : collectionThreshold;
-    std::vector<int> eligible;
-    for (int i = 0; i < graph.getNodeCount(); i++) {
+    const float activeThreshold = thresholdOverride >= 0.0f
+                                      ? thresholdOverride
+                                      : collectionThreshold;
+
+    std::vector<int> eligibleNodeIds;
+    for (int i = 0; i < graph.getNodeCount(); ++i) {
         const WasteNode& node = graph.getNode(i);
-        if (node.isEligible(threshold)) {
-            eligible.push_back(node.getId());
+        if (node.isEligible(activeThreshold)) {
+            eligibleNodeIds.push_back(node.getId());
         }
     }
-    return eligible;
+    return eligibleNodeIds;
 }
 
 void WasteSystem::markNodeCollected(int nodeId) {
-    int idx = graph.findNodeIndex(nodeId);
-    if (idx >= 0) {
-        graph.getNodeMutable(idx).setCollected(true);
+    const int nodeIndex = graph.findNodeIndex(nodeId);
+    if (nodeIndex >= 0) {
+        graph.getNodeMutable(nodeIndex).setCollected(true);
     }
 }
 
 void WasteSystem::resetCollectionStatus() {
-    for (int i = 0; i < graph.getNodeCount(); i++) {
+    for (int i = 0; i < graph.getNodeCount(); ++i) {
         graph.getNodeMutable(i).setCollected(false);
     }
 }
 
 float WasteSystem::computeWasteCollected(const std::vector<int>& route) const {
-    float total = 0.0f;
+    float totalWasteCollected = 0.0f;
+
     for (int nodeId : route) {
-        int idx = graph.findNodeIndex(nodeId);
-        if (idx >= 0) {
-            const WasteNode& node = graph.getNode(idx);
-            if (!node.getIsHQ()) {
-                total += node.getWasteAmount();
-            }
+        const int nodeIndex = graph.findNodeIndex(nodeId);
+        if (nodeIndex < 0) {
+            continue;
+        }
+
+        const WasteNode& node = graph.getNode(nodeIndex);
+        if (!node.getIsHQ()) {
+            totalWasteCollected += node.getWasteAmount();
         }
     }
-    return total;
+
+    return totalWasteCollected;
 }
 
 void WasteSystem::populateCosts(RouteResult& result) const {

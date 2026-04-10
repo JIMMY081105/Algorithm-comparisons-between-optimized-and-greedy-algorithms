@@ -1,23 +1,18 @@
 #ifndef COST_MODEL_H
 #define COST_MODEL_H
 
-#include <vector>
-
-// Centralizes all cost and operational parameters for the simulation.
-// Instead of scattering magic numbers throughout the codebase, every
-// cost calculation references this single model. This makes it easy
-// to adjust assumptions (e.g., fuel price changes) in one place.
+// Encapsulates the operating assumptions used to turn route distance into
+// travel time and cost. Keeping these values in one place makes it easier to
+// explain the simulation model and adjust it without touching route logic.
 class CostModel {
 private:
-    float fuelCostPerKm;    // RM per kilometer
-    float driverWagePerHour; // RM per hour
-    float truckSpeedKmh;    // average speed in km/h
-    float minutesPerKm;     // derived from truck speed
+    float fuelCostPerKm;
+    float driverWagePerHour;
+    float truckSpeedKmh;
 
 public:
     CostModel();
 
-    // Allow overriding defaults if needed
     void setFuelCostPerKm(float cost);
     void setDriverWagePerHour(float wage);
     void setTruckSpeedKmh(float speed);
@@ -26,9 +21,8 @@ public:
     float getDriverWagePerHour() const;
     float getTruckSpeedKmh() const;
 
-    // Core calculations — these take a total route distance and produce metrics
     float calculateFuelCost(float distanceKm) const;
-    float calculateTravelTime(float distanceKm) const;  // returns hours
+    float calculateTravelTime(float distanceKm) const;
     float calculateWageCost(float distanceKm) const;
     float calculateTotalCost(float distanceKm) const;
 };

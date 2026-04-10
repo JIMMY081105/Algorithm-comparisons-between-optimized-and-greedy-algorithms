@@ -2,12 +2,13 @@
 #define RESULT_LOGGER_H
 
 #include "FileExporter.h"
-#include "core/WasteSystem.h"
 #include "algorithms/ComparisonManager.h"
+#include "core/WasteSystem.h"
 
-// Higher-level persistence manager that coordinates exports.
-// Wraps FileExporter with convenience methods that the Application
-// layer calls when the user presses export buttons.
+#include <string>
+
+// Application-facing export service that wraps FileExporter with higher-level
+// actions such as "export the current result" or "export the comparison set".
 class ResultLogger {
 private:
     FileExporter exporter;
@@ -15,19 +16,9 @@ private:
 public:
     ResultLogger();
 
-    // Export the current single-algorithm result
-    std::string logCurrentResult(const RouteResult& result,
-                                  WasteSystem& system);
-
-    // Export the full comparison of all algorithms
-    std::string logComparison(const ComparisonManager& compMgr,
-                               WasteSystem& system);
-
-    // Export detailed route for one algorithm
-    std::string logRouteDetails(const RouteResult& result,
-                                 WasteSystem& system);
-
-    // Get the output folder path for display in the UI
+    std::string logCurrentResult(const RouteResult& result, WasteSystem& system);
+    std::string logComparison(const ComparisonManager& compMgr, WasteSystem& system);
+    std::string logRouteDetails(const RouteResult& result, WasteSystem& system);
     std::string getOutputPath() const;
 };
 

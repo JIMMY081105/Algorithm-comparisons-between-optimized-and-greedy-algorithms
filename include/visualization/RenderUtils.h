@@ -40,6 +40,9 @@ namespace RenderUtils {
     void updateProjection(float viewportWidth, float viewportHeight,
                           const MapGraph& graph);
     const ProjectionState& getProjection();
+    void adjustZoom(float zoomSteps);
+    void resetZoom();
+    float getUserZoom();
 
     // Urgency color mapping for waste nodes
     Color getUrgencyColor(UrgencyLevel urgency);

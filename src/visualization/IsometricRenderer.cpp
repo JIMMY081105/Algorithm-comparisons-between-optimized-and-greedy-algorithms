@@ -19,7 +19,7 @@ constexpr float kDepotClearRadius = 0.68f;
 constexpr float kClearInnerRadius = 0.20f;
 constexpr float kClearOuterRadius = 0.56f;
 constexpr int kAmbientParticleCount = 42;
-constexpr int kDecorIsletCount = 14;
+constexpr int kDecorIsletCount = 16;
 
 enum class GarbageSizeTier {
     SMALL,
@@ -699,13 +699,13 @@ void IsometricRenderer::drawGroundPlane(const MapGraph& graph, const Truck& truc
     const float bottom = top + static_cast<float>(viewport[3]);
 
     glBegin(GL_QUADS);
-    glColor4f(0.06f, 0.36f, 0.49f, 1.0f);
+    glColor4f(0.05f, 0.28f, 0.39f, 1.0f);
     glVertex2f(left, top);
-    glColor4f(0.12f, 0.51f, 0.62f, 1.0f);
+    glColor4f(0.05f, 0.28f, 0.39f, 1.0f);
     glVertex2f(right, top);
-    glColor4f(0.03f, 0.17f, 0.29f, 1.0f);
+    glColor4f(0.05f, 0.28f, 0.39f, 1.0f);
     glVertex2f(right, bottom);
-    glColor4f(0.02f, 0.12f, 0.22f, 1.0f);
+    glColor4f(0.05f, 0.28f, 0.39f, 1.0f);
     glVertex2f(left, bottom);
     glEnd();
 
@@ -729,6 +729,35 @@ void IsometricRenderer::drawGroundPlane(const MapGraph& graph, const Truck& truc
                           -0.18f, 0.26f, animationTime, 5.1f,
                           Color(0.07f, 0.28f, 0.40f, 0.10f),
                           Color(0.02f, 0.10f, 0.18f, 0.03f));
+    drawOrganicWorldPatch(centerX - spanX * 0.05f, centerY - spanY * 0.28f,
+                          spanX * 0.44f, spanY * 0.22f,
+                          0.54f, 0.24f, animationTime, 6.7f,
+                          Color(0.18f, 0.58f, 0.64f, 0.08f),
+                          Color(0.34f, 0.78f, 0.80f, 0.02f));
+    drawOrganicWorldPatch(centerX + spanX * 0.34f, centerY + spanY * 0.26f,
+                          spanX * 0.40f, spanY * 0.32f,
+                          -0.62f, 0.30f, animationTime, 7.9f,
+                          Color(0.02f, 0.12f, 0.20f, 0.12f),
+                          Color(0.01f, 0.05f, 0.10f, 0.04f));
+
+    for (int swell = 0; swell < 4; ++swell) {
+        const float lane = -spanY * 0.36f + static_cast<float>(swell) * spanY * 0.24f;
+        const float drift = std::sin(animationTime * (0.12f + swell * 0.03f) +
+                                     static_cast<float>(swell) * 1.7f) * spanY * 0.05f;
+        const float width = 1.2f + static_cast<float>(swell) * 0.24f;
+        drawWorldSwellBand(centerX - spanX * 0.82f,
+                           centerY + lane - spanY * 0.10f + drift,
+                           centerX + spanX * 0.84f,
+                           centerY + lane + spanY * 0.12f + drift * 0.5f,
+                           width,
+                           Color(0.02f, 0.12f, 0.18f, 0.040f - swell * 0.004f));
+        drawWorldSwellBand(centerX - spanX * 0.72f,
+                           centerY + lane - spanY * 0.02f + drift * 0.6f,
+                           centerX + spanX * 0.74f,
+                           centerY + lane + spanY * 0.06f + drift * 0.2f,
+                           width * 0.42f,
+                           Color(0.42f, 0.72f, 0.78f, 0.018f - swell * 0.002f));
+    }
 
     auto drawRibbonFamily = [&](float dirX, float dirY, float spacing,
                                 float halfWidth, float amplitude,
@@ -774,6 +803,9 @@ void IsometricRenderer::drawGroundPlane(const MapGraph& graph, const Truck& truc
     drawRibbonFamily(0.72f, -0.62f, 5.2f, 0.08f, 0.12f, 1.8f, 0.31f,
                      Color(0.70f, 0.88f, 0.92f, 0.022f),
                      Color(0.92f, 0.98f, 1.0f, 0.010f));
+    drawRibbonFamily(0.98f, 0.12f, 6.4f, 0.05f, 0.08f, 2.4f, 0.40f,
+                     Color(0.78f, 0.92f, 0.96f, 0.015f),
+                     Color(0.96f, 0.99f, 1.0f, 0.008f));
 
     if (currentRoute.visitOrder.size() > 1) {
         for (size_t i = 0; i + 1 < currentRoute.visitOrder.size(); ++i) {
@@ -833,6 +865,14 @@ void IsometricRenderer::drawGroundPlane(const MapGraph& graph, const Truck& truc
                               rotation + 0.44f, 0.28f, animationTime, node.getId() * 1.27f,
                               Color(0.16f, 0.54f, 0.60f, baseAlpha * 0.78f),
                               Color(0.30f, 0.70f, 0.72f, baseAlpha * 0.24f));
+        drawOrganicWorldPatch(node.getWorldX() + std::cos(rotation) * shelfX * 0.22f +
+                                  driftX * 0.12f,
+                              node.getWorldY() + std::sin(rotation) * shelfY * 0.18f +
+                                  driftY * 0.16f,
+                              shelfX * 0.74f, shelfY * 0.42f,
+                              rotation - 0.60f, 0.22f, animationTime, node.getId() * 1.91f,
+                              Color(0.48f, 0.76f, 0.76f, baseAlpha * 0.34f),
+                              Color(0.70f, 0.90f, 0.88f, baseAlpha * 0.08f));
 
         if (!node.isCollected() || node.getIsHQ()) {
             drawOrganicWorldPatch(node.getWorldX() + driftX * 0.20f,
@@ -948,9 +988,55 @@ void IsometricRenderer::drawRoadConnections(const MapGraph& graph) {
 void IsometricRenderer::drawRouteHighlight(const MapGraph& graph,
                                             const RouteResult& route,
                                             int segmentsToShow) {
+    if (route.visitOrder.size() < 2) return;
+
     const int maxSegments = static_cast<int>(route.visitOrder.size()) - 1;
     const int drawCount = (segmentsToShow <= 0) ? maxSegments
                     : std::min(segmentsToShow, maxSegments);
+    const int focusSegment = std::max(0, drawCount - 1);
+
+    auto drawWaypointMarker = [&](const WasteNode& node, bool isCurrent, bool isServiced) {
+        const IsoCoord iso = RenderUtils::worldToIso(node.getWorldX(), node.getWorldY());
+        const float baseScale = node.getIsHQ() ? 1.20f : 1.0f;
+        const float pulse = 0.5f + 0.5f *
+            std::sin(animationTime * (isCurrent ? 2.8f : 1.4f) + node.getId() * 0.6f);
+        const Color markerColor = node.getIsHQ()
+            ? Color(0.42f, 0.72f, 0.94f, 0.30f + pulse * 0.06f)
+            : isServiced
+                ? Color(0.48f, 0.86f, 0.72f, 0.20f + pulse * 0.06f)
+                : isCurrent
+                    ? Color(0.76f, 0.98f, 1.0f, 0.26f + pulse * 0.10f)
+                    : Color(0.54f, 0.86f, 0.84f, 0.16f);
+        const Color coreColor = node.getIsHQ()
+            ? Color(0.82f, 0.94f, 1.0f, 0.44f)
+            : isServiced
+                ? Color(0.76f, 0.98f, 0.88f, 0.30f)
+                : isCurrent
+                    ? Color(0.94f, 1.0f, 1.0f, 0.44f)
+                    : Color(0.82f, 0.96f, 0.94f, 0.24f);
+        const float rx = (node.getIsHQ() ? 5.2f : 4.0f) * baseScale;
+        const float ry = (node.getIsHQ() ? 2.6f : 2.1f) * baseScale;
+
+        drawDiamond(iso.x, iso.y + 0.1f, rx + 1.8f, ry + 1.0f,
+                    Color(0.04f, 0.18f, 0.22f, 0.12f + pulse * 0.04f));
+        drawDiamondOutline(iso.x, iso.y, rx, ry, markerColor, isCurrent ? 1.6f : 1.1f);
+        drawDiamond(iso.x, iso.y, rx * 0.34f, ry * 0.34f, coreColor);
+
+        const float bracketReach = rx + 1.6f + pulse * (isCurrent ? 0.9f : 0.3f);
+        const float bracketLift = ry + 0.8f;
+        drawLine(iso.x - bracketReach, iso.y,
+                 iso.x - bracketReach + 2.4f, iso.y - bracketLift,
+                 withAlpha(markerColor, markerColor.a * 0.9f), 1.0f);
+        drawLine(iso.x + bracketReach, iso.y,
+                 iso.x + bracketReach - 2.4f, iso.y - bracketLift,
+                 withAlpha(markerColor, markerColor.a * 0.9f), 1.0f);
+        drawLine(iso.x - bracketReach, iso.y,
+                 iso.x - bracketReach + 2.2f, iso.y + bracketLift * 0.8f,
+                 withAlpha(markerColor, markerColor.a * 0.7f), 1.0f);
+        drawLine(iso.x + bracketReach, iso.y,
+                 iso.x + bracketReach - 2.2f, iso.y + bracketLift * 0.8f,
+                 withAlpha(markerColor, markerColor.a * 0.7f), 1.0f);
+    };
 
     // Layer 1: Soft in-water underglow
     for (int i = 0; i < drawCount; i++) {
@@ -962,11 +1048,15 @@ void IsometricRenderer::drawRouteHighlight(const MapGraph& graph,
         const WasteNode& to = graph.getNode(toIdx);
         const IsoCoord isoFrom = RenderUtils::worldToIso(from.getWorldX(), from.getWorldY());
         const IsoCoord isoTo = RenderUtils::worldToIso(to.getWorldX(), to.getWorldY());
+        const float recency =
+            1.0f - clamp01(std::abs(static_cast<float>(i - focusSegment)) / 2.6f);
 
         drawLine(isoFrom.x, isoFrom.y + 1.0f, isoTo.x, isoTo.y + 1.0f,
-                 Color(0.03f, 0.16f, 0.22f, 0.10f), 8.5f);
+                 Color(0.03f, 0.16f, 0.22f, 0.08f + recency * 0.05f),
+                 7.2f + recency * 1.6f);
         drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                 Color(0.08f, 0.38f, 0.42f, 0.06f), 5.5f);
+                 Color(0.08f, 0.38f, 0.42f, 0.04f + recency * 0.03f),
+                 4.4f + recency * 0.8f);
     }
 
     // Layer 2: Quiet readable route core
@@ -979,17 +1069,21 @@ void IsometricRenderer::drawRouteHighlight(const MapGraph& graph,
         const WasteNode& to = graph.getNode(toIdx);
         const IsoCoord isoFrom = RenderUtils::worldToIso(from.getWorldX(), from.getWorldY());
         const IsoCoord isoTo = RenderUtils::worldToIso(to.getWorldX(), to.getWorldY());
+        const float recency =
+            1.0f - clamp01(std::abs(static_cast<float>(i - focusSegment)) / 2.2f);
 
         drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                 Color(0.34f, 0.82f, 0.82f, 0.20f), 2.8f);
+                 Color(0.34f, 0.82f, 0.82f, 0.14f + recency * 0.10f),
+                 2.0f + recency * 0.8f);
         drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                 Color(0.86f, 0.97f, 0.93f, 0.12f), 1.2f);
+                 Color(0.86f, 0.97f, 0.93f, 0.08f + recency * 0.05f),
+                 0.9f + recency * 0.4f);
     }
 
     // Layer 3: Elegant traveling pulse
     if (drawCount > 0) {
         const float totalSegments = static_cast<float>(drawCount);
-        const float pulseSpeed = 0.30f;
+        const float pulseSpeed = 0.38f;
         const float pulsePos = std::fmod(animationTime * pulseSpeed, totalSegments);
 
         for (int i = 0; i < drawCount; i++) {
@@ -1004,11 +1098,11 @@ void IsometricRenderer::drawRouteHighlight(const MapGraph& graph,
 
             const float segDist = std::abs(pulsePos - static_cast<float>(i));
             const float segWrap = std::min(segDist, totalSegments - segDist);
-            const float pulseAlpha = std::exp(-segWrap * segWrap * 2.6f) * 0.14f;
+            const float pulseAlpha = std::exp(-segWrap * segWrap * 2.2f) * 0.12f;
 
             if (pulseAlpha > 0.01f) {
                 drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                         Color(0.76f, 0.98f, 0.95f, pulseAlpha), 3.4f);
+                         Color(0.76f, 0.98f, 0.95f, pulseAlpha), 2.8f);
             }
 
             const float segFloat = static_cast<float>(i);
@@ -1016,10 +1110,12 @@ void IsometricRenderer::drawRouteHighlight(const MapGraph& graph,
                 const float t = pulsePos - segFloat;
                 const float dotX = RenderUtils::lerp(isoFrom.x, isoTo.x, t);
                 const float dotY = RenderUtils::lerp(isoFrom.y, isoTo.y, t);
-                drawFilledCircle(dotX, dotY, 3.8f,
-                                 Color(0.64f, 1.0f, 0.96f, 0.16f));
-                drawFilledCircle(dotX, dotY, 1.7f,
-                                 Color(1.0f, 1.0f, 1.0f, 0.68f));
+                drawDiamond(dotX, dotY, 3.8f, 1.8f,
+                            Color(0.64f, 1.0f, 0.96f, 0.13f));
+                drawDiamondOutline(dotX, dotY, 2.5f, 1.2f,
+                                   Color(0.92f, 1.0f, 1.0f, 0.26f), 1.0f);
+                drawFilledCircle(dotX, dotY, 1.0f,
+                                 Color(1.0f, 1.0f, 1.0f, 0.72f));
             }
         }
     }
@@ -1029,11 +1125,9 @@ void IsometricRenderer::drawRouteHighlight(const MapGraph& graph,
         const int idx = graph.findNodeIndex(route.visitOrder[i]);
         if (idx < 0) continue;
         const WasteNode& node = graph.getNode(idx);
-        const IsoCoord iso = RenderUtils::worldToIso(node.getWorldX(), node.getWorldY());
-        const float radius = node.getIsHQ() ? 3.8f : 3.0f;
-        drawFilledCircle(iso.x, iso.y, radius + 1.3f, Color(0.12f, 0.42f, 0.46f, 0.09f));
-        drawRing(iso.x, iso.y, radius, Color(0.64f, 0.95f, 0.90f, 0.20f), 1.0f);
-        drawFilledCircle(iso.x, iso.y, radius * 0.42f, Color(0.92f, 0.99f, 0.98f, 0.26f));
+        const bool isCurrent = !node.getIsHQ() && !node.isCollected() && i == drawCount;
+        const bool isServiced = !node.getIsHQ() && node.isCollected();
+        drawWaypointMarker(node, isCurrent, isServiced);
     }
 }
 
@@ -1044,11 +1138,13 @@ void IsometricRenderer::drawRouteHighlight(const MapGraph& graph,
 void IsometricRenderer::drawWasteNode(const WasteNode& node, float time) {
     IsoCoord iso = RenderUtils::worldToIso(node.getWorldX(), node.getWorldY());
     const GarbageSizeTier sizeTier = getGarbageSizeTier(node.getWasteCapacity());
-    const float scale = getGarbageScale(sizeTier) * 1.08f;
-    const float islandScale = scale * 1.08f;
+    const float zf = RenderUtils::getProjection().tileWidth / RenderUtils::BASE_TILE_WIDTH;
+    const float scale = getGarbageScale(sizeTier) * 1.08f * zf;
+    const float islandS = scale * 0.24f;
+    const float markerS = scale * 0.42f;
+    const float s = islandS;
     const float capacityNorm = clamp01(node.getWasteCapacity() / 550.0f);
-    const NodeVisualStyle style = getNodeVisualStyle(node);
-    const float styleJitter = pseudoRandomSigned(node.getId(), 0, 913);
+    const int seed = node.getId();
     Color bodyColor = getGarbageSizeColor(sizeTier);
     Color accentColor = RenderUtils::getUrgencyColor(node.getUrgency());
 
@@ -1066,204 +1162,197 @@ void IsometricRenderer::drawWasteNode(const WasteNode& node, float time) {
                                node.getWorldY() * 0.28f) * 1.0f;
     gCurrentGarbageSinkProgress = getGarbageSinkState(node.getId());
 
-    const Color islandShadow(0.02f, 0.05f, 0.12f, node.isCollected() ? 0.12f : 0.18f);
-    drawDiamond(iso.x, iso.y + 7.2f * islandScale + bob * 0.16f,
-                11.0f * islandScale, 5.8f * islandScale, islandShadow);
-    drawFilledCircle(iso.x, iso.y + 8.8f * islandScale,
-                     5.4f * islandScale,
-                     Color(0.04f, 0.16f, 0.24f, node.isCollected() ? 0.06f : 0.10f));
+    // Keep a clear water gap between the garbage patch and the island body.
+    const float ix = iso.x - 12.0f * markerS;
+    const float iy = iso.y - 36.0f * markerS;
 
-    // Sand/rock base under each node — gives island feel
-    if (!node.isCollected()) {
-        const Color sandTop(0.76f, 0.68f, 0.49f, 0.76f);
-        const Color sandSide(0.55f, 0.45f, 0.30f, 0.70f);
-        const Color rockTop(0.50f, 0.45f, 0.38f, 0.74f);
-        const Color rockSide(0.33f, 0.29f, 0.24f, 0.70f);
-        const Color raftTop(0.52f, 0.38f, 0.23f, 0.80f);
-        const Color raftSide(0.34f, 0.22f, 0.12f, 0.76f);
-        const Color reefTop(0.10f, 0.34f, 0.40f, 0.42f);
-        const Color reefGlow(0.18f, 0.50f, 0.54f, 0.26f);
-        const Color foam(0.84f, 0.95f, 1.0f, 0.10f + capacityNorm * 0.05f);
+    // ---- Boom Beach Island Palette ----
+    const Color islandShadow(0.02f, 0.05f, 0.12f, node.isCollected() ? 0.28f : 0.22f);
+    const Color beachTop(0.86f, 0.77f, 0.56f, 1.0f);
+    const Color beachLight(0.93f, 0.84f, 0.64f, 1.0f);
+    const Color cliffFace(0.70f, 0.56f, 0.38f, 1.0f);
+    const Color cliffDark(0.50f, 0.38f, 0.24f, 1.0f);
+    const Color canopyA(0.18f, 0.52f, 0.08f, 1.0f);
+    const Color canopyB(0.28f, 0.66f, 0.12f, 1.0f);
+    const Color canopyC(0.38f, 0.78f, 0.18f, 1.0f);
+    const Color canopyD(0.46f, 0.84f, 0.24f, 1.0f);
+    const Color trunkColor(0.46f, 0.32f, 0.18f, 1.0f);
+    const Color rockTop(0.62f, 0.54f, 0.40f, 1.0f);
+    const Color rockSide(0.42f, 0.35f, 0.24f, 1.0f);
 
-        auto drawBuoy = [&](float ox, float oy, float mastHeight, float radiusScale, float glow) {
-            const float bx = iso.x + ox * islandScale;
-            const float by = iso.y + oy * islandScale + bob * 0.12f;
-            drawLine(bx, by + mastHeight * islandScale, bx, by - 0.8f * islandScale,
-                     Color(0.72f, 0.74f, 0.70f, 0.72f), 1.1f);
-            drawFilledCircle(bx, by - 1.0f * islandScale, radiusScale * islandScale,
-                             withAlpha(accentColor, glow));
-        };
+    // ---- Water shadow beneath island ----
+    drawDiamond(ix, iy + 11.0f * s + bob * 0.16f,
+                30.0f * s, 13.0f * s, islandShadow);
 
-        switch (style) {
-            case NodeVisualStyle::SANDBAR:
-                drawDiamond(iso.x + 0.3f * islandScale, iso.y + 3.2f * islandScale,
-                            14.0f * islandScale, 7.0f * islandScale,
-                            Color(0.12f, 0.38f, 0.40f, 0.15f));
-                drawDiamond(iso.x + styleJitter * 1.1f * islandScale,
-                            iso.y + 2.9f * islandScale + bob * 0.12f,
-                            11.8f * islandScale, 5.8f * islandScale,
-                            sandTop);
-                drawIsometricBlock(iso.x + styleJitter * 0.5f * islandScale,
-                                   iso.y + 2.8f * islandScale + bob * 0.10f,
-                                   7.8f * islandScale, 4.8f * islandScale,
-                                   0.7f * islandScale, shiftColor(sandTop, 0.02f), sandSide);
-                drawDiamondOutline(iso.x - 0.6f * islandScale, iso.y + 2.2f * islandScale,
-                                   8.2f * islandScale, 3.8f * islandScale,
-                                   Color(0.90f, 0.96f, 0.92f, 0.10f), 1.0f);
-                drawFilledCircle(iso.x + 3.6f * islandScale, iso.y - 1.0f * islandScale,
-                                 1.1f * islandScale, Color(0.22f, 0.54f, 0.28f, 0.54f));
-                drawFilledCircle(iso.x + 4.9f * islandScale, iso.y - 2.1f * islandScale,
-                                 0.8f * islandScale, Color(0.28f, 0.60f, 0.32f, 0.48f));
-                break;
-            case NodeVisualStyle::ROCKY:
-                drawDiamond(iso.x - 0.4f * islandScale, iso.y + 4.0f * islandScale,
-                            11.2f * islandScale, 5.4f * islandScale,
-                            Color(0.10f, 0.30f, 0.34f, 0.14f));
-                drawDiamond(iso.x - 1.2f * islandScale, iso.y + 2.8f * islandScale,
-                            7.6f * islandScale, 4.0f * islandScale,
-                            shiftColor(rockTop, -0.02f));
-                drawIsometricBlock(iso.x - 1.4f * islandScale,
-                                   iso.y + 2.9f * islandScale + bob * 0.10f,
-                                   8.2f * islandScale, 5.6f * islandScale,
-                                   2.1f * islandScale, rockTop, rockSide);
-                drawIsometricBlock(iso.x + 3.6f * islandScale,
-                                   iso.y + 1.5f * islandScale + bob * 0.08f,
-                                   5.4f * islandScale, 3.6f * islandScale,
-                                   1.6f * islandScale,
-                                   shiftColor(rockTop, 0.04f),
-                                   shiftColor(rockSide, 0.03f));
-                drawFilledCircle(iso.x - 4.8f * islandScale, iso.y - 1.2f * islandScale,
-                                 1.1f * islandScale, Color(0.18f, 0.42f, 0.26f, 0.34f));
-                break;
-            case NodeVisualStyle::RAFT:
-                drawDiamond(iso.x, iso.y + 4.3f * islandScale,
-                            13.4f * islandScale, 6.6f * islandScale,
-                            Color(0.06f, 0.18f, 0.28f, 0.22f));
-                drawDiamondOutline(iso.x, iso.y + 1.8f * islandScale,
-                                   12.8f * islandScale, 6.0f * islandScale,
-                                   foam, 1.0f);
-                drawIsometricBlock(iso.x + styleJitter * 0.6f * islandScale,
-                                   iso.y + 2.4f * islandScale + bob * 0.10f,
-                                   12.6f * islandScale, 7.0f * islandScale,
-                                   1.0f * islandScale, raftTop, raftSide);
-                for (int plank = 0; plank < 4; plank++) {
-                    const float px = -4.4f + plank * 3.0f;
-                    drawLine(iso.x + (px - 0.4f) * islandScale, iso.y + (0.8f + plank * 0.2f) * islandScale,
-                             iso.x + (px + 1.8f) * islandScale, iso.y + (2.4f + plank * 0.2f) * islandScale,
-                             Color(0.72f, 0.60f, 0.42f, 0.32f), 1.1f);
-                }
-                drawFilledCircle(iso.x - 5.8f * islandScale, iso.y + 2.2f * islandScale,
-                                 1.1f * islandScale, Color(0.86f, 0.52f, 0.18f, 0.62f));
-                drawFilledCircle(iso.x + 5.6f * islandScale, iso.y + 1.8f * islandScale,
-                                 1.1f * islandScale, Color(0.86f, 0.52f, 0.18f, 0.62f));
-                drawLine(iso.x + 4.6f * islandScale, iso.y - 1.0f * islandScale,
-                         iso.x + 4.6f * islandScale, iso.y - 6.0f * islandScale,
-                         Color(0.62f, 0.60f, 0.54f, 0.68f), 1.2f);
-                break;
-            case NodeVisualStyle::BUOY_FIELD:
-                drawDiamond(iso.x, iso.y + 2.8f * islandScale,
-                            14.2f * islandScale, 7.4f * islandScale,
-                            Color(0.08f, 0.28f, 0.34f, 0.22f));
-                drawDiamond(iso.x, iso.y + 1.8f * islandScale,
-                            10.2f * islandScale, 5.0f * islandScale,
-                            reefTop);
-                drawDiamondOutline(iso.x, iso.y + 1.8f * islandScale,
-                                   12.2f * islandScale, 6.2f * islandScale,
-                                   withAlpha(accentColor, 0.20f), 1.3f);
-                drawLine(iso.x - 4.2f * islandScale, iso.y + 1.0f * islandScale,
-                         iso.x + 4.4f * islandScale, iso.y + 4.0f * islandScale,
-                         Color(0.72f, 0.88f, 0.86f, 0.20f), 1.0f);
-                drawLine(iso.x - 4.2f * islandScale, iso.y + 4.0f * islandScale,
-                         iso.x + 4.4f * islandScale, iso.y + 1.0f * islandScale,
-                         Color(0.72f, 0.88f, 0.86f, 0.20f), 1.0f);
-                drawBuoy(-6.0f, 0.2f, 3.8f, 0.95f, 0.52f);
-                drawBuoy(5.8f, 1.2f, 4.2f, 0.95f, 0.52f);
-                drawBuoy(0.8f, -3.0f, 4.0f, 0.88f, 0.46f);
-                break;
-            case NodeVisualStyle::REEF:
-                drawDiamond(iso.x + 0.6f * islandScale, iso.y + 3.5f * islandScale,
-                            15.2f * islandScale, 7.8f * islandScale,
-                            Color(0.09f, 0.32f, 0.40f, 0.28f));
-                drawDiamond(iso.x - 0.8f * islandScale, iso.y + 2.6f * islandScale,
-                            10.8f * islandScale, 5.4f * islandScale,
-                            reefGlow);
-                drawDiamond(iso.x + 2.2f * islandScale, iso.y + 0.8f * islandScale,
-                            6.2f * islandScale, 3.0f * islandScale,
-                            Color(0.76f, 0.70f, 0.55f, 0.24f));
-                drawFilledCircle(iso.x - 3.4f * islandScale, iso.y - 0.8f * islandScale,
-                                 1.2f * islandScale, Color(0.62f, 0.44f, 0.54f, 0.34f));
-                drawFilledCircle(iso.x - 1.5f * islandScale, iso.y - 1.8f * islandScale,
-                                 0.9f * islandScale, Color(0.82f, 0.58f, 0.42f, 0.30f));
-                break;
+    {
+        const int variant = positiveMod(seed * 7 + 3, 4);
+        const float jx = pseudoRandomSigned(seed, 0, 101) * 0.5f;
+
+        // ---- 3D Cliff Landmass (Boom Beach style) ----
+        // Main island block — sand top surface with cliff face on sides
+        drawIsometricBlock(ix + jx * s, iy + 3.8f * s + bob * 0.10f,
+                           22.0f * s, 13.0f * s, 4.0f * s, beachTop, cliffDark);
+
+        // Asymmetric extension blocks give each island a unique shape
+        if (variant == 0 || variant == 2) {
+            drawIsometricBlock(ix + (jx - 10.0f) * s, iy + 2.0f * s + bob * 0.08f,
+                               13.0f * s, 8.5f * s, 3.2f * s,
+                               shiftColor(beachTop, -0.02f), shiftColor(cliffDark, -0.02f));
         }
-    } else {
-        drawDiamond(iso.x, iso.y + 4.8f * islandScale,
-                    11.2f * islandScale, 5.8f * islandScale,
-                    Color(0.40f, 0.38f, 0.34f, 0.18f));
+        if (variant == 1 || variant == 3) {
+            drawIsometricBlock(ix + (jx + 10.0f) * s, iy + 1.4f * s + bob * 0.08f,
+                               12.0f * s, 7.5f * s, 2.8f * s, beachLight, cliffFace);
+        }
+        // Secondary extension on the opposite side
+        if (variant == 0 || variant == 1) {
+            drawIsometricBlock(ix + (jx + 7.5f) * s, iy + 2.8f * s + bob * 0.07f,
+                               9.0f * s, 6.0f * s, 2.2f * s, beachLight, cliffFace);
+        } else {
+            drawIsometricBlock(ix + (jx - 7.5f) * s, iy + 2.4f * s + bob * 0.07f,
+                               10.0f * s, 6.5f * s, 2.4f * s,
+                               shiftColor(beachTop, 0.02f), shiftColor(cliffDark, 0.02f));
+        }
+        // Elevated center ridge
+        drawIsometricBlock(ix + jx * 0.3f * s, iy + 0.2f * s + bob * 0.06f,
+                           11.0f * s, 6.0f * s, 2.0f * s, beachLight, cliffFace);
+
+        // ---- Beach sand landing ----
+        drawDiamond(ix + jx * 0.2f * s, iy + 5.6f * s + bob * 0.10f,
+                    7.5f * s, 3.2f * s, beachLight);
+        // White surf lines at beach edge
+        drawLine(ix - 8.5f * s, iy + 5.6f * s + bob * 0.10f,
+                 ix - 1.5f * s, iy + 7.5f * s + bob * 0.10f,
+                 Color(1.0f, 1.0f, 1.0f, 0.84f), 1.6f);
+        drawLine(ix - 1.5f * s, iy + 7.5f * s + bob * 0.10f,
+                 ix + 6.5f * s, iy + 5.0f * s + bob * 0.10f,
+                 Color(1.0f, 1.0f, 1.0f, 0.78f), 1.4f);
+
+        // ---- Shoreline rocks ----
+        const int rockCount = 4 + static_cast<int>(capacityNorm * 4.0f);
+        for (int r = 0; r < rockCount; ++r) {
+            const float ang = static_cast<float>(r) * 6.283f /
+                              static_cast<float>(rockCount) +
+                              pseudoRandom01(seed, r, 333) * 0.5f;
+            const float dist = (10.0f + pseudoRandom01(seed, r, 444) * 3.5f) * s;
+            const float rx = ix + std::cos(ang) * dist * 0.80f;
+            const float ry = iy + std::sin(ang) * dist * 0.40f + 4.0f * s;
+            const float rSize = (1.6f + pseudoRandom01(seed, r, 555) * 1.2f) * s;
+            drawIsometricBlock(rx, ry + bob * 0.06f,
+                               rSize, rSize * 0.65f, 0.9f * s,
+                               rockTop, rockSide);
+        }
+
+        // ---- Dense opaque tree canopy — back layer ----
+        const int backCount = 9 + static_cast<int>(capacityNorm * 5.0f);
+        for (int c = 0; c < backCount; ++c) {
+            const float t = static_cast<float>(c) / static_cast<float>(backCount);
+            const float ang = t * 6.283f + pseudoRandom01(seed, c, 666) * 1.3f;
+            const float radX = (4.5f + pseudoRandom01(seed, c, 777) * 6.0f) * s;
+            const float radY = (2.2f + pseudoRandom01(seed, c, 888) * 3.5f) * s;
+            const float cx = ix + std::cos(ang) * radX * 0.58f + jx * s * 0.15f;
+            const float cy = iy + std::sin(ang) * radY * 0.38f - 5.0f * s + bob * 0.08f;
+            const float radius = (3.2f + pseudoRandom01(seed, c, 999) * 3.2f) * s;
+            const Color& canopy = (c % 4 == 0) ? canopyA :
+                                  (c % 4 == 1) ? canopyB :
+                                  (c % 4 == 2) ? canopyC : canopyD;
+            drawFilledCircle(cx, cy, radius, canopy);
+        }
+        // ---- Canopy front layer — slightly brighter for depth ----
+        const int frontCount = backCount / 2 + 1;
+        for (int c = 0; c < frontCount; ++c) {
+            const float t = static_cast<float>(c) / static_cast<float>(frontCount);
+            const float ang = t * 6.283f + pseudoRandom01(seed, c + 50, 612) * 1.5f;
+            const float radX = (3.0f + pseudoRandom01(seed, c + 50, 723) * 4.5f) * s;
+            const float radY = (1.4f + pseudoRandom01(seed, c + 50, 834) * 2.2f) * s;
+            const float cx = ix + std::cos(ang) * radX * 0.50f + jx * s * 0.10f;
+            const float cy = iy + std::sin(ang) * radY * 0.32f - 3.5f * s + bob * 0.08f;
+            const float radius = (2.8f + pseudoRandom01(seed, c + 50, 945) * 2.8f) * s;
+            const Color& canopy = ((c + 1) % 4 == 0) ? canopyA :
+                                  ((c + 1) % 4 == 1) ? canopyB :
+                                  ((c + 1) % 4 == 2) ? canopyC : canopyD;
+            drawFilledCircle(cx, cy, radius, shiftColor(canopy, 0.04f));
+        }
+
+        // ---- Palm trees ----
+        const int palmCount = 2 + static_cast<int>(capacityNorm * 3.0f);
+        for (int p = 0; p < palmCount; ++p) {
+            const float spacing = 15.0f / static_cast<float>(palmCount);
+            const float px = (-7.5f + static_cast<float>(p) * spacing +
+                              pseudoRandomSigned(seed, p, 111) * 1.5f) * s;
+            const float py = (-1.5f + pseudoRandomSigned(seed, p, 222) * 1.5f) * s;
+            // Trunk
+            drawLine(ix + px, iy + py,
+                     ix + px + 0.4f * s, iy + py - 6.5f * s,
+                     trunkColor, 1.2f);
+            // Palm fronds
+            drawFilledCircle(ix + px - 1.3f * s, iy + py - 6.8f * s,
+                             2.2f * s, canopyC);
+            drawFilledCircle(ix + px + 1.3f * s, iy + py - 7.2f * s,
+                             2.0f * s, canopyB);
+        }
+
+        // ---- Animated shore foam ring ----
+        const float foamPulse = 0.5f + 0.5f *
+            std::sin(time * 0.8f + static_cast<float>(seed) * 0.7f);
+        drawDiamondOutline(ix, iy + 9.0f * s,
+                           31.0f * s * (0.98f + foamPulse * 0.02f),
+                           13.5f * s * (0.98f + foamPulse * 0.02f),
+                           Color(0.86f, 0.96f, 1.0f, 0.08f + foamPulse * 0.05f), 1.5f);
     }
 
+    // ---- Garbage patch sprite (stays at node center, away from island) ----
     const float fillRatio = node.isCollected()
         ? 0.0f
         : clamp01(node.getWasteLevel() / 100.0f);
-    float patchX = iso.x;
-    float patchY = iso.y - 2.0f + bob;
-    float patchScale = scale * 1.14f;
-    switch (style) {
-        case NodeVisualStyle::SANDBAR:
-            patchX -= 0.4f * islandScale;
-            patchY -= 0.6f * islandScale;
-            patchScale *= 1.04f;
-            break;
-        case NodeVisualStyle::ROCKY:
-            patchX += 0.9f * islandScale;
-            patchY -= 1.0f * islandScale;
-            patchScale *= 0.96f;
-            break;
-        case NodeVisualStyle::RAFT:
-            patchY -= 0.2f * islandScale;
-            patchScale *= 0.92f;
-            break;
-        case NodeVisualStyle::BUOY_FIELD:
-            patchY -= 0.8f * islandScale;
-            patchScale *= 0.88f;
-            break;
-        case NodeVisualStyle::REEF:
-            patchX += 0.6f * islandScale;
-            patchY -= 0.9f * islandScale;
-            patchScale *= 0.98f;
-            break;
-    }
+    const float patchX = iso.x;
+    const float patchY = iso.y - 2.0f + bob;
+    const float patchScale = scale * 1.14f;
     drawGarbagePatchSprite(patchX, patchY, patchScale, bodyColor, accentColor,
                            node.isCollected(), fillRatio);
 
+    // ---- Collected glow overlay ----
+    if (node.isCollected()) {
+        const float settle = 0.4f + 0.6f * gCurrentGarbageSinkProgress;
+        drawDiamondOutline(iso.x, iso.y + 4.0f * markerS,
+                           22.0f * markerS * (0.96f + settle * 0.04f),
+                           10.0f * markerS * (0.96f + settle * 0.04f),
+                           Color(0.72f, 0.96f, 0.86f, 0.12f + settle * 0.06f), 1.1f);
+    }
+
+    // ---- Urgency indicators (around garbage at node center) ----
     if (!node.isCollected()) {
         if (node.getUrgency() != UrgencyLevel::LOW) {
-            float ringRadius = (style == NodeVisualStyle::BUOY_FIELD ? 13.6f : 11.8f) * islandScale;
-            float thickness = 1.3f;
+            float ringRadius = 16.0f * markerS;
+            float ringHeight = 7.0f * markerS;
+            float thickness = 1.2f;
             if (node.getUrgency() == UrgencyLevel::HIGH) {
-                ringRadius += 1.2f * islandScale * std::sin(time * 2.4f);
-                thickness = 1.8f;
+                ringRadius += 1.5f * markerS * std::sin(time * 2.4f);
+                ringHeight += 0.7f * markerS * std::sin(time * 2.4f);
+                thickness = 1.6f;
             }
             Color ringColor = accentColor;
-            ringColor.a = (node.getUrgency() == UrgencyLevel::HIGH) ? 0.22f : 0.12f;
-            drawRing(iso.x, iso.y + 2.0f * islandScale + bob * 0.18f,
-                     ringRadius, ringColor, thickness);
+            ringColor.a = (node.getUrgency() == UrgencyLevel::HIGH) ? 0.22f : 0.13f;
+            drawDiamondOutline(iso.x, iso.y + 2.0f * markerS + bob * 0.18f,
+                               ringRadius, ringHeight, ringColor, thickness);
+            const float braceX = ringRadius + 1.5f * markerS;
+            const float braceY = ringHeight + 0.8f * markerS;
+            drawLine(iso.x - braceX, iso.y + 2.0f * markerS + bob * 0.18f,
+                     iso.x - braceX + 2.5f * markerS,
+                     iso.y + 2.0f * markerS - braceY + bob * 0.18f,
+                     withAlpha(ringColor, ringColor.a * 0.8f), 1.0f);
+            drawLine(iso.x + braceX, iso.y + 2.0f * markerS + bob * 0.18f,
+                     iso.x + braceX - 2.5f * markerS,
+                     iso.y + 2.0f * markerS - braceY + bob * 0.18f,
+                     withAlpha(ringColor, ringColor.a * 0.8f), 1.0f);
         }
 
-        if (node.getUrgency() != UrgencyLevel::LOW &&
-            style != NodeVisualStyle::BUOY_FIELD) {
+        if (node.getUrgency() != UrgencyLevel::LOW) {
             const float beaconBob = std::sin(time * 2.0f + node.getWorldX()) * 0.6f;
-            const float beaconOffsetX =
-                (style == NodeVisualStyle::ROCKY ? 5.6f :
-                 style == NodeVisualStyle::RAFT ? 4.8f : 7.0f);
-            const float beaconOffsetY =
-                (style == NodeVisualStyle::RAFT ? -4.8f :
-                 style == NodeVisualStyle::REEF ? -5.6f : -6.8f);
-            const float bx = iso.x + beaconOffsetX * islandScale;
-            const float by = iso.y + beaconOffsetY * islandScale + bob + beaconBob;
-            drawLine(bx, by + 3.8f * islandScale, bx, by - 0.8f * islandScale,
+            const float bx = iso.x + 9.0f * markerS;
+            const float by = iso.y - 8.0f * markerS + bob + beaconBob;
+            drawLine(bx, by + 3.8f * markerS, bx, by - 0.8f * markerS,
                      Color(0.8f, 0.8f, 0.75f, 0.7f), 1.2f);
-            drawFilledCircle(bx, by - 1.3f * islandScale, 1.1f * islandScale,
+            drawFilledCircle(bx, by - 1.3f * markerS, 1.1f * markerS,
                              Color(accentColor.r, accentColor.g, accentColor.b,
                                    0.6f + 0.3f * std::sin(time * 4.0f)));
         }
@@ -1276,7 +1365,8 @@ void IsometricRenderer::drawWasteNode(const WasteNode& node, float time) {
 
 void IsometricRenderer::drawHQNode(const WasteNode& node) {
     IsoCoord iso = RenderUtils::worldToIso(node.getWorldX(), node.getWorldY());
-    const float s = 3.45f;  // uniform scale factor for HQ landmark
+    const float zf = RenderUtils::getProjection().tileWidth / RenderUtils::BASE_TILE_WIDTH;
+    const float s = 3.45f * zf;  // uniform scale factor for HQ landmark
 
     const float tide = std::sin(animationTime * 0.9f +
                                 node.getWorldX() * 0.18f +
@@ -1416,6 +1506,48 @@ void IsometricRenderer::drawHQNode(const WasteNode& node) {
              steel, 1.3f);
     drawFilledCircle(dockCx + 12.0f * s, dockCy - 8.6f * s, 1.1f * s,
                      Color(0.95f, 0.62f, 0.20f, 0.80f));
+
+    const IsoCoord radarHub{dockCx + 8.4f * s, dockCy - 10.8f * s};
+    const float radarSweep = animationTime * 0.72f;
+    drawFilledCircle(radarHub.x, radarHub.y, 0.9f * s,
+                     Color(0.54f, 0.88f, 0.98f, 0.78f));
+    drawDiamondOutline(radarHub.x, radarHub.y,
+                       4.2f * s, 1.9f * s,
+                       Color(0.48f, 0.86f, 0.96f, 0.20f), 1.0f);
+    const IsoCoord radarA{
+        radarHub.x + std::cos(radarSweep - 0.22f) * 22.0f * s,
+        radarHub.y + std::sin(radarSweep - 0.22f) * 10.0f * s
+    };
+    const IsoCoord radarB{
+        radarHub.x + std::cos(radarSweep + 0.22f) * 22.0f * s,
+        radarHub.y + std::sin(radarSweep + 0.22f) * 10.0f * s
+    };
+    drawImmediateTriangle({{radarHub, radarA, radarB}},
+                          Color(0.58f, 0.90f, 0.98f, 0.08f));
+
+    for (size_t light = 0; light < pierTops.size(); ++light) {
+        drawFilledCircle(pierTops[light].x,
+                         pierTops[light].y - 2.0f * s,
+                         0.75f * s,
+                         Color(0.98f, 0.88f, 0.62f, 0.24f + light * 0.03f));
+    }
+
+    const float skiffBob = std::sin(animationTime * 1.6f + 0.8f) * 0.5f * s;
+    drawDiamond(dockCx + 22.0f * s, dockCy + 16.2f * s + skiffBob,
+                7.4f * s, 3.0f * s,
+                Color(0.02f, 0.06f, 0.12f, 0.18f));
+    drawIsometricBlock(dockCx + 21.0f * s, dockCy + 11.8f * s + skiffBob,
+                       8.6f * s, 4.0f * s, 1.2f * s,
+                       Color(0.70f, 0.32f, 0.20f, 0.94f),
+                       Color(0.46f, 0.18f, 0.10f, 0.94f));
+    drawLine(dockCx + 21.0f * s, dockCy + 8.8f * s + skiffBob,
+             dockCx + 21.0f * s, dockCy + 3.8f * s + skiffBob,
+             Color(0.78f, 0.78f, 0.74f, 0.72f), 1.1f);
+    drawImmediateTriangle({{
+        {dockCx + 21.0f * s, dockCy + 3.8f * s + skiffBob},
+        {dockCx + 24.2f * s, dockCy + 6.0f * s + skiffBob},
+        {dockCx + 21.0f * s, dockCy + 7.0f * s + skiffBob}
+    }}, Color(0.92f, 0.94f, 0.90f, 0.72f));
 
     // Vegetation on harbor island
     drawFilledCircle(dockCx - 14.0f * s, dockCy - 2.0f * s, 3.5f * s,
@@ -1876,27 +2008,147 @@ void IsometricRenderer::drawNodeLabel(const WasteNode& /*node*/) {
 // =====================================================================
 
 void IsometricRenderer::drawDecorativeIslets(const MapGraph& graph) {
-    for (int i = 0; i < kDecorIsletCount; i++) {
-        const float rx = pseudoRandom01(i, 0, 777);
-        const float ry = pseudoRandom01(i, 1, 777);
-        const float wx = RenderUtils::lerp(gSceneBounds.minX - 0.8f,
-                                            gSceneBounds.maxX + 0.8f, rx);
-        const float wy = RenderUtils::lerp(gSceneBounds.minY - 0.8f,
-                                            gSceneBounds.maxY + 0.8f, ry);
+    auto drawLargeCoastalIsland = [&](float wx, float wy, float scaleBias,
+                                      bool lushNorth, float seedPhase) {
+        const IsoCoord iso = RenderUtils::worldToIso(wx, wy);
+        const float tide = std::sin(animationTime * 0.42f + seedPhase) * 0.6f;
+        const float zf = RenderUtils::getProjection().tileWidth / RenderUtils::BASE_TILE_WIDTH;
+        const float s = scaleBias * 2.35f * zf;
+        const Color shadow(0.02f, 0.05f, 0.12f, 0.20f);
+        const Color beachTop(0.87f, 0.77f, 0.56f, 1.0f);
+        const Color beachTopLight(0.93f, 0.84f, 0.64f, 1.0f);
+        const Color cliffFace(0.70f, 0.56f, 0.38f, 1.0f);
+        const Color cliffDark(0.50f, 0.38f, 0.24f, 1.0f);
+        const Color canopyA(0.36f, 0.77f, 0.18f, 1.0f);
+        const Color canopyB(0.28f, 0.68f, 0.14f, 1.0f);
+        const Color canopyC(0.42f, 0.84f, 0.24f, 1.0f);
+        const Color trunk(0.46f, 0.32f, 0.18f, 1.0f);
+        const Color rockTop(0.62f, 0.54f, 0.40f, 1.0f);
+        const Color rockSide(0.42f, 0.35f, 0.24f, 1.0f);
+        const float bob = std::sin(animationTime * 0.85f + seedPhase) * 0.25f * s;
 
-        // Skip if too close to an actual node
+        drawDiamond(iso.x - 2.0f * s, iso.y + 12.0f * s + bob,
+                    28.0f * s, 12.0f * s, shadow);
+
+        // Solid landmass with a front beach cove instead of stacked floating slabs.
+        drawIsometricBlock(iso.x - 8.0f * s, iso.y + 3.8f * s + bob * 0.2f,
+                           22.0f * s, 13.2f * s, 4.0f * s, beachTop, cliffDark);
+        drawIsometricBlock(iso.x - 20.5f * s, iso.y + 1.2f * s + bob * 0.15f,
+                           14.4f * s, 9.4f * s, 3.3f * s,
+                           shiftColor(beachTop, -0.02f), shiftColor(cliffDark, -0.02f));
+        drawIsometricBlock(iso.x + 10.5f * s, iso.y + 0.8f * s + bob * 0.10f,
+                           11.0f * s, 7.2f * s, 2.6f * s,
+                           beachTopLight, cliffFace);
+        drawIsometricBlock(iso.x - 2.0f * s, iso.y - 0.2f * s + bob * 0.08f,
+                           10.8f * s, 6.0f * s, 1.8f * s,
+                           beachTopLight, cliffFace);
+
+        // Beach landing where the node sits in front of the island.
+        drawDiamond(iso.x - 2.8f * s, iso.y + 5.4f * s + bob * 0.10f,
+                    7.4f * s, 3.0f * s, beachTopLight);
+        drawLine(iso.x - 8.4f * s, iso.y + 5.4f * s + bob * 0.10f,
+                 iso.x - 2.8f * s, iso.y + 7.3f * s + bob * 0.10f,
+                 Color(1.0f, 1.0f, 1.0f, 0.86f), 1.6f);
+        drawLine(iso.x - 2.8f * s, iso.y + 7.3f * s + bob * 0.10f,
+                 iso.x + 3.2f * s, iso.y + 5.0f * s + bob * 0.10f,
+                 Color(1.0f, 1.0f, 1.0f, 0.82f), 1.5f);
+
+        // Cliff stones around the shoreline.
+        const std::array<IsoCoord, 7> rocks = {{
+            {iso.x - 22.0f * s, iso.y + 4.0f * s},
+            {iso.x - 16.0f * s, iso.y + 7.0f * s},
+            {iso.x - 10.0f * s, iso.y + 8.2f * s},
+            {iso.x + 3.0f * s, iso.y + 7.6f * s},
+            {iso.x + 11.0f * s, iso.y + 5.8f * s},
+            {iso.x + 17.0f * s, iso.y + 2.2f * s},
+            {iso.x + 6.0f * s, iso.y + 0.6f * s}
+        }};
+        for (size_t i = 0; i < rocks.size(); ++i) {
+            const float rockSize = (i % 2 == 0 ? 2.2f : 1.7f) * s;
+            drawIsometricBlock(rocks[i].x, rocks[i].y + bob * 0.06f,
+                               rockSize, rockSize * 0.68f, 0.9f * s,
+                               rockTop, rockSide);
+        }
+
+        // Dense opaque canopy mass like the reference, not translucent circles.
+        const std::array<IsoCoord, 14> canopyCenters = lushNorth
+            ? std::array<IsoCoord, 14>{{
+                {iso.x - 20.0f * s, iso.y - 4.5f * s},
+                {iso.x - 14.5f * s, iso.y - 7.0f * s},
+                {iso.x - 8.5f * s, iso.y - 8.8f * s},
+                {iso.x - 2.0f * s, iso.y - 9.6f * s},
+                {iso.x + 4.8f * s, iso.y - 9.2f * s},
+                {iso.x + 10.5f * s, iso.y - 7.6f * s},
+                {iso.x + 15.0f * s, iso.y - 4.8f * s},
+                {iso.x - 17.0f * s, iso.y - 1.0f * s},
+                {iso.x - 10.5f * s, iso.y - 2.4f * s},
+                {iso.x - 4.0f * s, iso.y - 2.8f * s},
+                {iso.x + 2.5f * s, iso.y - 2.2f * s},
+                {iso.x + 8.5f * s, iso.y - 1.4f * s},
+                {iso.x - 7.0f * s, iso.y - 13.0f * s},
+                {iso.x + 1.0f * s, iso.y - 12.0f * s}
+            }}
+            : std::array<IsoCoord, 14>{{
+                {iso.x - 19.0f * s, iso.y - 5.0f * s},
+                {iso.x - 13.0f * s, iso.y - 7.4f * s},
+                {iso.x - 7.2f * s, iso.y - 9.0f * s},
+                {iso.x - 1.2f * s, iso.y - 9.5f * s},
+                {iso.x + 5.2f * s, iso.y - 8.8f * s},
+                {iso.x + 11.0f * s, iso.y - 6.6f * s},
+                {iso.x + 15.5f * s, iso.y - 3.2f * s},
+                {iso.x - 15.5f * s, iso.y - 0.8f * s},
+                {iso.x - 9.0f * s, iso.y - 2.6f * s},
+                {iso.x - 2.5f * s, iso.y - 3.0f * s},
+                {iso.x + 3.6f * s, iso.y - 2.4f * s},
+                {iso.x + 9.5f * s, iso.y - 1.6f * s},
+                {iso.x - 5.5f * s, iso.y - 12.5f * s},
+                {iso.x + 2.4f * s, iso.y - 11.5f * s}
+            }};
+        const std::array<float, 14> canopyRadii = {{
+            6.2f, 6.6f, 7.0f, 7.3f, 7.0f, 6.4f, 5.8f,
+            5.9f, 6.3f, 6.2f, 5.8f, 5.2f, 4.8f, 4.4f
+        }};
+
+        for (size_t i = 0; i < canopyCenters.size(); ++i) {
+            const Color canopy = (i % 3 == 0) ? canopyA : ((i % 3 == 1) ? canopyB : canopyC);
+            drawFilledCircle(canopyCenters[i].x,
+                             canopyCenters[i].y + bob * 0.08f,
+                             canopyRadii[i] * s, canopy);
+        }
+
+        for (int palm = 0; palm < 5; ++palm) {
+            const float px = (-17.0f + palm * 8.8f) * s;
+            const float py = (-1.0f - (palm % 2) * 2.2f) * s;
+            drawLine(iso.x + px, iso.y + py,
+                     iso.x + px + 0.5f * s, iso.y + py - 6.2f * s,
+                     trunk, 1.1f);
+            drawFilledCircle(iso.x + px - 1.2f * s, iso.y + py - 6.5f * s,
+                             2.2f * s, canopyC);
+            drawFilledCircle(iso.x + px + 1.2f * s, iso.y + py - 6.9f * s,
+                             2.0f * s, canopyB);
+        }
+    };
+
+    auto drawAmbientIslet = [&](float wx, float wy, int seed, float scaleBias,
+                                int variantOverride = -1,
+                                float minNodeDistance = 4.8f) {
         float minDist = 1e9f;
         for (const auto& node : graph.getNodes()) {
             const float dx = wx - node.getWorldX();
             const float dy = wy - node.getWorldY();
             minDist = std::min(minDist, std::sqrt(dx * dx + dy * dy));
         }
-        if (minDist < 3.0f) continue;
+        if (minDist < minNodeDistance) return;
 
         const IsoCoord iso = RenderUtils::worldToIso(wx, wy);
-        const float isletScale = 0.95f + pseudoRandom01(i, 2, 777) * 0.95f;
-        const float tide = std::sin(animationTime * 0.45f + i * 1.4f) * 0.4f;
-        const int variant = i % 4;
+        const float zf = RenderUtils::getProjection().tileWidth / RenderUtils::BASE_TILE_WIDTH;
+        const float isletScale =
+            (0.90f + pseudoRandom01(seed, 2, 777) * 0.95f) * scaleBias * zf;
+        const float tide = std::sin(animationTime * 0.45f + seed * 1.4f) * 0.4f;
+        const int variant = (variantOverride >= 0)
+            ? variantOverride
+            : positiveMod(seed + static_cast<int>(
+                pseudoRandom01(seed, 0, 811) * 9.0f), 5);
 
         // Water shadow
         drawDiamond(iso.x, iso.y + 3.5f * isletScale + tide * 0.15f,
@@ -1929,7 +2181,7 @@ void IsometricRenderer::drawDecorativeIslets(const MapGraph& graph) {
             drawDiamond(iso.x, iso.y + 0.5f + tide * 0.1f,
                         5.5f * isletScale, 2.8f * isletScale,
                         Color(0.12f, 0.38f, 0.44f, 0.28f));
-        } else {
+        } else if (variant == 3) {
             drawDiamond(iso.x, iso.y + 0.8f + tide * 0.12f,
                         7.8f * isletScale, 3.8f * isletScale,
                         Color(0.10f, 0.28f, 0.36f, 0.28f));
@@ -1945,15 +2197,69 @@ void IsometricRenderer::drawDecorativeIslets(const MapGraph& graph) {
                 drawFilledCircle(bx, by - 0.5f * isletScale, 0.45f * isletScale,
                                  Color(0.92f, 0.64f, 0.24f, 0.58f));
             }
+        } else {
+            drawDiamond(iso.x + 0.4f * isletScale, iso.y + 1.4f * isletScale + tide * 0.12f,
+                        9.4f * isletScale, 4.4f * isletScale,
+                        Color(0.08f, 0.26f, 0.34f, 0.22f));
+            drawLine(iso.x - 5.4f * isletScale, iso.y - 1.6f * isletScale,
+                     iso.x + 5.8f * isletScale, iso.y + 2.2f * isletScale,
+                     Color(0.80f, 0.92f, 0.88f, 0.22f), 1.0f);
+            drawLine(iso.x - 2.2f * isletScale, iso.y + 3.4f * isletScale,
+                     iso.x + 3.8f * isletScale, iso.y + 1.0f * isletScale,
+                     Color(0.80f, 0.92f, 0.88f, 0.18f), 1.0f);
+            drawLine(iso.x - 4.6f * isletScale, iso.y - 3.0f * isletScale,
+                     iso.x - 4.6f * isletScale, iso.y - 7.0f * isletScale,
+                     Color(0.78f, 0.78f, 0.72f, 0.62f), 0.9f);
+            drawFilledCircle(iso.x - 4.6f * isletScale, iso.y - 7.4f * isletScale,
+                             0.55f * isletScale,
+                             Color(0.96f, 0.66f, 0.22f, 0.62f));
         }
 
         // Shore foam ring
-        const float foamPulse = 0.5f + 0.5f * std::sin(animationTime * 0.9f + i * 0.7f);
+        const float foamPulse = 0.5f + 0.5f *
+            std::sin(animationTime * 0.9f + seed * 0.7f);
         drawDiamondOutline(iso.x, iso.y + 2.2f * isletScale + tide * 0.08f,
                            9.5f * isletScale * (0.97f + foamPulse * 0.03f),
                            4.8f * isletScale * (0.97f + foamPulse * 0.03f),
                            Color(0.86f, 0.96f, 1.0f, 0.06f + foamPulse * 0.05f), 1.0f);
+    };
+
+    for (int i = 0; i < kDecorIsletCount; i++) {
+        const float rx = pseudoRandom01(i, 0, 777);
+        const float ry = pseudoRandom01(i, 1, 777);
+        const float wx = RenderUtils::lerp(gSceneBounds.minX - 0.8f,
+                                            gSceneBounds.maxX + 0.8f, rx);
+        const float wy = RenderUtils::lerp(gSceneBounds.minY - 0.8f,
+                                            gSceneBounds.maxY + 0.8f, ry);
+        drawAmbientIslet(wx, wy, i, 1.0f);
     }
+
+    auto drawIsletNearNode = [&](int nodeId, float offsetX, float offsetY,
+                                 float scaleBias, int seed,
+                                 int variantOverride,
+                                 float minNodeDistance) {
+        const int idx = graph.findNodeIndex(nodeId);
+        if (idx < 0) return;
+        const WasteNode& node = graph.getNode(idx);
+        drawAmbientIslet(node.getWorldX() + offsetX,
+                         node.getWorldY() + offsetY,
+                         seed, scaleBias, variantOverride, minNodeDistance);
+    };
+
+    auto drawLargeIslandNearNode = [&](int nodeId, float offsetX, float offsetY,
+                                       float scaleBias, bool lushNorth,
+                                       float seedPhase) {
+        const int idx = graph.findNodeIndex(nodeId);
+        if (idx < 0) return;
+        const WasteNode& node = graph.getNode(idx);
+        drawLargeCoastalIsland(node.getWorldX() + offsetX,
+                               node.getWorldY() + offsetY,
+                               scaleBias, lushNorth, seedPhase);
+    };
+
+    // Keep the decorative landmasses well away from the playable cleanup nodes.
+    drawLargeIslandNearNode(1, -7.8f, -2.4f, 1.12f, true, 21.0f);
+    drawLargeIslandNearNode(9, -7.2f,  2.8f, 1.24f, false, 24.0f);
 }
 
 // =====================================================================
@@ -2010,6 +2316,30 @@ void IsometricRenderer::drawAtmosphericEffects(const MapGraph& graph) {
         }
     }
 
+    for (int marker = 0; marker < 4; ++marker) {
+        const float mx = RenderUtils::lerp(paddedMinX + 1.2f, paddedMaxX - 1.4f,
+                                           pseudoRandom01(marker, 4, 933));
+        const float my = RenderUtils::lerp(paddedMinY + 1.0f, paddedMaxY - 1.2f,
+                                           pseudoRandom01(marker, 5, 933));
+        float minDist = 1.0e9f;
+        for (const auto& node : graph.getNodes()) {
+            const float dx = mx - node.getWorldX();
+            const float dy = my - node.getWorldY();
+            minDist = std::min(minDist, std::sqrt(dx * dx + dy * dy));
+        }
+        if (minDist < 3.8f) continue;
+
+        const IsoCoord markerIso = RenderUtils::worldToIso(mx, my);
+        const float bob = std::sin(animationTime * (0.8f + marker * 0.1f) + marker) * 0.5f;
+        drawLine(markerIso.x, markerIso.y - 6.0f + bob,
+                 markerIso.x, markerIso.y - 0.8f + bob,
+                 Color(0.70f, 0.74f, 0.72f, 0.48f), 0.9f);
+        drawFilledCircle(markerIso.x, markerIso.y - 1.2f + bob, 1.0f,
+                         Color(0.94f, 0.70f, 0.24f, 0.32f));
+        drawDiamond(markerIso.x, markerIso.y + 2.2f + bob,
+                    3.6f, 1.4f, Color(0.62f, 0.88f, 0.94f, 0.05f));
+    }
+
     for (int edge = 0; edge < 3; edge++) {
         const float wy = paddedMaxY + 2.5f + edge * 0.4f;
         const float waveShift = std::sin(animationTime * (0.15f + edge * 0.04f) + edge) * 0.5f;
@@ -2032,6 +2362,10 @@ void IsometricRenderer::drawAtmosphericEffects(const MapGraph& graph) {
                               5.0f, 3.8f, 0.28f, 0.24f, animationTime, 10.8f,
                               Color(0.98f, 0.93f, 0.78f, 0.045f),
                               Color(0.80f, 0.84f, 0.76f, 0.012f));
+        drawOrganicWorldPatch(hq.getWorldX() + 1.4f, hq.getWorldY() - 0.8f,
+                              7.4f, 4.8f, -0.22f, 0.20f, animationTime, 14.1f,
+                              Color(0.34f, 0.74f, 0.84f, 0.026f),
+                              Color(0.18f, 0.42f, 0.52f, 0.008f));
         drawOrganicWorldPatch(centerX, centerY,
                               (paddedMaxX - paddedMinX) * 0.20f,
                               (paddedMaxY - paddedMinY) * 0.14f,

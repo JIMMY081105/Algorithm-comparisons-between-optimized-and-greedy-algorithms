@@ -1,17 +1,11 @@
-// Smart Waste Clearance and Management System
-// EcoRoute Solutions Sdn Bhd — Simulation & Decision-Support Tool
-//
-// This application simulates waste collection route planning for a
-// fictitious Malaysian waste management company. It provides an isometric
-// 3D-style dashboard for visualizing and comparing four different routing
-// algorithms: Regular, Greedy, MST, and TSP.
-//
-// Built with C++17, OpenGL, GLFW, and Dear ImGui.
-
 #include "app/Application.h"
-#include <iostream>
-#include <stdexcept>
 
+#include <exception>
+#include <iostream>
+
+// Entry point for the ocean-cleanup route planning simulation.
+// main() stays intentionally small so startup, runtime, and shutdown concerns
+// remain owned by the Application class.
 int main() {
     try {
         Application app;
@@ -23,7 +17,6 @@ int main() {
 
         app.run();
         app.shutdown();
-
     } catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;
         return 1;

@@ -1,41 +1,44 @@
 #ifndef WASTE_SYSTEM_H
 #define WASTE_SYSTEM_H
 
-#include <vector>
-#include <random>
-#include "MapGraph.h"
 #include "CostModel.h"
 #include "EventLog.h"
+#include "MapGraph.h"
 #include "RouteResult.h"
 
-// The main simulation manager that ties together the map, cost model,
-// and event log. It handles waste generation, node eligibility checks,
-// and provides the data that algorithms and the UI need to operate.
+#include <random>
+#include <vector>
+
+// Central simulation state for the coursework scenario.
+// WasteSystem owns the fixed map, the current day's waste levels, the
+// collection threshold, and the event log consumed by the UI.
 class WasteSystem {
 private:
     MapGraph graph;
     CostModel costModel;
     EventLog eventLog;
-    std::mt19937 rng;           // Mersenne Twister for quality randomness
+    std::mt19937 rng;
     unsigned int currentSeed;
     int dayNumber;
 
-    // Threshold for route eligibility — nodes below this won't be serviced
+    // Nodes below the threshold are ignored when algorithms build routes.
     float collectionThreshold;
+
+    void addDefaultLocations();
+    void assignWasteLevelsForCurrentDay();
 
 public:
     WasteSystem();
 
-    // Initialize the predefined Malaysian city map with fixed node positions
+    // Initialize the fixed Indian Ocean cleanup sector used across the app.
     void initializeMap();
 
-    // Generate a new day: randomize waste levels across all non-HQ nodes
+    // Generate a fresh simulation day using a time-based seed.
     void generateNewDay();
 
-    // Generate with a specific seed for reproducible testing
+    // Generate the day with a specific seed for reproducible demos and testing.
     void generateNewDayWithSeed(unsigned int seed);
 
-    // Access to subsystems
     MapGraph& getGraph();
     const MapGraph& getGraph() const;
     CostModel& getCostModel();
@@ -43,26 +46,21 @@ public:
     EventLog& getEventLog();
     const EventLog& getEventLog() const;
 
-    // Threshold management
     float getCollectionThreshold() const;
     void setCollectionThreshold(float threshold);
 
-    // Get node IDs that are eligible for collection (above threshold)
+    // Return the node IDs eligible for collection on the current day.
     std::vector<int> getEligibleNodes(float thresholdOverride = -1.0f) const;
 
-    // Mark a node as collected
+    // Mark a node as collected so playback and rendering can show progress.
     void markNodeCollected(int nodeId);
 
-    // Reset all nodes to uncollected (for running a different algorithm)
+    // Clear the collected state before a fresh comparison or replay.
     void resetCollectionStatus();
 
-    // Compute total waste collected for a given route
     float computeWasteCollected(const std::vector<int>& route) const;
-
-    // Fill in a RouteResult's cost fields from its distance
     void populateCosts(RouteResult& result) const;
 
-    // Day info
     int getDayNumber() const;
     unsigned int getCurrentSeed() const;
 };
