@@ -99,6 +99,7 @@ private:
 
     struct PairRouteData {
         std::vector<PlaybackPoint> polyline;
+        std::vector<float> segmentSpeedFactors;
         RouteInsight insight;
         bool valid = false;
     };
@@ -128,6 +129,7 @@ private:
     std::vector<int> shortestPath(int startIntersection, int endIntersection) const;
 
     float roadCost(const RoadSegment& road) const;
+    float roadTravelSpeedFactor(const RoadSegment& road) const;
     float weatherDistanceMultiplier() const;
     float weatherOverlayStrength() const;
     bool isTrafficLightGreen(const Intersection& intersection, float animationTime) const;

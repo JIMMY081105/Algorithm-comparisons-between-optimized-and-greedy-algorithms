@@ -21,6 +21,7 @@ struct PlaybackStop {
 struct PlaybackPath {
     std::vector<PlaybackPoint> points;
     std::vector<float> cumulativeDistances;
+    std::vector<float> segmentSpeedFactors;
     std::vector<PlaybackStop> stops;
     float totalLength = 0.0f;
 

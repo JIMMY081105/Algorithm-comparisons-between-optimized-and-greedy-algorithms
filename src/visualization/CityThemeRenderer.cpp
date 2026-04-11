@@ -5,6 +5,7 @@
 
 #include <glad/glad.h>
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -16,9 +17,45 @@ constexpr float kCityPaddingX = 2.0f;
 constexpr float kCityPaddingY = 1.8f;
 constexpr float kCongestionPenaltyScale = 0.75f;
 constexpr float kIncidentPenaltyScale = 1.75f;
+constexpr int kBuildingsPerSquareRows = 5;
+constexpr int kBuildingsPerSquareColumns = 10;
+constexpr int kBuildingsPerSquare = kBuildingsPerSquareRows * kBuildingsPerSquareColumns;
 
 float clamp01(float value) {
     return std::max(0.0f, std::min(1.0f, value));
+}
+
+float currentZoomFactor() {
+    return RenderUtils::getProjection().tileWidth / RenderUtils::BASE_TILE_WIDTH;
+}
+
+template <std::size_t N>
+void normalizeWeights(std::array<float, N>& weights, float targetSpan) {
+    float sum = 0.0f;
+    for (const float weight : weights) {
+        sum += weight;
+    }
+
+    if (sum <= 0.0001f) {
+        weights.fill(targetSpan / static_cast<float>(N));
+        return;
+    }
+
+    const float scale = targetSpan / sum;
+    for (float& weight : weights) {
+        weight *= scale;
+    }
+}
+
+float hotspotInfluence(float x, float y,
+                       float hotspotX, float hotspotY,
+                       float radiusX, float radiusY) {
+    const float safeRadiusX = std::max(radiusX, 0.001f);
+    const float safeRadiusY = std::max(radiusY, 0.001f);
+    const float dx = (x - hotspotX) / safeRadiusX;
+    const float dy = (y - hotspotY) / safeRadiusY;
+    const float distance = std::sqrt(dx * dx + dy * dy);
+    return 1.0f - RenderUtils::smoothstep(clamp01(distance));
 }
 
 Color mixColor(const Color& from, const Color& to, float t) {
@@ -151,8 +188,28 @@ MissionPresentation CityThemeRenderer::buildMissionPresentation(
             continue;
         }
 
-        for (const PlaybackPoint& point : pair.polyline) {
-            appendDistinctPoint(pathPoints, point);
+        if (pair.polyline.empty()) {
+            continue;
+        }
+
+        if (pathPoints.empty()) {
+            pathPoints.push_back(pair.polyline.front());
+        }
+
+        for (std::size_t pointIndex = 1; pointIndex < pair.polyline.size(); ++pointIndex) {
+            const PlaybackPoint& nextPoint = pair.polyline[pointIndex];
+            if (pointDistance(pathPoints.back().x, pathPoints.back().y,
+                              nextPoint.x, nextPoint.y) <= 0.001f) {
+                continue;
+            }
+
+            pathPoints.push_back(nextPoint);
+            if (pointIndex - 1 < pair.segmentSpeedFactors.size()) {
+                presentation.playbackPath.segmentSpeedFactors.push_back(
+                    pair.segmentSpeedFactors[pointIndex - 1]);
+            } else {
+                presentation.playbackPath.segmentSpeedFactors.push_back(1.0f);
+            }
         }
 
         stopNodeIds.push_back(route.visitOrder[leg + 1]);
@@ -177,7 +234,8 @@ MissionPresentation CityThemeRenderer::buildMissionPresentation(
     }
 
     presentation.playbackPath = MissionPresentationUtils::buildPlaybackPath(
-        pathPoints, stopNodeIds, stopPointIndices);
+        pathPoints, stopNodeIds, stopPointIndices,
+        presentation.playbackPath.segmentSpeedFactors);
 
     const float avgCongestion = dashboardInfo.congestionLevel * 100.0f;
     presentation.narrative =
@@ -298,8 +356,27 @@ void CityThemeRenderer::drawTransitNetwork(
         const float midY = (isoFrom.y + isoTo.y) * 0.5f;
         renderer.drawDiamond(midX, midY, 2.4f, 1.0f,
                              Color(0.92f, 0.88f, 0.62f, 0.12f));
+    }
 
-        if (road.incident && layerToggles.showIncidents) {
+    // Draw buildings after the road bed so tall towers can occlude streets
+    // from the current camera angle instead of leaving roads painted on top.
+    for (const auto& building : buildings) {
+        drawBuildingLot(renderer, building);
+    }
+
+    if (layerToggles.showIncidents) {
+        for (std::size_t i = 0; i < roads.size(); ++i) {
+            const RoadSegment& road = roads[i];
+            if (!road.incident) {
+                continue;
+            }
+
+            const Intersection& from = intersections[road.from];
+            const Intersection& to = intersections[road.to];
+            const IsoCoord isoFrom = RenderUtils::worldToIso(from.x, from.y);
+            const IsoCoord isoTo = RenderUtils::worldToIso(to.x, to.y);
+            const float midX = (isoFrom.x + isoTo.x) * 0.5f;
+            const float midY = (isoFrom.y + isoTo.y) * 0.5f;
             renderer.drawLine(midX - 4.0f, midY - 3.0f, midX + 4.0f, midY + 3.0f,
                               Color(1.0f, 0.24f, 0.18f, 0.78f), 1.6f);
             renderer.drawLine(midX - 4.0f, midY + 3.0f, midX + 4.0f, midY - 3.0f,
@@ -434,6 +511,8 @@ void CityThemeRenderer::drawTruck(IsometricRenderer& renderer,
     }
 
     const float bob = std::sin(animationTime * 5.0f) * 0.6f;
+    renderer.drawRing(iso.x, iso.y + bob, 7.0f,
+                      Color(0.22f, 0.90f, 1.0f, 0.20f), 1.5f);
     renderer.drawDiamond(iso.x, iso.y + bob, 5.0f, 2.4f,
                          Color(0.96f, 0.74f, 0.18f, 0.96f));
     renderer.drawDiamondOutline(iso.x, iso.y + bob, 5.0f, 2.4f,
@@ -446,9 +525,7 @@ void CityThemeRenderer::drawTruck(IsometricRenderer& renderer,
 void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
                                                const MapGraph&,
                                                float) {
-    for (const auto& building : buildings) {
-        drawBuildingLot(renderer, building);
-    }
+    (void)renderer;
 }
 
 void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
@@ -594,35 +671,145 @@ void CityThemeRenderer::assignNodeAnchors(const MapGraph& graph) {
 
 void CityThemeRenderer::generateBuildings(const MapGraph&, std::mt19937& rng) {
     buildings.clear();
-    std::uniform_real_distribution<float> widthDistribution(1.0f, 1.8f);
-    std::uniform_real_distribution<float> depthDistribution(0.9f, 1.5f);
-    std::uniform_real_distribution<float> heightDistribution(6.0f, 22.0f);
-    std::uniform_real_distribution<float> hueDistribution(-0.06f, 0.08f);
-    std::bernoulli_distribution towerDistribution(0.32);
+    buildings.reserve((gridRows - 1) * (gridColumns - 1) * kBuildingsPerSquare);
+    std::uniform_real_distribution<float> columnWeightDistribution(0.72f, 1.50f);
+    std::uniform_real_distribution<float> rowWeightDistribution(0.70f, 1.45f);
+    std::uniform_real_distribution<float> widthFillDistribution(0.88f, 1.34f);
+    std::uniform_real_distribution<float> depthFillDistribution(0.86f, 1.30f);
+    std::uniform_real_distribution<float> hueDistribution(-0.03f, 0.05f);
+    std::uniform_real_distribution<float> centerBiasDistribution(0.26f, 0.74f);
+    std::uniform_real_distribution<float> positionJitter(-0.16f, 0.16f);
+    std::uniform_real_distribution<float> blockTallnessDistribution(0.0f, 1.0f);
+    std::uniform_real_distribution<float> skylineBiasDistribution(0.0f, 1.0f);
+    std::uniform_real_distribution<float> massNoiseDistribution(0.0f, 1.0f);
+    std::uniform_real_distribution<float> hotspotDistribution(0.14f, 0.86f);
+    std::uniform_real_distribution<float> hotspotRadiusDistribution(0.16f, 0.38f);
+    std::uniform_real_distribution<float> heightNoiseDistribution(0.0f, 8.0f);
+    std::uniform_real_distribution<float> towerBoostDistribution(14.0f, 30.0f);
+    std::uniform_int_distribution<int> signatureLotDistribution(0, kBuildingsPerSquare - 1);
+    std::bernoulli_distribution towerDistribution(0.14);
 
     for (int row = 0; row + 1 < gridRows; ++row) {
         for (int col = 0; col + 1 < gridColumns; ++col) {
             const Intersection& a = intersections[row * gridColumns + col];
             const Intersection& b = intersections[row * gridColumns + col + 1];
             const Intersection& c = intersections[(row + 1) * gridColumns + col];
-            const float centerX = (a.x + b.x) * 0.5f;
-            const float centerY = (a.y + c.y) * 0.5f;
+            const float blockMinX = RenderUtils::lerp(a.x, b.x, 0.08f);
+            const float blockMaxX = RenderUtils::lerp(a.x, b.x, 0.92f);
+            const float blockMinY = RenderUtils::lerp(a.y, c.y, 0.10f);
+            const float blockMaxY = RenderUtils::lerp(a.y, c.y, 0.90f);
+            const float blockSpanX = blockMaxX - blockMinX;
+            const float blockSpanY = blockMaxY - blockMinY;
+            const float blockTallness = blockTallnessDistribution(rng);
+            const float skylineBias = skylineBiasDistribution(rng);
+            const int signatureLotA = signatureLotDistribution(rng);
+            const int signatureLotB = signatureLotDistribution(rng);
+            const float primaryHotspotX = hotspotDistribution(rng);
+            const float primaryHotspotY = hotspotDistribution(rng);
+            const float secondaryHotspotX = hotspotDistribution(rng);
+            const float secondaryHotspotY = hotspotDistribution(rng);
+            const float primaryRadiusX = hotspotRadiusDistribution(rng);
+            const float primaryRadiusY = hotspotRadiusDistribution(rng);
+            const float secondaryRadiusX = hotspotRadiusDistribution(rng) * 1.25f;
+            const float secondaryRadiusY = hotspotRadiusDistribution(rng) * 1.25f;
+            const float blockBulk = 1.08f + skylineBias * 0.22f + blockTallness * 0.16f;
+            const float blockStretchX = 0.92f + massNoiseDistribution(rng) * 0.24f;
+            const float blockStretchY = 0.92f + massNoiseDistribution(rng) * 0.24f;
 
-            for (int lot = 0; lot < 2; ++lot) {
-                const float offsetX = (lot == 0 ? -0.8f : 0.8f) * widthDistribution(rng);
-                const float offsetY = (lot == 0 ? -0.5f : 0.5f) * depthDistribution(rng);
-                buildings.push_back(BuildingLot{
-                    centerX + offsetX,
-                    centerY + offsetY,
-                    widthDistribution(rng),
-                    depthDistribution(rng),
-                    heightDistribution(rng),
-                    hueDistribution(rng),
-                    towerDistribution(rng)
-                });
+            std::array<float, kBuildingsPerSquareColumns> columnWidths{};
+            std::array<float, kBuildingsPerSquareRows> rowHeights{};
+            for (float& width : columnWidths) {
+                width = columnWeightDistribution(rng);
+            }
+            for (float& height : rowHeights) {
+                height = rowWeightDistribution(rng);
+            }
+            normalizeWeights(columnWidths, blockSpanX);
+            normalizeWeights(rowHeights, blockSpanY);
+
+            std::array<float, kBuildingsPerSquareColumns + 1> columnOffsets{};
+            std::array<float, kBuildingsPerSquareRows + 1> rowOffsets{};
+            columnOffsets[0] = 0.0f;
+            rowOffsets[0] = 0.0f;
+            for (int index = 0; index < kBuildingsPerSquareColumns; ++index) {
+                columnOffsets[index + 1] = columnOffsets[index] + columnWidths[index];
+            }
+            for (int index = 0; index < kBuildingsPerSquareRows; ++index) {
+                rowOffsets[index + 1] = rowOffsets[index] + rowHeights[index];
+            }
+
+            for (int blockRow = 0; blockRow < kBuildingsPerSquareRows; ++blockRow) {
+                for (int blockCol = 0; blockCol < kBuildingsPerSquareColumns; ++blockCol) {
+                    const int slotIndex = blockRow * kBuildingsPerSquareColumns + blockCol;
+                    const float cellMinX = blockMinX + columnOffsets[blockCol];
+                    const float cellMaxX = blockMinX + columnOffsets[blockCol + 1];
+                    const float cellMinY = blockMinY + rowOffsets[blockRow];
+                    const float cellMaxY = blockMinY + rowOffsets[blockRow + 1];
+                    const float cellSpanX = cellMaxX - cellMinX;
+                    const float cellSpanY = cellMaxY - cellMinY;
+                    const float localX =
+                        (columnOffsets[blockCol] + columnOffsets[blockCol + 1]) * 0.5f / blockSpanX;
+                    const float localY =
+                        (rowOffsets[blockRow] + rowOffsets[blockRow + 1]) * 0.5f / blockSpanY;
+                    const float hotspotA = hotspotInfluence(localX, localY,
+                                                            primaryHotspotX, primaryHotspotY,
+                                                            primaryRadiusX, primaryRadiusY);
+                    const float hotspotB = hotspotInfluence(localX, localY,
+                                                            secondaryHotspotX, secondaryHotspotY,
+                                                            secondaryRadiusX, secondaryRadiusY);
+                    const float urbanCore = clamp01(std::max(hotspotA, hotspotB * 0.82f) +
+                                                    blockTallness * 0.28f +
+                                                    skylineBias * 0.18f +
+                                                    massNoiseDistribution(rng) * 0.20f);
+                    const bool tower = slotIndex == signatureLotA ||
+                                       slotIndex == signatureLotB ||
+                                       (urbanCore > 0.82f &&
+                                        (skylineBias > 0.34f || blockTallness > 0.56f) &&
+                                        towerDistribution(rng));
+                    const float width =
+                        cellSpanX * widthFillDistribution(rng) *
+                        (0.92f + urbanCore * 0.26f) * blockBulk * blockStretchX;
+                    const float depth =
+                        cellSpanY * depthFillDistribution(rng) *
+                        (0.90f + urbanCore * 0.24f) * blockBulk * blockStretchY;
+                    const float heightBias =
+                        clamp01(0.18f + blockTallness * 0.36f + urbanCore * 0.46f);
+                    float height = 8.0f + heightBias * 16.0f +
+                                   skylineBias * 4.0f + heightNoiseDistribution(rng);
+                    if (tower) {
+                        height += towerBoostDistribution(rng);
+                    } else if (urbanCore < 0.14f) {
+                        height *= 0.86f;
+                    }
+
+                    const float centerX = RenderUtils::lerp(cellMinX, cellMaxX,
+                                                            centerBiasDistribution(rng)) +
+                                          cellSpanX * positionJitter(rng) * 0.18f;
+                    const float centerY = RenderUtils::lerp(cellMinY, cellMaxY,
+                                                            centerBiasDistribution(rng)) +
+                                          cellSpanY * positionJitter(rng) * 0.18f;
+
+                    buildings.push_back(BuildingLot{
+                        centerX,
+                        centerY,
+                        width,
+                        depth,
+                        height,
+                        hueDistribution(rng),
+                        tower
+                    });
+                }
             }
         }
     }
+
+    std::sort(buildings.begin(), buildings.end(),
+              [](const BuildingLot& lhs, const BuildingLot& rhs) {
+                  if (std::abs(lhs.y - rhs.y) > 0.02f) {
+                      return lhs.y < rhs.y;
+                  }
+                  return lhs.x < rhs.x;
+              });
 }
 
 void CityThemeRenderer::generateAmbientCars(std::mt19937& rng) {
@@ -666,6 +853,7 @@ void CityThemeRenderer::refreshPairRoutes(const MapGraph& graph) {
             appendDistinctPoint(routeData.polyline,
                                 PlaybackPoint{intersections[nodeAnchors[fromIndex]].x,
                                               intersections[nodeAnchors[fromIndex]].y});
+            routeData.segmentSpeedFactors.push_back(1.0f);
 
             float roadBaseDistance = 0.0f;
             float congestionPenalty = 0.0f;
@@ -692,6 +880,7 @@ void CityThemeRenderer::refreshPairRoutes(const MapGraph& graph) {
                     ? road.baseLength * kIncidentPenaltyScale
                     : 0.0f;
                 signalPenalty += road.signalDelay;
+                routeData.segmentSpeedFactors.push_back(roadTravelSpeedFactor(road));
             }
 
             appendDistinctPoint(routeData.polyline,
@@ -699,6 +888,7 @@ void CityThemeRenderer::refreshPairRoutes(const MapGraph& graph) {
                                               intersections[nodeAnchors[toIndex]].y});
             appendDistinctPoint(routeData.polyline,
                                 PlaybackPoint{toNode.getWorldX(), toNode.getWorldY()});
+            routeData.segmentSpeedFactors.push_back(1.0f);
 
             const float spurDistance =
                 pointDistance(fromNode.getWorldX(), fromNode.getWorldY(),
@@ -726,6 +916,8 @@ void CityThemeRenderer::refreshPairRoutes(const MapGraph& graph) {
 
             PairRouteData reverseRoute = routeData;
             std::reverse(reverseRoute.polyline.begin(), reverseRoute.polyline.end());
+            std::reverse(reverseRoute.segmentSpeedFactors.begin(),
+                         reverseRoute.segmentSpeedFactors.end());
             reverseRoute.insight.fromNodeId = routeData.insight.toNodeId;
             reverseRoute.insight.toNodeId = routeData.insight.fromNodeId;
             pairRoutes[toIndex][fromIndex] = reverseRoute;
@@ -788,6 +980,16 @@ float CityThemeRenderer::roadCost(const RoadSegment& road) const {
            road.baseLength * road.congestion * kCongestionPenaltyScale +
            (road.incident ? road.baseLength * kIncidentPenaltyScale : 0.0f) +
            road.signalDelay;
+}
+
+float CityThemeRenderer::roadTravelSpeedFactor(const RoadSegment& road) const {
+    if (road.incident || road.congestion >= 0.82f) {
+        return 0.25f;
+    }
+    if (road.congestion >= 0.58f) {
+        return 0.50f;
+    }
+    return 1.0f;
 }
 
 float CityThemeRenderer::weatherDistanceMultiplier() const {
@@ -885,11 +1087,11 @@ void CityThemeRenderer::drawRoutePath(IsometricRenderer& renderer,
             RenderUtils::worldToIso(path.points[i - 1].x, path.points[i - 1].y);
         const IsoCoord isoTo = RenderUtils::worldToIso(endX, endY);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.08f, 0.10f, 0.12f, 0.30f + pulse * 0.08f), 8.0f);
+                          Color(0.08f, 0.10f, 0.12f, 0.38f + pulse * 0.08f), 9.0f);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.24f, 0.84f, 0.96f, 0.22f + pulse * 0.10f), 3.0f);
+                          Color(0.24f, 0.84f, 0.96f, 0.30f + pulse * 0.10f), 3.8f);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.94f, 0.98f, 1.0f, 0.12f + pulse * 0.08f), 1.0f);
+                          Color(0.94f, 0.98f, 1.0f, 0.18f + pulse * 0.08f), 1.2f);
     }
 
     for (const auto& stop : path.stops) {
@@ -904,19 +1106,60 @@ void CityThemeRenderer::drawRoutePath(IsometricRenderer& renderer,
 void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                                         const BuildingLot& building) const {
     const IsoCoord iso = RenderUtils::worldToIso(building.x, building.y);
-    const Color roof = mixColor(Color(0.46f, 0.52f, 0.60f, 0.98f),
-                                Color(0.78f, 0.84f, 0.90f, 0.98f),
-                                0.35f + building.hueShift);
-    const Color side = mixColor(Color(0.18f, 0.20f, 0.26f, 0.98f),
-                                Color(0.34f, 0.38f, 0.46f, 0.98f),
-                                0.30f + building.hueShift);
-    const float height = building.tower ? building.height * 1.3f : building.height;
+    const float zf = currentZoomFactor();
+    const float shapeNoise = clamp01((building.hueShift + 0.03f) / 0.08f);
+    const Color podiumRoof = mixColor(Color(0.03f, 0.03f, 0.04f, 0.98f),
+                                      Color(0.09f, 0.09f, 0.10f, 0.98f),
+                                      0.24f + building.hueShift);
+    const Color podiumSide = mixColor(Color(0.0f, 0.0f, 0.0f, 0.96f),
+                                      Color(0.05f, 0.05f, 0.06f, 0.96f),
+                                      0.18f + building.hueShift);
+    const Color roof = mixColor(Color(0.04f, 0.04f, 0.05f, 0.98f),
+                                Color(0.12f, 0.12f, 0.13f, 0.98f),
+                                0.28f + building.hueShift);
+    const Color side = mixColor(Color(0.01f, 0.01f, 0.02f, 0.98f),
+                                Color(0.07f, 0.07f, 0.08f, 0.98f),
+                                0.22f + building.hueShift);
+    const float totalHeight =
+        (building.tower ? building.height * 1.78f : building.height * 1.34f) * zf;
+    const float podiumRatio = building.tower
+        ? 0.16f + shapeNoise * 0.08f
+        : 0.10f + shapeNoise * 0.10f;
+    const float podiumHeight =
+        std::max(2.8f * zf, totalHeight * podiumRatio);
+    const float shaftHeight = std::max(4.4f * zf, totalHeight - podiumHeight);
+    const float podiumWidth = building.width * (12.0f + shapeNoise * 1.8f) * zf;
+    const float podiumDepth = building.depth * (9.6f + shapeNoise * 1.4f) * zf;
+    const float shaftTaper = building.tower
+        ? 0.60f + shapeNoise * 0.20f
+        : 0.78f + shapeNoise * 0.18f;
+    const float shaftWidth = podiumWidth * shaftTaper;
+    const float shaftDepth = podiumDepth * (shaftTaper + 0.02f);
+    const float shadowOffsetY = 8.0f * zf;
+    const float podiumBaseYOffset = 1.2f * zf;
 
-    renderer.drawDiamond(iso.x, iso.y + 6.0f, building.width * 10.0f,
-                         building.depth * 5.0f, Color(0.12f, 0.14f, 0.16f, 0.18f));
-    renderer.drawIsometricBlock(iso.x, iso.y, building.width * 10.0f,
-                                building.depth * 8.0f, height,
+    renderer.drawDiamond(iso.x, iso.y + shadowOffsetY, podiumWidth * 1.08f,
+                         podiumDepth * 0.56f, Color(0.02f, 0.02f, 0.02f, 0.26f));
+    renderer.drawIsometricBlock(iso.x, iso.y + podiumBaseYOffset, podiumWidth,
+                                podiumDepth, podiumHeight,
+                                podiumRoof, podiumSide);
+    renderer.drawIsometricBlock(iso.x, iso.y - podiumHeight, shaftWidth,
+                                shaftDepth, shaftHeight,
                                 roof, side);
+
+    if (building.tower) {
+        renderer.drawIsometricBlock(iso.x, iso.y - podiumHeight - shaftHeight,
+                                    shaftWidth * (0.34f + shapeNoise * 0.18f),
+                                    shaftDepth * (0.34f + shapeNoise * 0.18f),
+                                    std::max(2.0f * zf, shaftHeight * (0.10f + shapeNoise * 0.05f)),
+                                    Color(0.14f, 0.14f, 0.15f, 0.98f),
+                                    Color(0.04f, 0.04f, 0.05f, 0.96f));
+    }
+
+    renderer.drawDiamondOutline(iso.x, iso.y - podiumHeight - shaftHeight,
+                                shaftWidth * 0.48f, shaftDepth * 0.24f,
+                                Color(0.18f, 0.18f, 0.20f, 0.34f),
+                                std::max(0.8f, 0.8f * zf));
 }
 
 void CityThemeRenderer::drawTrafficLight(IsometricRenderer& renderer,

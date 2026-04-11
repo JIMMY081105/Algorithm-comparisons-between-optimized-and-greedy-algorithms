@@ -12,7 +12,8 @@ float distanceBetween(const PlaybackPoint& a, const PlaybackPoint& b);
 
 PlaybackPath buildPlaybackPath(const std::vector<PlaybackPoint>& points,
                                const std::vector<int>& stopNodeIds,
-                               const std::vector<std::size_t>& stopPointIndices);
+                               const std::vector<std::size_t>& stopPointIndices,
+                               const std::vector<float>& segmentSpeedFactors = {});
 
 } // namespace MissionPresentationUtils
 

@@ -13,7 +13,8 @@ float distanceBetween(const PlaybackPoint& a, const PlaybackPoint& b) {
 
 PlaybackPath buildPlaybackPath(const std::vector<PlaybackPoint>& points,
                                const std::vector<int>& stopNodeIds,
-                               const std::vector<std::size_t>& stopPointIndices) {
+                               const std::vector<std::size_t>& stopPointIndices,
+                               const std::vector<float>& segmentSpeedFactors) {
     PlaybackPath path;
     if (points.empty()) {
         return path;
@@ -21,6 +22,14 @@ PlaybackPath buildPlaybackPath(const std::vector<PlaybackPoint>& points,
 
     path.points = points;
     path.cumulativeDistances.resize(points.size(), 0.0f);
+    if (points.size() > 1) {
+        path.segmentSpeedFactors.assign(points.size() - 1, 1.0f);
+        const std::size_t speedCount =
+            std::min(path.segmentSpeedFactors.size(), segmentSpeedFactors.size());
+        for (std::size_t i = 0; i < speedCount; ++i) {
+            path.segmentSpeedFactors[i] = std::max(0.05f, segmentSpeedFactors[i]);
+        }
+    }
 
     for (std::size_t i = 1; i < points.size(); ++i) {
         path.cumulativeDistances[i] =

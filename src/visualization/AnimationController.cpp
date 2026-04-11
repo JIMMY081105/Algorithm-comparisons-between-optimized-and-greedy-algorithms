@@ -7,6 +7,16 @@
 namespace {
 constexpr float kBaseTravelUnitsPerSecond = 6.5f;
 constexpr float kDistanceEpsilon = 0.0001f;
+
+float segmentSpeedFactorFor(const PlaybackPath& path, std::size_t segmentIndex) {
+    if (path.segmentSpeedFactors.empty()) {
+        return 1.0f;
+    }
+
+    const std::size_t clampedIndex =
+        std::min(segmentIndex, path.segmentSpeedFactors.size() - 1);
+    return std::max(0.05f, path.segmentSpeedFactors[clampedIndex]);
+}
 }
 
 AnimationController::AnimationController()
@@ -147,9 +157,11 @@ int AnimationController::update(float deltaTime) {
         return -1;
     }
 
-    const float newDistance = std::min(
-        travelledDistance + (kBaseTravelUnitsPerSecond * playbackSpeed * deltaTime),
-        path.totalLength);
+    const float activeSegmentSpeedFactor =
+        segmentSpeedFactorFor(path, currentPolylineSegment);
+    const float travelStep =
+        kBaseTravelUnitsPerSecond * playbackSpeed * activeSegmentSpeedFactor * deltaTime;
+    const float newDistance = std::min(travelledDistance + travelStep, path.totalLength);
 
     int collectedNodeId = -1;
     while (nextStopIndex < path.stops.size() &&
