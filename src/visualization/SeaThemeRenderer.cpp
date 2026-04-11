@@ -1,4 +1,5 @@
 #include "visualization/SeaThemeRenderer.h"
+#include "environment/MissionPresentationUtils.h"
 #include "visualization/IsometricRenderer.h"
 
 #include <glad/glad.h>
@@ -24,6 +25,11 @@ constexpr float kClearInnerRadius = 0.20f;
 constexpr float kClearOuterRadius = 0.56f;
 constexpr int kAmbientParticleCount = 42;
 constexpr int kDecorIsletCount = 16;
+
+const RouteResult& routeFromMission(const MissionPresentation* mission) {
+    static const RouteResult kEmptyRoute{};
+    return mission ? mission->route : kEmptyRoute;
+}
 
 enum class GarbageSizeTier {
     SMALL,
@@ -474,7 +480,10 @@ float getClearingAmount(const MapGraph& graph, const Truck& truck,
 // =====================================================================
 
 SeaThemeRenderer::SeaThemeRenderer()
-    : currentGarbageSinkProgress(0.0f),
+    : dashboardInfo{EnvironmentTheme::Sea, "Sea", "Harbour command",
+                    "N/A", "Open-water transit and port logistics", 0.0f, 0, false},
+      sceneSeed(0),
+      currentGarbageSinkProgress(0.0f),
       boatCargoFillRatio(0.0f),
       boatWakeStrength(0.0f),
       boatPitchWave(0.0f),
@@ -483,9 +492,83 @@ SeaThemeRenderer::SeaThemeRenderer()
       sceneBounds{0.0f, 0.0f, 0.0f, 0.0f},
       activeGraph(nullptr) {}
 
+EnvironmentTheme SeaThemeRenderer::getTheme() const {
+    return EnvironmentTheme::Sea;
+}
+
 bool SeaThemeRenderer::init() {
     return oceanShader.init();
 }
+
+void SeaThemeRenderer::rebuildScene(const MapGraph& graph, unsigned int seed) {
+    sceneSeed = seed;
+    activeGraph = &graph;
+    updateSceneBounds(graph);
+    dashboardInfo.subtitle =
+        (seed % 2 == 0) ? "Harbour command" : "Offshore response deck";
+    dashboardInfo.atmosphereLabel =
+        (seed % 3 == 0) ? "Calm swells and clean marine lanes"
+                        : "Rolling tides across the cleanup corridor";
+}
+
+void SeaThemeRenderer::update(float deltaTime) {
+    currentGarbageSinkProgress = clamp01(currentGarbageSinkProgress + deltaTime * 0.2f);
+}
+
+void SeaThemeRenderer::applyRouteWeights(MapGraph& graph) const {
+    graph.buildFullyConnectedGraph();
+}
+
+MissionPresentation SeaThemeRenderer::buildMissionPresentation(
+    const RouteResult& route,
+    const MapGraph& graph) const {
+    MissionPresentation presentation;
+    presentation.route = route;
+    if (!route.isValid()) {
+        return presentation;
+    }
+
+    presentation.playbackPath = buildDirectPlaybackPath(route, graph);
+    presentation.narrative =
+        "Sea mode uses direct marine lanes between cleanup sectors for clear route comparison.";
+
+    for (std::size_t i = 0; i + 1 < route.visitOrder.size(); ++i) {
+        const int fromId = route.visitOrder[i];
+        const int toId = route.visitOrder[i + 1];
+        presentation.legInsights.push_back(RouteInsight{
+            fromId,
+            toId,
+            graph.getDistance(fromId, toId),
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            graph.getDistance(fromId, toId)
+        });
+    }
+
+    return presentation;
+}
+
+ThemeDashboardInfo SeaThemeRenderer::getDashboardInfo() const {
+    return dashboardInfo;
+}
+
+void SeaThemeRenderer::setLayerToggles(const SceneLayerToggles& toggles) {
+    layerToggles = toggles;
+}
+
+bool SeaThemeRenderer::supportsWeather() const {
+    return false;
+}
+
+CityWeather SeaThemeRenderer::getWeather() const {
+    return CityWeather::Sunny;
+}
+
+void SeaThemeRenderer::setWeather(CityWeather) {}
+
+void SeaThemeRenderer::randomizeWeather(unsigned int) {}
 
 void SeaThemeRenderer::cleanup() {
     oceanShader.cleanup();
@@ -541,6 +624,122 @@ float SeaThemeRenderer::getGarbageSinkState(int nodeId) {
     return (it != garbageSinkProgress.end()) ? it->second : 0.0f;
 }
 
+PlaybackPath SeaThemeRenderer::buildDirectPlaybackPath(const RouteResult& route,
+                                                       const MapGraph& graph) const {
+    std::vector<PlaybackPoint> points;
+    std::vector<int> stopNodeIds;
+    std::vector<std::size_t> stopPointIndices;
+
+    points.reserve(route.visitOrder.size());
+    stopNodeIds.reserve(route.visitOrder.size());
+    stopPointIndices.reserve(route.visitOrder.size());
+
+    for (int nodeId : route.visitOrder) {
+        const int nodeIndex = graph.findNodeIndex(nodeId);
+        if (nodeIndex < 0) {
+            continue;
+        }
+
+        const WasteNode& node = graph.getNode(nodeIndex);
+        points.push_back(PlaybackPoint{node.getWorldX(), node.getWorldY()});
+        stopNodeIds.push_back(nodeId);
+        stopPointIndices.push_back(points.size() - 1);
+    }
+
+    return MissionPresentationUtils::buildPlaybackPath(
+        points, stopNodeIds, stopPointIndices);
+}
+
+void SeaThemeRenderer::drawTransitNetwork(
+    IsometricRenderer& renderer,
+    const MapGraph& graph,
+    const MissionPresentation* mission,
+    AnimationController::PlaybackState playbackState,
+    float routeRevealProgress,
+    float animationTime) {
+    constexpr float kMaxVisibleDist = 48.75f;
+
+    for (int i = 0; i < graph.getNodeCount(); ++i) {
+        for (int j = i + 1; j < graph.getNodeCount(); ++j) {
+            const float dist = graph.getAdjacencyMatrix()[i][j];
+            if (dist <= 0.0f || dist >= kMaxVisibleDist) {
+                continue;
+            }
+
+            const WasteNode& from = graph.getNode(i);
+            const WasteNode& to = graph.getNode(j);
+            const IsoCoord isoFrom =
+                RenderUtils::worldToIso(from.getWorldX(), from.getWorldY());
+            const IsoCoord isoTo =
+                RenderUtils::worldToIso(to.getWorldX(), to.getWorldY());
+            const float alpha = 1.0f - (dist / kMaxVisibleDist);
+            renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
+                              Color(0.18f, 0.35f, 0.48f, 0.36f * alpha), 1.4f);
+        }
+    }
+
+    if (!mission || !mission->isValid()) {
+        return;
+    }
+
+    const PlaybackPath& path = mission->playbackPath;
+    const float revealDistance = path.totalLength * std::clamp(routeRevealProgress, 0.0f, 1.0f);
+    const float pulse = 0.5f + 0.5f * std::sin(animationTime * 2.4f);
+
+    for (std::size_t i = 1; i < path.points.size(); ++i) {
+        const float startDistance = path.cumulativeDistances[i - 1];
+        const float endDistance = path.cumulativeDistances[i];
+        if (revealDistance <= startDistance) {
+            break;
+        }
+
+        float worldX = path.points[i].x;
+        float worldY = path.points[i].y;
+        if (revealDistance < endDistance && endDistance > startDistance) {
+            const float localT = (revealDistance - startDistance) / (endDistance - startDistance);
+            worldX = RenderUtils::lerp(path.points[i - 1].x, path.points[i].x, localT);
+            worldY = RenderUtils::lerp(path.points[i - 1].y, path.points[i].y, localT);
+        }
+
+        const IsoCoord isoFrom =
+            RenderUtils::worldToIso(path.points[i - 1].x, path.points[i - 1].y);
+        const IsoCoord isoTo = RenderUtils::worldToIso(worldX, worldY);
+        renderer.drawLine(isoFrom.x, isoFrom.y + 1.0f, isoTo.x, isoTo.y + 1.0f,
+                          Color(0.03f, 0.16f, 0.22f, 0.10f + pulse * 0.04f), 6.4f);
+        renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
+                          Color(0.24f, 0.78f, 0.80f, 0.18f + pulse * 0.10f), 2.2f);
+        renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
+                          Color(0.92f, 0.98f, 0.96f, 0.10f + pulse * 0.08f), 0.9f);
+    }
+
+    if (playbackState != AnimationController::PlaybackState::IDLE &&
+        path.totalLength > 0.0f) {
+        const float markerDistance =
+            std::fmod(animationTime * 3.5f, std::max(path.totalLength, 0.001f));
+        for (std::size_t i = 1; i < path.points.size(); ++i) {
+            if (markerDistance > path.cumulativeDistances[i]) {
+                continue;
+            }
+
+            const float startDistance = path.cumulativeDistances[i - 1];
+            const float endDistance = path.cumulativeDistances[i];
+            const float localT = (endDistance > startDistance)
+                ? (markerDistance - startDistance) / (endDistance - startDistance)
+                : 0.0f;
+            const float worldX =
+                RenderUtils::lerp(path.points[i - 1].x, path.points[i].x, localT);
+            const float worldY =
+                RenderUtils::lerp(path.points[i - 1].y, path.points[i].y, localT);
+            const IsoCoord iso = RenderUtils::worldToIso(worldX, worldY);
+            renderer.drawDiamond(iso.x, iso.y, 4.0f, 1.8f,
+                                 Color(0.66f, 1.0f, 0.96f, 0.16f));
+            renderer.drawFilledCircle(iso.x, iso.y, 1.1f,
+                                      Color(1.0f, 1.0f, 1.0f, 0.78f));
+            break;
+        }
+    }
+}
+
 // =====================================================================
 //  Ground plane — ocean water
 // =====================================================================
@@ -548,8 +747,9 @@ float SeaThemeRenderer::getGarbageSinkState(int nodeId) {
 void SeaThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
                                         const MapGraph& graph,
                                         const Truck& truck,
-                                        const RouteResult& currentRoute,
+                                        const MissionPresentation* mission,
                                         float animationTime) {
+    const RouteResult& currentRoute = routeFromMission(mission);
     activeGraph = &graph;
     updateSceneBounds(graph);
     updateGarbageSinkState(graph, renderer.getLastDeltaTime());
@@ -1212,8 +1412,9 @@ void SeaThemeRenderer::drawHQNode(IsometricRenderer& renderer,
 void SeaThemeRenderer::drawTruck(IsometricRenderer& renderer,
                                   const MapGraph& graph,
                                   const Truck& truck,
-                                  const RouteResult& currentRoute,
+                                  const MissionPresentation* mission,
                                   float animationTime) {
+    const RouteResult& currentRoute = routeFromMission(mission);
     if (!truck.isMoving() && !currentRoute.isValid()) return;
 
     IsoCoord iso = RenderUtils::worldToIso(truck.getPosX(), truck.getPosY());

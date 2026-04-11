@@ -60,6 +60,7 @@ void WasteSystem::addDefaultLocations() {
 void WasteSystem::initializeMap() {
     // The coursework uses one fixed sector so algorithm behaviour is easier to
     // compare and explain during the demo and in the final report.
+    graph.clear();
     addDefaultLocations();
 
     graph.setDistanceScale(kDistanceScaleKmPerGridUnit);

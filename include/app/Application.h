@@ -3,6 +3,7 @@
 
 #include "algorithms/ComparisonManager.h"
 #include "core/WasteSystem.h"
+#include "environment/EnvironmentController.h"
 #include "persistence/ResultLogger.h"
 #include "visualization/AnimationController.h"
 #include "visualization/DashboardUI.h"
@@ -28,8 +29,10 @@ private:
     AnimationController animController;
     DashboardUI dashboardUI;
     ResultLogger resultLogger;
+    EnvironmentController environmentController;
 
     RouteResult currentResult;
+    MissionPresentation currentMission;
     float lastFrameTime;
     bool initialized;
 

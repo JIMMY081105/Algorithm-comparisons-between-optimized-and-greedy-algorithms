@@ -1,6 +1,7 @@
 #ifndef DASHBOARD_STYLE_H
 #define DASHBOARD_STYLE_H
 
+#include "environment/EnvironmentTypes.h"
 #include "visualization/AnimationController.h"
 #include <imgui.h>
 
@@ -40,6 +41,7 @@ ImVec4 playbackTint(AnimationController::PlaybackState playState,
                     bool hasMission);
 
 void applyTheme(bool hasMission, bool missionRunning);
+void applyTheme(EnvironmentTheme theme, bool hasMission, bool missionRunning);
 
 } // namespace DashboardStyle
 

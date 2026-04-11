@@ -17,13 +17,16 @@ private:
 
     // Compute Euclidean distance between two nodes on the grid
     float computeEuclidean(const WasteNode& a, const WasteNode& b) const;
+    std::vector<std::vector<float>> buildEuclideanMatrix() const;
 
 public:
     MapGraph();
 
     // Setup
     void addNode(const WasteNode& node);
+    void clear();
     void buildFullyConnectedGraph();  // connect every pair of nodes
+    void installWeightedMatrix(const std::vector<std::vector<float>>& matrix);
     void setDistanceScale(float scale);
 
     // Queries

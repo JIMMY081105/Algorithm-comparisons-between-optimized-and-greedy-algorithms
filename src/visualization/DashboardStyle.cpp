@@ -125,6 +125,10 @@ ImVec4 playbackTint(AnimationController::PlaybackState playState,
 }
 
 void applyTheme(bool hasMission, bool missionRunning) {
+    applyTheme(EnvironmentTheme::Sea, hasMission, missionRunning);
+}
+
+void applyTheme(EnvironmentTheme theme, bool hasMission, bool missionRunning) {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 12.0f;
     style.ChildRounding = 10.0f;
@@ -142,11 +146,17 @@ void applyTheme(bool hasMission, bool missionRunning) {
 
     const float missionGlow = missionRunning ? 1.0f : (hasMission ? 0.45f : 0.0f);
     ImVec4* colors = style.Colors;
-    colors[ImGuiCol_WindowBg] = ImVec4(0.06f, 0.09f, 0.14f, 0.94f);
+    const ImVec4 accent = (theme == EnvironmentTheme::City)
+        ? ImVec4(0.88f, 0.64f, 0.20f, 1.0f)
+        : ImVec4(0.24f, 0.82f, 0.90f, 1.0f);
+
+    colors[ImGuiCol_WindowBg] = (theme == EnvironmentTheme::City)
+        ? ImVec4(0.08f, 0.09f, 0.11f, 0.95f)
+        : ImVec4(0.06f, 0.09f, 0.14f, 0.94f);
     colors[ImGuiCol_PopupBg] = ImVec4(0.07f, 0.10f, 0.15f, 0.96f);
-    colors[ImGuiCol_Border] = ImVec4(0.18f + missionGlow * 0.03f,
-                                     0.29f + missionGlow * 0.09f,
-                                     0.37f + missionGlow * 0.08f, 0.74f);
+    colors[ImGuiCol_Border] = ImVec4(0.16f + accent.x * 0.10f + missionGlow * 0.03f,
+                                     0.18f + accent.y * 0.12f + missionGlow * 0.09f,
+                                     0.20f + accent.z * 0.12f + missionGlow * 0.08f, 0.74f);
     colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.12f, 0.17f, 0.96f);
     colors[ImGuiCol_TitleBgActive] = ImVec4(0.10f, 0.15f, 0.20f, 0.98f);
     colors[ImGuiCol_Header] = ImVec4(0.13f, 0.23f + missionGlow * 0.04f,
@@ -167,18 +177,20 @@ void applyTheme(bool hasMission, bool missionRunning) {
                                              0.25f + missionGlow * 0.04f, 0.94f);
     colors[ImGuiCol_FrameBgActive] = ImVec4(0.11f, 0.21f + missionGlow * 0.03f,
                                             0.28f + missionGlow * 0.04f, 0.96f);
-    colors[ImGuiCol_CheckMark] = ImVec4(0.37f, 0.87f, 0.92f, 1.0f);
-    colors[ImGuiCol_SliderGrab] = ImVec4(0.30f, 0.82f, 0.88f, 0.94f);
-    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.48f, 0.91f, 0.96f, 1.0f);
+    colors[ImGuiCol_CheckMark] = accent;
+    colors[ImGuiCol_SliderGrab] = ImVec4(accent.x * 0.92f, accent.y * 0.92f,
+                                         accent.z * 0.92f, 0.94f);
+    colors[ImGuiCol_SliderGrabActive] = accent;
     colors[ImGuiCol_Separator] = ImVec4(0.18f, 0.31f, 0.39f, 0.74f);
     colors[ImGuiCol_TableHeaderBg] = ImVec4(0.08f, 0.14f, 0.20f, 0.96f);
     colors[ImGuiCol_TableBorderStrong] = ImVec4(0.18f, 0.28f, 0.36f, 0.76f);
     colors[ImGuiCol_TableBorderLight] = ImVec4(0.14f, 0.23f, 0.30f, 0.50f);
     colors[ImGuiCol_TableRowBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
     colors[ImGuiCol_TableRowBgAlt] = ImVec4(0.08f, 0.12f, 0.17f, 0.30f);
-    colors[ImGuiCol_PlotHistogram] = ImVec4(0.33f, 0.86f, 0.91f, 0.96f);
-    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.52f, 0.94f, 0.98f, 1.0f);
-    colors[ImGuiCol_TextSelectedBg] = ImVec4(0.18f, 0.46f, 0.54f, 0.36f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(accent.x, accent.y, accent.z, 0.96f);
+    colors[ImGuiCol_PlotHistogramHovered] = accent;
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(accent.x * 0.5f, accent.y * 0.5f,
+                                             accent.z * 0.5f, 0.36f);
 }
 
 } // namespace DashboardStyle

@@ -74,7 +74,7 @@ bool Application::initWindow() {
         }
     }
 
-    const char* title = "Ocean Cleanup System - EcoRoute Solutions";
+    const char* title = "EcoRoute Solutions - Dual Environment Simulation Dashboard";
     window = glfwCreateWindow(windowWidth, windowHeight, title, nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -180,9 +180,15 @@ void Application::initImGui() {
 void Application::initSimulation() {
     wasteSystem.initializeMap();
     comparisonManager.initializeAlgorithms();
+    if (!environmentController.init()) {
+        throw std::runtime_error("Failed to initialize environment themes");
+    }
 
     // Generate the first day immediately so the user sees waste data
     wasteSystem.generateNewDay();
+    environmentController.rebuildScenes(wasteSystem.getGraph(),
+                                        wasteSystem.getCurrentSeed());
+    environmentController.applyActiveWeights(wasteSystem.getGraph());
 
     lastFrameTime = static_cast<float>(glfwGetTime());
 }
@@ -212,13 +218,12 @@ void Application::run() {
 }
 
 void Application::update(float deltaTime) {
+    environmentController.update(deltaTime);
+
     const int collectedNodeId = animController.update(deltaTime);
     if (collectedNodeId >= 0) {
         handleCollectedNode(collectedNodeId);
     }
-
-    // Keep the renderer's route line progress in sync with animation
-    renderer.setRouteDrawProgress(animController.getRouteDrawSegment());
 }
 
 void Application::renderFrame() {
@@ -242,14 +247,35 @@ void Application::renderFrame() {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    // Render the isometric map with OpenGL
+    // Render the active environment scene.
     float dt = 1.0f / 60.0f;
-    renderer.render(wasteSystem.getGraph(), animController.getTruck(),
-                    animController.getCurrentRoute(), dt);
+    renderer.render(environmentController.activeRenderer(),
+                    wasteSystem.getGraph(),
+                    animController.getTruck(),
+                    currentMission.isValid() ? &currentMission : nullptr,
+                    animController.getState(),
+                    animController.getProgress(),
+                    dt);
+
+    if (environmentController.getTransitionAlpha() > 0.001f) {
+        const float alpha = environmentController.getTransitionAlpha();
+        glBegin(GL_QUADS);
+        glColor4f(0.96f, 0.98f, 1.0f, alpha * 0.08f);
+        glVertex2f(0.0f, 0.0f);
+        glVertex2f(static_cast<float>(windowWidth), 0.0f);
+        glColor4f(0.96f, 0.98f, 1.0f, alpha * 0.14f);
+        glVertex2f(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
+        glVertex2f(0.0f, static_cast<float>(windowHeight));
+        glEnd();
+    }
 
     // Render ImGui dashboard on top
     auto actions = dashboardUI.render(wasteSystem, comparisonManager,
-                                       animController, currentResult);
+                                      animController, currentResult,
+                                      currentMission,
+                                      environmentController.getDashboardInfo(),
+                                      environmentController.getLayerToggles(),
+                                      environmentController.getActiveTheme());
 
     // Process all UI actions
     handleUIActions(actions);
@@ -298,6 +324,7 @@ void Application::handleCollectedNode(int collectedNodeId) {
 
 void Application::resetMissionSession() {
     currentResult = RouteResult();
+    currentMission = MissionPresentation();
     animController.stop();
     renderer.resetAnimation();
     comparisonManager.clearResults();
@@ -306,7 +333,9 @@ void Application::resetMissionSession() {
 
 void Application::loadMissionRoute(const RouteResult& result, bool autoPlay) {
     currentResult = result;
-    animController.loadRoute(currentResult, wasteSystem.getGraph());
+    currentMission = environmentController.buildMissionPresentation(
+        currentResult, wasteSystem.getGraph());
+    animController.loadRoute(currentMission);
     wasteSystem.resetCollectionStatus();
 
     if (autoPlay) {
@@ -315,12 +344,12 @@ void Application::loadMissionRoute(const RouteResult& result, bool autoPlay) {
 }
 
 void Application::replayCurrentMission() {
-    if (!currentResult.isValid()) {
+    if (!currentMission.isValid()) {
         return;
     }
 
     wasteSystem.resetCollectionStatus();
-    animController.replay(wasteSystem.getGraph());
+    animController.replay();
 }
 
 void Application::logRuntimeError(const std::string& context,
@@ -329,9 +358,37 @@ void Application::logRuntimeError(const std::string& context,
 }
 
 void Application::handleUIActions(const DashboardUI::UIActions& actions) {
+    if (actions.layerTogglesChanged) {
+        environmentController.setLayerToggles(actions.layerToggles);
+    }
+
+    if (actions.changeTheme) {
+        if (environmentController.setActiveTheme(actions.selectedTheme,
+                                                 wasteSystem.getGraph())) {
+            resetMissionSession();
+            wasteSystem.getEventLog().addEvent(
+                std::string("Environment switched to ") +
+                toDisplayString(actions.selectedTheme));
+        }
+    }
+
+    if (actions.randomizeWeather &&
+        environmentController.getActiveTheme() == EnvironmentTheme::City) {
+        const unsigned int weatherSeed =
+            wasteSystem.getCurrentSeed() +
+            static_cast<unsigned int>(wasteSystem.getDayNumber() * 97) +
+            static_cast<unsigned int>(glfwGetTime() * 1000.0);
+        environmentController.randomizeCityWeather(weatherSeed,
+                                                   wasteSystem.getGraph());
+        resetMissionSession();
+        wasteSystem.getEventLog().addEvent("City weather refreshed");
+    }
     // Generate New Day — randomize waste levels
     if (actions.generateNewDay) {
         wasteSystem.generateNewDay();
+        environmentController.rebuildScenes(wasteSystem.getGraph(),
+                                            wasteSystem.getCurrentSeed());
+        environmentController.applyActiveWeights(wasteSystem.getGraph());
         resetMissionSession();
     }
 
@@ -416,7 +473,8 @@ void Application::endImGuiFrame() {
 void Application::shutdown() {
     if (!initialized) return;
 
-    renderer.cleanup();  // Free GPU resources while GL context is alive
+    renderer.cleanup();
+    environmentController.cleanup();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();

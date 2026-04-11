@@ -1,53 +1,53 @@
 #include "visualization/AnimationController.h"
+
 #include "visualization/RenderUtils.h"
 
-AnimationController::AnimationController()
-    : state(PlaybackState::IDLE), playbackSpeed(1.0f), routeDrawSegment(0) {}
+#include <algorithm>
 
-void AnimationController::loadRoute(const RouteResult& route, const MapGraph& graph) {
-    currentRoute = route;
-    buildWaypoints(graph);
-
-    // Position the truck at the first waypoint (HQ)
-    if (!waypoints.empty()) {
-        truck.setPosition(waypoints[0].x, waypoints[0].y);
-    }
-
-    truck.setCurrentSegment(0);
-    truck.setSegmentProgress(0.0f);
-    truck.setSpeed(playbackSpeed);
-    truck.setMoving(false);
-    routeDrawSegment = 0;
-    state = PlaybackState::IDLE;
+namespace {
+constexpr float kBaseTravelUnitsPerSecond = 6.5f;
+constexpr float kDistanceEpsilon = 0.0001f;
 }
 
-void AnimationController::buildWaypoints(const MapGraph& graph) {
-    waypoints.clear();
+AnimationController::AnimationController()
+    : state(PlaybackState::IDLE),
+      playbackSpeed(1.0f),
+      travelledDistance(0.0f),
+      currentPolylineSegment(0),
+      currentLegIndex(0),
+      nextStopIndex(0) {}
 
-    // Keep route waypoints in world space so the renderer can recenter
-    // and zoom the map without desynchronizing the truck animation.
-    for (int nodeId : currentRoute.visitOrder) {
-        int idx = graph.findNodeIndex(nodeId);
-        if (idx < 0) continue;
+void AnimationController::resetPlaybackState() {
+    travelledDistance = 0.0f;
+    currentPolylineSegment = 0;
+    currentLegIndex = 0;
+    nextStopIndex = currentMission.playbackPath.stops.size() > 1 ? 1 : 0;
+    truck.setSpeed(playbackSpeed);
+    truck.setMoving(false);
+    truck.setCurrentSegment(0);
+    truck.setSegmentProgress(0.0f);
 
-        const WasteNode& node = graph.getNode(idx);
-
-        Waypoint wp;
-        wp.x = node.getWorldX();
-        wp.y = node.getWorldY();
-        wp.nodeId = nodeId;
-        waypoints.push_back(wp);
+    if (!currentMission.playbackPath.points.empty()) {
+        truck.setPosition(currentMission.playbackPath.points.front().x,
+                          currentMission.playbackPath.points.front().y);
+    } else {
+        truck.setPosition(0.0f, 0.0f);
     }
+}
+
+void AnimationController::loadRoute(const MissionPresentation& mission) {
+    currentMission = mission;
+    resetPlaybackState();
+    state = mission.isValid() ? PlaybackState::IDLE : PlaybackState::IDLE;
 }
 
 void AnimationController::play() {
-    if (waypoints.size() < 2) return;
+    if (!currentMission.isValid() || currentMission.playbackPath.points.size() < 2) {
+        return;
+    }
 
-    truck.setCurrentSegment(0);
-    truck.setSegmentProgress(0.0f);
+    resetPlaybackState();
     truck.setMoving(true);
-    truck.setPosition(waypoints[0].x, waypoints[0].y);
-    routeDrawSegment = 1;  // show the first route segment
     state = PlaybackState::PLAYING;
 }
 
@@ -65,52 +65,110 @@ void AnimationController::resume() {
     }
 }
 
-void AnimationController::replay(const MapGraph& graph) {
-    loadRoute(currentRoute, graph);
+void AnimationController::replay() {
+    if (!currentMission.isValid()) {
+        return;
+    }
+
+    resetPlaybackState();
     play();
 }
 
 void AnimationController::stop() {
     truck.setMoving(false);
     state = PlaybackState::IDLE;
-    routeDrawSegment = 0;
+    resetPlaybackState();
+}
+
+void AnimationController::syncTruckToDistance(float distance) {
+    const PlaybackPath& path = currentMission.playbackPath;
+    if (path.empty()) {
+        return;
+    }
+
+    const float clampedDistance = std::clamp(distance, 0.0f, path.totalLength);
+
+    while (currentPolylineSegment + 1 < path.cumulativeDistances.size() &&
+           path.cumulativeDistances[currentPolylineSegment + 1] < clampedDistance) {
+        ++currentPolylineSegment;
+    }
+
+    while (currentPolylineSegment > 0 &&
+           path.cumulativeDistances[currentPolylineSegment] > clampedDistance) {
+        --currentPolylineSegment;
+    }
+
+    const std::size_t nextPolylineIndex = std::min(currentPolylineSegment + 1,
+                                                   path.points.size() - 1);
+    const float startDistance = path.cumulativeDistances[currentPolylineSegment];
+    const float endDistance = path.cumulativeDistances[nextPolylineIndex];
+    const float localT = (endDistance > startDistance)
+        ? (clampedDistance - startDistance) / (endDistance - startDistance)
+        : 0.0f;
+
+    const float x = RenderUtils::lerp(path.points[currentPolylineSegment].x,
+                                      path.points[nextPolylineIndex].x,
+                                      RenderUtils::smoothstep(localT));
+    const float y = RenderUtils::lerp(path.points[currentPolylineSegment].y,
+                                      path.points[nextPolylineIndex].y,
+                                      RenderUtils::smoothstep(localT));
+    truck.setPosition(x, y);
+
+    std::size_t visitedStopIndex = 0;
+    while (visitedStopIndex + 1 < path.stops.size() &&
+           path.stops[visitedStopIndex + 1].distanceAlongPath <= clampedDistance + kDistanceEpsilon) {
+        ++visitedStopIndex;
+    }
+
+    currentLegIndex = visitedStopIndex;
+    const int maxLegIndex = std::max(
+        0, static_cast<int>(currentMission.route.visitOrder.size()) - 2);
+    truck.setCurrentSegment(std::min(static_cast<int>(visitedStopIndex), maxLegIndex));
+
+    if (path.stops.size() > 1) {
+        const std::size_t fromStop = std::min(visitedStopIndex, path.stops.size() - 2);
+        const std::size_t toStop = std::min(fromStop + 1, path.stops.size() - 1);
+        const float legStartDistance = path.stops[fromStop].distanceAlongPath;
+        const float legEndDistance = path.stops[toStop].distanceAlongPath;
+        const float legT = (legEndDistance > legStartDistance)
+            ? (clampedDistance - legStartDistance) / (legEndDistance - legStartDistance)
+            : (clampedDistance >= legEndDistance ? 1.0f : 0.0f);
+        truck.setSegmentProgress(std::clamp(legT, 0.0f, 1.0f));
+    }
 }
 
 int AnimationController::update(float deltaTime) {
-    if (state != PlaybackState::PLAYING) return -1;
-    if (waypoints.size() < 2) return -1;
-
-    int seg = truck.getCurrentSegment();
-    if (seg >= static_cast<int>(waypoints.size()) - 1) {
-        // Animation complete — truck has reached the final waypoint
-        truck.setMoving(false);
-        state = PlaybackState::FINISHED;
-        routeDrawSegment = static_cast<int>(waypoints.size());
+    if (state != PlaybackState::PLAYING || !currentMission.isValid()) {
         return -1;
     }
 
-    // Interpolate truck position between current and next waypoint
-    bool segmentDone = truck.advanceProgress(deltaTime);
-
-    float t = RenderUtils::smoothstep(truck.getSegmentProgress());
-    float newX = RenderUtils::lerp(waypoints[seg].x, waypoints[seg + 1].x, t);
-    float newY = RenderUtils::lerp(waypoints[seg].y, waypoints[seg + 1].y, t);
-    truck.setPosition(newX, newY);
-
-    if (segmentDone) {
-        // Move to the next segment
-        int collectedNodeId = waypoints[seg + 1].nodeId;
-        truck.setCurrentSegment(seg + 1);
-        truck.setSegmentProgress(0.0f);
-        routeDrawSegment = seg + 2;  // reveal the next route line
-
-        // Snap truck to the waypoint exactly
-        truck.setPosition(waypoints[seg + 1].x, waypoints[seg + 1].y);
-
-        return collectedNodeId;  // signal that this node was just reached
+    const PlaybackPath& path = currentMission.playbackPath;
+    if (path.empty() || path.points.size() < 2) {
+        return -1;
     }
 
-    return -1;
+    const float newDistance = std::min(
+        travelledDistance + (kBaseTravelUnitsPerSecond * playbackSpeed * deltaTime),
+        path.totalLength);
+
+    int collectedNodeId = -1;
+    while (nextStopIndex < path.stops.size() &&
+           newDistance + kDistanceEpsilon >= path.stops[nextStopIndex].distanceAlongPath) {
+        collectedNodeId = path.stops[nextStopIndex].nodeId;
+        ++nextStopIndex;
+    }
+
+    travelledDistance = newDistance;
+    syncTruckToDistance(travelledDistance);
+
+    if (travelledDistance + kDistanceEpsilon >= path.totalLength) {
+        travelledDistance = path.totalLength;
+        syncTruckToDistance(travelledDistance);
+        truck.setMoving(false);
+        state = PlaybackState::FINISHED;
+    }
+
+    return collectedNodeId;
 }
 
 void AnimationController::setSpeed(float speed) {
@@ -139,17 +197,21 @@ const Truck& AnimationController::getTruck() const {
 }
 
 const RouteResult& AnimationController::getCurrentRoute() const {
-    return currentRoute;
+    return currentMission.route;
 }
 
-int AnimationController::getRouteDrawSegment() const {
-    return routeDrawSegment;
+const MissionPresentation& AnimationController::getCurrentMission() const {
+    return currentMission;
 }
 
 float AnimationController::getProgress() const {
-    if (waypoints.size() < 2) return 0.0f;
-    int seg = truck.getCurrentSegment();
-    float segFrac = truck.getSegmentProgress();
-    float totalSegs = static_cast<float>(waypoints.size() - 1);
-    return (seg + segFrac) / totalSegs;
+    if (!currentMission.isValid() || currentMission.playbackPath.totalLength <= 0.0f) {
+        return 0.0f;
+    }
+    return std::clamp(
+        travelledDistance / currentMission.playbackPath.totalLength, 0.0f, 1.0f);
+}
+
+float AnimationController::getTravelledDistance() const {
+    return travelledDistance;
 }

@@ -72,10 +72,16 @@ set(VISUALIZATION_SOURCES
     src/visualization/RenderUtils.cpp
     src/visualization/IsometricRenderer.cpp
     src/visualization/SeaThemeRenderer.cpp
+    src/visualization/CityThemeRenderer.cpp
     src/visualization/OceanShader.cpp
     src/visualization/AnimationController.cpp
     src/visualization/DashboardStyle.cpp
     src/visualization/DashboardUI.cpp
+)
+
+set(ENVIRONMENT_SOURCES
+    src/environment/EnvironmentController.cpp
+    src/environment/MissionPresentationUtils.cpp
 )
 
 set(PERSISTENCE_SOURCES
@@ -91,6 +97,7 @@ set(APP_SOURCES
 add_executable(SmartWasteClearance
     ${CORE_SOURCES}
     ${ALGORITHM_SOURCES}
+    ${ENVIRONMENT_SOURCES}
     ${VISUALIZATION_SOURCES}
     ${PERSISTENCE_SOURCES}
     ${APP_SOURCES}
@@ -121,4 +128,35 @@ endif()
 add_custom_command(TARGET SmartWasteClearance POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
     "$<TARGET_FILE_DIR:SmartWasteClearance>/output"
+)
+
+enable_testing()
+
+add_executable(EnvironmentCoreTests
+    tests/EnvironmentCoreTests.cpp
+    ${CORE_SOURCES}
+    ${ALGORITHM_SOURCES}
+    ${ENVIRONMENT_SOURCES}
+    src/visualization/RenderUtils.cpp
+    src/visualization/IsometricRenderer.cpp
+    src/visualization/SeaThemeRenderer.cpp
+    src/visualization/CityThemeRenderer.cpp
+    src/visualization/OceanShader.cpp
+)
+
+target_include_directories(EnvironmentCoreTests PRIVATE
+    include
+    external/glad/include
+)
+
+target_link_libraries(EnvironmentCoreTests PRIVATE
+    glfw
+    OpenGL::GL
+    glad
+)
+
+add_test(NAME EnvironmentCoreTests COMMAND EnvironmentCoreTests)
+
+add_custom_target(smoke_dashboard
+    DEPENDS SmartWasteClearance EnvironmentCoreTests
 )

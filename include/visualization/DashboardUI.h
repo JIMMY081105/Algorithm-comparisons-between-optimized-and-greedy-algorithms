@@ -3,6 +3,8 @@
 
 #include "algorithms/ComparisonManager.h"
 #include "core/WasteSystem.h"
+#include "environment/EnvironmentTypes.h"
+#include "environment/MissionPresentation.h"
 #include "visualization/AnimationController.h"
 
 // Renders the gameplay dashboard layered over the isometric scene.
@@ -17,30 +19,42 @@ public:
         bool replay = false;
         bool exportResults = false;
         bool exportComparison = false;
+        bool changeTheme = false;
+        bool randomizeWeather = false;
+        bool layerTogglesChanged = false;
         int algorithmToRun = -1;
         bool playPause = false;
+        EnvironmentTheme selectedTheme = EnvironmentTheme::Sea;
+        SceneLayerToggles layerToggles;
     };
 
 private:
     int selectedAlgorithm;
+    EnvironmentTheme selectedTheme;
     bool showComparisonTable;
     bool showEventLog;
     bool showNodeDetails;
 
     void drawHeaderPanel(const WasteSystem& system,
+                         const ThemeDashboardInfo& environmentInfo,
                          AnimationController::PlaybackState playState,
                          bool hasMission);
     void drawControlPanel(WasteSystem& system, AnimationController& animCtrl,
+                          const ThemeDashboardInfo& environmentInfo,
                           UIActions& actions);
     void drawMetricsPanel(const RouteResult& currentResult,
+                          const MissionPresentation& currentMission,
                           const WasteSystem& system,
+                          const ThemeDashboardInfo& environmentInfo,
                           AnimationController::PlaybackState playState,
                           float progress);
-    void drawComparisonTable(const ComparisonManager& compMgr);
+    void drawComparisonTable(const ComparisonManager& compMgr,
+                            const ThemeDashboardInfo& environmentInfo);
     void drawNodeDetailsPanel(const WasteSystem& system);
     void drawEventLogPanel(const WasteSystem& system);
-    void drawLegendPanel();
+    void drawLegendPanel(const ThemeDashboardInfo& environmentInfo);
     void drawRouteOrderPanel(const RouteResult& result,
+                             const MissionPresentation& currentMission,
                              const WasteSystem& system,
                              AnimationController::PlaybackState playState,
                              float progress);
@@ -51,7 +65,11 @@ public:
 
     UIActions render(WasteSystem& system, ComparisonManager& compMgr,
                      AnimationController& animCtrl,
-                     const RouteResult& currentResult);
+                     const RouteResult& currentResult,
+                     const MissionPresentation& currentMission,
+                     const ThemeDashboardInfo& environmentInfo,
+                     const SceneLayerToggles& layerToggles,
+                     EnvironmentTheme activeTheme);
 
     int getSelectedAlgorithm() const;
 };

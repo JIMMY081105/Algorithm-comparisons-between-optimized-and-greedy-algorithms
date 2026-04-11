@@ -3,58 +3,34 @@
 
 #include "core/MapGraph.h"
 #include "core/Truck.h"
-#include "core/RouteResult.h"
-#include "visualization/RenderUtils.h"
+#include "environment/MissionPresentation.h"
 #include "visualization/IThemeRenderer.h"
-#include <vector>
-#include <memory>
+#include "visualization/RenderUtils.h"
 
-// Handles all OpenGL drawing for the isometric map view.
-// Theme-specific visuals (sea, city, etc.) are delegated to an
-// IThemeRenderer implementation, while shared logic like road
-// connections, route highlights, and low-level primitives live here.
+// Shared OpenGL draw host. Theme renderers own scene composition; this class
+// only tracks timing and exposes low-level primitives.
 class IsometricRenderer {
 private:
-    float animationTime;    // accumulated time for pulsing effects
-    float lastDeltaTime;    // most recent delta for theme updates
-    int routeDrawProgress;  // how many segments of the route to show
-    bool showGrid;
-    std::unique_ptr<IThemeRenderer> themeRenderer;
-
-    // Shared drawing helpers (not theme-specific)
-    void drawRoadConnections(const MapGraph& graph);
-    void drawRouteHighlight(const MapGraph& graph, const RouteResult& route,
-                            int segmentsToShow);
+    float animationTime;
+    float lastDeltaTime;
 
 public:
     IsometricRenderer();
-    ~IsometricRenderer();
 
-    // Main render call — draws the full map scene
-    void render(const MapGraph& graph, const Truck& truck,
-                const RouteResult& currentRoute, float deltaTime);
+    void render(IThemeRenderer& themeRenderer,
+                const MapGraph& graph,
+                const Truck& truck,
+                const MissionPresentation* mission,
+                AnimationController::PlaybackState playbackState,
+                float routeRevealProgress,
+                float deltaTime);
 
-    // Switch the active visual theme
-    void setTheme(std::unique_ptr<IThemeRenderer> theme);
-
-    // Control progressive route drawing
-    void setRouteDrawProgress(int segments);
-    int getRouteDrawProgress() const;
-
-    // Toggle ground grid visibility
-    void setShowGrid(bool show);
-
-    // Reset visual state for a new route animation
-    void resetAnimation();
-
-    // Release GPU resources (call before GL context destruction)
-    void cleanup();
-
-    // Get accumulated animation time (for theme renderers)
     float getAnimationTime() const { return animationTime; }
     float getLastDeltaTime() const { return lastDeltaTime; }
 
-    // Low-level shape drawing — public so theme renderers can use them
+    void resetAnimation();
+    void cleanup();
+
     void drawFilledCircle(float cx, float cy, float radius, const Color& color);
     void drawRing(float cx, float cy, float radius, const Color& color, float thickness);
     void drawLine(float x1, float y1, float x2, float y2,

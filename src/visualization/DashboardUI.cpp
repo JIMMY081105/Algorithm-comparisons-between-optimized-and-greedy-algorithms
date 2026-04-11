@@ -1,45 +1,73 @@
 #include "visualization/DashboardUI.h"
+
 #include "visualization/DashboardStyle.h"
 #include "visualization/RenderUtils.h"
 
 #include <imgui.h>
+
 #include <algorithm>
 #include <cmath>
 
 namespace {
-constexpr ImVec4 kBrandPrimary(0.15f, 0.72f, 0.94f, 1.0f);
+constexpr ImVec4 kSeaPrimary(0.15f, 0.72f, 0.94f, 1.0f);
+constexpr ImVec4 kCityPrimary(0.94f, 0.72f, 0.22f, 1.0f);
 constexpr ImVec4 kTextSoft(0.45f, 0.50f, 0.58f, 1.0f);
 constexpr ImVec4 kTextMuted(0.46f, 0.56f, 0.64f, 1.0f);
 constexpr ImVec4 kTextSubtle(0.55f, 0.60f, 0.68f, 1.0f);
 constexpr ImVec4 kTextNeutral(0.76f, 0.80f, 0.84f, 1.0f);
+
+ImVec4 brandColor(EnvironmentTheme theme) {
+    return theme == EnvironmentTheme::City ? kCityPrimary : kSeaPrimary;
+}
+
+const char* themeTooltip(EnvironmentTheme theme) {
+    return theme == EnvironmentTheme::City
+        ? "Street-constrained routing with weather, congestion, and incidents."
+        : "Open-water routing with harbour visuals and direct marine travel costs.";
+}
+
 } // namespace
 
 DashboardUI::DashboardUI()
-    : selectedAlgorithm(0), showComparisonTable(false),
-      showEventLog(true), showNodeDetails(false) {}
+    : selectedAlgorithm(0),
+      selectedTheme(EnvironmentTheme::Sea),
+      showComparisonTable(false),
+      showEventLog(true),
+      showNodeDetails(false) {}
 
 DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
-                                            ComparisonManager& compMgr,
-                                            AnimationController& animCtrl,
-                                            const RouteResult& currentResult) {
+                                           ComparisonManager& compMgr,
+                                           AnimationController& animCtrl,
+                                           const RouteResult& currentResult,
+                                           const MissionPresentation& currentMission,
+                                           const ThemeDashboardInfo& environmentInfo,
+                                           const SceneLayerToggles& layerToggles,
+                                           EnvironmentTheme activeTheme) {
     const auto playState = animCtrl.getState();
     const bool hasMission = currentResult.isValid();
     const bool missionRunning =
         playState == AnimationController::PlaybackState::PLAYING;
     const float missionProgress = animCtrl.getProgress();
 
-    DashboardStyle::applyTheme(hasMission, missionRunning);
+    DashboardStyle::applyTheme(activeTheme, hasMission, missionRunning);
+
     UIActions actions;
+    actions.selectedTheme = activeTheme;
+    actions.layerToggles = layerToggles;
 
-    drawHeaderPanel(system, playState, hasMission);
-    drawControlPanel(system, animCtrl, actions);
+    selectedTheme = activeTheme;
 
-    drawMetricsPanel(currentResult, system, playState, missionProgress);
-    drawLegendPanel();
-    drawRouteOrderPanel(currentResult, system, playState, missionProgress);
+    drawHeaderPanel(system, environmentInfo, playState, hasMission);
+    drawControlPanel(system, animCtrl, environmentInfo, actions);
+
+    drawMetricsPanel(currentResult, currentMission, system, environmentInfo,
+                     playState, missionProgress);
+    drawLegendPanel(environmentInfo);
+    drawRouteOrderPanel(currentResult, currentMission, system, playState,
+                        missionProgress);
 
     if (showComparisonTable) {
-        drawComparisonTable(compMgr);
+        drawComparisonTable(compMgr, environmentInfo);
     }
     if (showEventLog) {
         drawEventLogPanel(system);
@@ -54,6 +82,7 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
 }
 
 void DashboardUI::drawHeaderPanel(const WasteSystem& system,
+                                  const ThemeDashboardInfo& environmentInfo,
                                   AnimationController::PlaybackState playState,
                                   bool hasMission) {
     const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
@@ -66,24 +95,28 @@ void DashboardUI::drawHeaderPanel(const WasteSystem& system,
                  ImGuiWindowFlags_NoTitleBar);
 
     const ImVec4 stateTint = DashboardStyle::playbackTint(playState, hasMission);
-    ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - 116.0f, 10.0f));
+    ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - 122.0f, 10.0f));
     ImGui::TextColored(stateTint, "[%s]",
                        DashboardStyle::playbackLabel(playState, hasMission));
     ImGui::SetCursorPos(ImVec2(14.0f, 10.0f));
     ImGui::SetWindowFontScale(1.05f);
-    ImGui::TextColored(kBrandPrimary, "ECOROUTE SOLUTIONS");
+    ImGui::TextColored(brandColor(environmentInfo.theme), "ECOROUTE SOLUTIONS");
     ImGui::SetWindowFontScale(1.0f);
     ImGui::TextColored(ImVec4(0.64f, 0.78f, 0.84f, 1.0f),
-                       "Marine Cleanup Command");
+                       "%s Operations", environmentInfo.themeLabel.c_str());
     ImGui::TextColored(kTextSoft,
-                       "Day %d  |  Seed %u", system.getDayNumber(),
-                       system.getCurrentSeed());
+                       "Day %d  |  Seed %u  |  %s",
+                       system.getDayNumber(), system.getCurrentSeed(),
+                       environmentInfo.supportsWeather
+                           ? environmentInfo.weatherLabel.c_str()
+                           : "Standard Conditions");
 
     ImGui::End();
 }
 
 void DashboardUI::drawControlPanel(WasteSystem& system,
                                    AnimationController& animCtrl,
+                                   const ThemeDashboardInfo& environmentInfo,
                                    UIActions& actions) {
     const auto playState = animCtrl.getState();
     const bool hasMission = animCtrl.getCurrentRoute().isValid();
@@ -94,12 +127,54 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
     ImGui::SetNextWindowSize(layout.controlsSize, ImGuiCond_Always);
     ImGui::Begin("Operations", nullptr, DashboardStyle::pinnedSidebarWindowFlags());
 
+    ImGui::SeparatorText("Environment");
+    if (ImGui::RadioButton("Sea", selectedTheme == EnvironmentTheme::Sea)) {
+        selectedTheme = EnvironmentTheme::Sea;
+        actions.changeTheme = true;
+        actions.selectedTheme = selectedTheme;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", themeTooltip(EnvironmentTheme::Sea));
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("City", selectedTheme == EnvironmentTheme::City)) {
+        selectedTheme = EnvironmentTheme::City;
+        actions.changeTheme = true;
+        actions.selectedTheme = selectedTheme;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", themeTooltip(EnvironmentTheme::City));
+    }
+
+    if (environmentInfo.supportsWeather) {
+        ImGui::TextDisabled("Weather");
+        ImGui::TextColored(brandColor(environmentInfo.theme), "%s",
+                           environmentInfo.weatherLabel.c_str());
+        if (ImGui::Button("Refresh Weather", ImVec2(-1, 24))) {
+            actions.randomizeWeather = true;
+        }
+    }
+
+    if (selectedTheme == EnvironmentTheme::City) {
+        ImGui::Spacing();
+        ImGui::TextDisabled("Visual layers");
+        bool changed = false;
+        changed |= ImGui::Checkbox("Traffic", &actions.layerToggles.showTraffic);
+        ImGui::SameLine();
+        changed |= ImGui::Checkbox("Congestion", &actions.layerToggles.showCongestion);
+        changed |= ImGui::Checkbox("Incidents", &actions.layerToggles.showIncidents);
+        ImGui::SameLine();
+        changed |= ImGui::Checkbox("Traffic lights", &actions.layerToggles.showTrafficLights);
+        changed |= ImGui::Checkbox("Route graph", &actions.layerToggles.showRouteGraph);
+        actions.layerTogglesChanged = changed;
+    }
+
     ImGui::SeparatorText("Simulation");
     if (ImGui::Button("Generate New Day", ImVec2(-1, 28))) {
         actions.generateNewDay = true;
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Randomize debris levels for all sea zones");
+        ImGui::SetTooltip("Randomize waste levels and rebuild the active environment scene.");
     }
 
     float threshold = system.getCollectionThreshold();
@@ -171,9 +246,11 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
 }
 
 void DashboardUI::drawMetricsPanel(const RouteResult& currentResult,
-                                    const WasteSystem& system,
-                                    AnimationController::PlaybackState playState,
-                                    float progress) {
+                                   const MissionPresentation& currentMission,
+                                   const WasteSystem& system,
+                                   const ThemeDashboardInfo& environmentInfo,
+                                   AnimationController::PlaybackState playState,
+                                   float progress) {
     const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.metricsPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.metricsSize, ImGuiCond_Always);
@@ -199,7 +276,8 @@ void DashboardUI::drawMetricsPanel(const RouteResult& currentResult,
 
         ImGui::TextDisabled("Active mission");
         ImGui::SetWindowFontScale(1.03f);
-        ImGui::TextColored(kBrandPrimary, "%s", currentResult.algorithmName.c_str());
+        ImGui::TextColored(brandColor(environmentInfo.theme), "%s",
+                           currentResult.algorithmName.c_str());
         ImGui::SetWindowFontScale(1.0f);
         ImGui::TextColored(kTextMuted,
                            "%d stops scheduled  |  Threshold %.0f%%",
@@ -237,21 +315,31 @@ void DashboardUI::drawMetricsPanel(const RouteResult& currentResult,
                            "%.1f kg", currentResult.wasteCollected);
         ImGui::NextColumn();
 
-        ImGui::TextColored(kTextSubtle, "Nodes");
-        ImGui::NextColumn();
-        ImGui::Text("%d", static_cast<int>(currentResult.visitOrder.size())); ImGui::NextColumn();
-
         ImGui::TextColored(kTextSubtle, "Compute");
         ImGui::NextColumn();
         ImGui::Text("%.3f ms", currentResult.runtimeMs); ImGui::NextColumn();
 
         ImGui::Columns(1);
+
+        ImGui::SeparatorText("Environment");
+        ImGui::TextColored(brandColor(environmentInfo.theme), "%s",
+                           environmentInfo.atmosphereLabel.c_str());
+        ImGui::TextColored(kTextSoft, "Weather: %s", environmentInfo.weatherLabel.c_str());
+        ImGui::TextColored(kTextSoft, "Congestion: %.0f%%",
+                           environmentInfo.congestionLevel * 100.0f);
+        ImGui::TextColored(kTextSoft, "Incidents: %d", environmentInfo.incidentCount);
+
+        if (!currentMission.narrative.empty()) {
+            ImGui::Spacing();
+            ImGui::TextWrapped("%s", currentMission.narrative.c_str());
+        }
     }
 
     ImGui::End();
 }
 
-void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr) {
+void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr,
+                                      const ThemeDashboardInfo& environmentInfo) {
     const DashboardStyle::BottomOverlayLayout layout =
         DashboardStyle::buildBottomOverlayLayout();
     ImGui::SetNextWindowPos(layout.comparisonPos, ImGuiCond_Always);
@@ -266,13 +354,15 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr) {
         ImGui::TextColored(ImVec4(0.45f, 0.50f, 0.55f, 1.0f),
                            "Run 'Compare All' to populate this table.");
     } else {
-        int bestIdx = compMgr.getBestAlgorithmIndex();
-        ImGui::TextDisabled("Operational cost and runtime across current sea conditions.");
+        const int bestIdx = compMgr.getBestAlgorithmIndex();
+        ImGui::TextDisabled("Operational cost and runtime under %s conditions.",
+                            environmentInfo.themeLabel.c_str());
         ImGui::Spacing();
 
         if (ImGui::BeginTable("CompTable", 8,
-                ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX)) {
+                              ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                  ImGuiTableFlags_SizingStretchProp |
+                                  ImGuiTableFlags_PadOuterX)) {
 
             ImGui::TableSetupColumn("Algorithm");
             ImGui::TableSetupColumn("Distance (km)");
@@ -284,18 +374,19 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr) {
             ImGui::TableSetupColumn("Runtime (ms)");
             ImGui::TableHeadersRow();
 
-            for (int i = 0; i < static_cast<int>(results.size()); i++) {
+            for (int i = 0; i < static_cast<int>(results.size()); ++i) {
                 const auto& r = results[i];
                 ImGui::TableNextRow();
 
                 if (i == bestIdx) {
-                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1,
-                        ImGui::GetColorU32(ImVec4(0.1f, 0.4f, 0.15f, 0.4f)));
+                    ImGui::TableSetBgColor(
+                        ImGuiTableBgTarget_RowBg1,
+                        ImGui::GetColorU32(ImVec4(0.10f, 0.40f, 0.15f, 0.4f)));
                 }
 
                 ImGui::TableSetColumnIndex(0);
                 if (i == bestIdx) {
-                    ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.4f, 1.0f),
+                    ImGui::TextColored(ImVec4(0.30f, 1.0f, 0.40f, 1.0f),
                                        "%s *", r.algorithmName.c_str());
                 } else {
                     ImGui::Text("%s", r.algorithmName.c_str());
@@ -312,12 +403,6 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr) {
 
             ImGui::EndTable();
         }
-
-        if (bestIdx >= 0) {
-            ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.4f, 1.0f),
-                               "* Recommended: %s (lowest total cost)",
-                               results[bestIdx].algorithmName.c_str());
-        }
     }
 
     ImGui::End();
@@ -330,18 +415,16 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
     ImGui::Begin("Node Details", &showNodeDetails);
 
     const MapGraph& graph = system.getGraph();
-
     if (ImGui::BeginTable("NodeTable", 4,
-            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-            ImGuiTableFlags_ScrollY)) {
-
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                              ImGuiTableFlags_ScrollY)) {
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("Debris %", ImGuiTableColumnFlags_WidthFixed, 60);
         ImGui::TableSetupColumn("kg", ImGuiTableColumnFlags_WidthFixed, 50);
         ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 60);
         ImGui::TableHeadersRow();
 
-        for (int i = 0; i < graph.getNodeCount(); i++) {
+        for (int i = 0; i < graph.getNodeCount(); ++i) {
             const WasteNode& node = graph.getNode(i);
             ImGui::TableNextRow();
 
@@ -350,9 +433,9 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
 
             ImGui::TableSetColumnIndex(1);
             if (node.getIsHQ()) {
-                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "Dock");
+                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "HQ");
             } else {
-                Color c = RenderUtils::getUrgencyColor(node.getUrgency());
+                const Color c = RenderUtils::getUrgencyColor(node.getUrgency());
                 ImGui::TextColored(ImVec4(c.r, c.g, c.b, 1.0f),
                                    "%.0f%%", node.getWasteLevel());
             }
@@ -364,7 +447,7 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
 
             ImGui::TableSetColumnIndex(3);
             if (node.getIsHQ()) {
-                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "Dock");
+                ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f), "HQ");
             } else if (node.isCollected()) {
                 ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Done");
             } else if (node.isEligible(system.getCollectionThreshold())) {
@@ -376,7 +459,7 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
         ImGui::EndTable();
     }
 
-    int eligible = static_cast<int>(system.getEligibleNodes().size());
+    const int eligible = static_cast<int>(system.getEligibleNodes().size());
     ImGui::Text("Eligible nodes: %d / %d", eligible, graph.getNodeCount() - 1);
 
     ImGui::End();
@@ -394,8 +477,7 @@ void DashboardUI::drawEventLogPanel(const WasteSystem& system) {
     ImGui::TextDisabled("Latest operations");
     ImGui::Separator();
 
-    auto events = system.getEventLog().getRecentEvents(12);
-
+    const auto events = system.getEventLog().getRecentEvents(12);
     for (const auto* entry : events) {
         ImGui::TextColored(ImVec4(0.38f, 0.44f, 0.52f, 1.0f),
                            "%s", entry->timestamp.c_str());
@@ -407,44 +489,46 @@ void DashboardUI::drawEventLogPanel(const WasteSystem& system) {
     ImGui::End();
 }
 
-void DashboardUI::drawLegendPanel() {
+void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo) {
     const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.legendPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(layout.legendSize, ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.95f);
 
     ImGui::Begin("Legend", nullptr, DashboardStyle::pinnedSidebarWindowFlags());
-    ImGui::TextDisabled("Urgency and cleanup state");
+    ImGui::TextDisabled("Urgency and environment");
 
-    Color low = RenderUtils::getUrgencyColor(UrgencyLevel::LOW);
-    Color med = RenderUtils::getUrgencyColor(UrgencyLevel::MEDIUM);
-    Color high = RenderUtils::getUrgencyColor(UrgencyLevel::HIGH);
-    Color hq = RenderUtils::getHQColor();
-    Color collected = RenderUtils::getCollectedColor();
+    const Color low = RenderUtils::getUrgencyColor(UrgencyLevel::LOW);
+    const Color med = RenderUtils::getUrgencyColor(UrgencyLevel::MEDIUM);
+    const Color high = RenderUtils::getUrgencyColor(UrgencyLevel::HIGH);
+    const Color hq = RenderUtils::getHQColor();
+    const Color collected = RenderUtils::getCollectedColor();
 
     ImGui::ColorButton("##low", ImVec4(low.r, low.g, low.b, 1.0f));
     ImGui::SameLine(); ImGui::Text("Low (0-39%%)");
-
     ImGui::ColorButton("##med", ImVec4(med.r, med.g, med.b, 1.0f));
     ImGui::SameLine(); ImGui::Text("Medium (40-69%%)");
-
     ImGui::ColorButton("##high", ImVec4(high.r, high.g, high.b, 1.0f));
-    ImGui::SameLine(); ImGui::Text("High (70-100%%) - Pulsing");
-
+    ImGui::SameLine(); ImGui::Text("High (70-100%%)");
     ImGui::ColorButton("##hq", ImVec4(hq.r, hq.g, hq.b, 1.0f));
-    ImGui::SameLine(); ImGui::Text("Dock / Harbor");
-
+    ImGui::SameLine(); ImGui::Text("HQ / Control");
     ImGui::ColorButton("##done", ImVec4(collected.r, collected.g, collected.b, 1.0f));
-    ImGui::SameLine(); ImGui::Text("Cleaned Up");
+    ImGui::SameLine(); ImGui::Text("Completed");
+
+    ImGui::Separator();
+    ImGui::TextWrapped("%s", environmentInfo.atmosphereLabel.c_str());
 
     ImGui::End();
 }
 
 void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
-                                       const WasteSystem& system,
-                                       AnimationController::PlaybackState playState,
-                                       float progress) {
-    if (!result.isValid()) return;
+                                      const MissionPresentation& currentMission,
+                                      const WasteSystem& system,
+                                      AnimationController::PlaybackState playState,
+                                      float progress) {
+    if (!result.isValid()) {
+        return;
+    }
 
     const DashboardStyle::BottomOverlayLayout layout =
         DashboardStyle::buildBottomOverlayLayout();
@@ -468,17 +552,19 @@ void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
         activeIndex = static_cast<int>(result.visitOrder.size()) - 1;
     }
 
-    ImGui::TextColored(kBrandPrimary, "%s", result.algorithmName.c_str());
+    ImGui::TextColored(kSeaPrimary, "%s", result.algorithmName.c_str());
     ImGui::TextColored(stateTint, "%s",
                        DashboardStyle::playbackLabel(playState, true));
     ImGui::ProgressBar(progress, ImVec2(-1, 8.0f));
     ImGui::TextDisabled("Visit order");
     ImGui::Separator();
 
-    for (int i = 0; i < static_cast<int>(result.visitOrder.size()); i++) {
-        int nodeId = result.visitOrder[i];
-        int idx = system.getGraph().findNodeIndex(nodeId);
-        if (idx < 0) continue;
+    for (int i = 0; i < static_cast<int>(result.visitOrder.size()); ++i) {
+        const int nodeId = result.visitOrder[i];
+        const int idx = system.getGraph().findNodeIndex(nodeId);
+        if (idx < 0) {
+            continue;
+        }
 
         const WasteNode& node = system.getGraph().getNode(idx);
         const bool isCurrent =
@@ -507,6 +593,18 @@ void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
                                "%s  [%.0f%%]",
                                node.getName().c_str(), node.getWasteLevel());
         }
+    }
+
+    if (!currentMission.legInsights.empty()) {
+        ImGui::SeparatorText("Current leg");
+        const int insightIndex = std::max(0, std::min(
+            activeIndex - 1, static_cast<int>(currentMission.legInsights.size()) - 1));
+        const RouteInsight& insight = currentMission.legInsights[insightIndex];
+        ImGui::Text("Base %.2f km", insight.baseDistance);
+        ImGui::Text("Traffic %.2f  |  Incidents %.2f", insight.congestionPenalty,
+                    insight.incidentPenalty);
+        ImGui::Text("Signals %.2f  |  Weather %.2f", insight.signalPenalty,
+                    insight.weatherPenalty);
     }
 
     ImGui::End();

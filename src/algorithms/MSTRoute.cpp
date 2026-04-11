@@ -52,6 +52,13 @@ RouteResult MSTRouteAlgorithm::computeRoute(const MapGraph& graph,
         result.visitOrder.push_back(nodeIds[localIdx]);
     }
 
+    if (result.visitOrder.empty() || result.visitOrder.front() != hqId) {
+        result.visitOrder.insert(result.visitOrder.begin(), hqId);
+    }
+    if (result.visitOrder.back() != hqId) {
+        result.visitOrder.push_back(hqId);
+    }
+
     auto endTime = std::chrono::high_resolution_clock::now();
     result.runtimeMs = std::chrono::duration<double, std::milli>(
         endTime - startTime).count();

@@ -14,13 +14,32 @@ public:
     SeaThemeRenderer();
     ~SeaThemeRenderer() override = default;
 
+    EnvironmentTheme getTheme() const override;
     bool init() override;
+    void rebuildScene(const MapGraph& graph, unsigned int seed) override;
+    void update(float deltaTime) override;
+    void applyRouteWeights(MapGraph& graph) const override;
+    MissionPresentation buildMissionPresentation(const RouteResult& route,
+                                                 const MapGraph& graph) const override;
+    ThemeDashboardInfo getDashboardInfo() const override;
+    void setLayerToggles(const SceneLayerToggles& toggles) override;
+    bool supportsWeather() const override;
+    CityWeather getWeather() const override;
+    void setWeather(CityWeather weather) override;
+    void randomizeWeather(unsigned int seed) override;
 
     void drawGroundPlane(IsometricRenderer& renderer,
                          const MapGraph& graph,
                          const Truck& truck,
-                         const RouteResult& currentRoute,
+                         const MissionPresentation* mission,
                          float animationTime) override;
+
+    void drawTransitNetwork(IsometricRenderer& renderer,
+                            const MapGraph& graph,
+                            const MissionPresentation* mission,
+                            AnimationController::PlaybackState playbackState,
+                            float routeRevealProgress,
+                            float animationTime) override;
 
     void drawWasteNode(IsometricRenderer& renderer,
                        const WasteNode& node,
@@ -33,7 +52,7 @@ public:
     void drawTruck(IsometricRenderer& renderer,
                    const MapGraph& graph,
                    const Truck& truck,
-                   const RouteResult& currentRoute,
+                   const MissionPresentation* mission,
                    float animationTime) override;
 
     void drawDecorativeElements(IsometricRenderer& renderer,
@@ -48,6 +67,9 @@ public:
 
 private:
     OceanShader oceanShader;
+    ThemeDashboardInfo dashboardInfo;
+    SceneLayerToggles layerToggles;
+    unsigned int sceneSeed;
 
     // Per-node garbage collection sink animation state
     std::unordered_map<int, float> garbageSinkProgress;
@@ -95,6 +117,9 @@ private:
     void drawDecorativeIslets(IsometricRenderer& renderer,
                               const MapGraph& graph,
                               float animationTime);
+
+    PlaybackPath buildDirectPlaybackPath(const RouteResult& route,
+                                         const MapGraph& graph) const;
 };
 
 #endif // SEA_THEME_RENDERER_H
