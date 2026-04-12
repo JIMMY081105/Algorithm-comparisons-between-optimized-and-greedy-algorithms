@@ -6,7 +6,36 @@
 #include "visualization/SeaThemeRenderer.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <stdexcept>
+
+namespace {
+constexpr unsigned int kFnvOffsetBasis = 2166136261u;
+constexpr unsigned int kFnvPrime = 16777619u;
+constexpr float kCoordinateQuantizationScale = 1000.0f;
+
+void mixSeed(unsigned int& seed, unsigned int value) {
+    seed ^= value;
+    seed *= kFnvPrime;
+}
+
+unsigned int stableVisualSeed(const MapGraph& graph) {
+    unsigned int seed = kFnvOffsetBasis;
+    mixSeed(seed, static_cast<unsigned int>(graph.getNodeCount()));
+
+    for (const WasteNode& node : graph.getNodes()) {
+        mixSeed(seed, static_cast<unsigned int>(node.getId()));
+        mixSeed(seed, static_cast<unsigned int>(
+            std::lround(node.getWorldX() * kCoordinateQuantizationScale)));
+        mixSeed(seed, static_cast<unsigned int>(
+            std::lround(node.getWorldY() * kCoordinateQuantizationScale)));
+        mixSeed(seed, node.getIsHQ() ? 0x9E3779B9u : 0x7F4A7C15u);
+    }
+
+    return seed;
+}
+} // namespace
 
 EnvironmentController::EnvironmentController()
     : seaTheme(std::make_unique<SeaThemeRenderer>()),
@@ -28,7 +57,8 @@ bool EnvironmentController::init() {
     return seaTheme->init() && cityTheme->init();
 }
 
-void EnvironmentController::rebuildScenes(const MapGraph& graph, unsigned int seed) {
+void EnvironmentController::rebuildScenes(const MapGraph& graph) {
+    const unsigned int seed = stableVisualSeed(graph);
     seaTheme->setLayerToggles(layerToggles);
     cityTheme->setLayerToggles(layerToggles);
     seaTheme->rebuildScene(graph, seed ^ 0x52A913u);
@@ -48,6 +78,14 @@ bool EnvironmentController::setActiveTheme(EnvironmentTheme theme, MapGraph& gra
 
 void EnvironmentController::applyActiveWeights(MapGraph& graph) const {
     rendererFor(activeTheme).applyRouteWeights(graph);
+}
+
+void EnvironmentController::randomizeCityTraffic(unsigned int seed, MapGraph& graph) {
+    static_cast<CityThemeRenderer&>(*cityTheme).randomizeTrafficConditions(seed);
+    if (activeTheme == EnvironmentTheme::City) {
+        applyActiveWeights(graph);
+        transitionAlpha = 0.25f;
+    }
 }
 
 void EnvironmentController::randomizeCityWeather(unsigned int seed, MapGraph& graph) {

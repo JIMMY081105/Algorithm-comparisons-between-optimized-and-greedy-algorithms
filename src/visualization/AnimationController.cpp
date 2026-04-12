@@ -48,7 +48,7 @@ void AnimationController::resetPlaybackState() {
 void AnimationController::loadRoute(const MissionPresentation& mission) {
     currentMission = mission;
     resetPlaybackState();
-    state = mission.isValid() ? PlaybackState::IDLE : PlaybackState::IDLE;
+    state = PlaybackState::IDLE;
 }
 
 void AnimationController::play() {
@@ -80,7 +80,6 @@ void AnimationController::replay() {
         return;
     }
 
-    resetPlaybackState();
     play();
 }
 

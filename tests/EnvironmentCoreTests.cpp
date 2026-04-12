@@ -2,6 +2,7 @@
 #include "core/MapGraph.h"
 #include "core/WasteNode.h"
 #include "core/WasteSystem.h"
+#include "environment/EnvironmentController.h"
 #include "visualization/CityThemeRenderer.h"
 #include "visualization/SeaThemeRenderer.h"
 
@@ -19,6 +20,77 @@ int firstEligibleNode(const WasteSystem& system) {
     const auto eligible = system.getEligibleNodes(0.0f);
     assert(!eligible.empty());
     return eligible.front();
+}
+
+RouteResult buildDeterministicRoute(const MapGraph& graph) {
+    assert(graph.getNodeCount() > 1);
+
+    RouteResult route;
+    route.algorithmName = "Deterministic";
+    route.visitOrder = {
+        graph.getHQNode().getId(),
+        graph.getNode(1).getId(),
+        graph.getHQNode().getId(),
+    };
+    return route;
+}
+
+void assertMatricesMatch(const MapGraph& lhs, const MapGraph& rhs) {
+    assert(lhs.getAdjacencyMatrix().size() == rhs.getAdjacencyMatrix().size());
+    for (std::size_t row = 0; row < lhs.getAdjacencyMatrix().size(); ++row) {
+        assert(lhs.getAdjacencyMatrix()[row].size() == rhs.getAdjacencyMatrix()[row].size());
+        for (std::size_t col = 0; col < lhs.getAdjacencyMatrix()[row].size(); ++col) {
+            assert(nearlyEqual(lhs.getAdjacencyMatrix()[row][col],
+                               rhs.getAdjacencyMatrix()[row][col]));
+        }
+    }
+}
+
+bool matricesDiffer(const MapGraph& lhs, const MapGraph& rhs, float epsilon = 0.001f) {
+    if (lhs.getAdjacencyMatrix().size() != rhs.getAdjacencyMatrix().size()) {
+        return true;
+    }
+
+    for (std::size_t row = 0; row < lhs.getAdjacencyMatrix().size(); ++row) {
+        if (lhs.getAdjacencyMatrix()[row].size() != rhs.getAdjacencyMatrix()[row].size()) {
+            return true;
+        }
+
+        for (std::size_t col = 0; col < lhs.getAdjacencyMatrix()[row].size(); ++col) {
+            if (!nearlyEqual(lhs.getAdjacencyMatrix()[row][col],
+                             rhs.getAdjacencyMatrix()[row][col],
+                             epsilon)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void assertPresentationMatches(const MissionPresentation& lhs,
+                               const MissionPresentation& rhs) {
+    assert(lhs.isValid());
+    assert(rhs.isValid());
+    assert(lhs.playbackPath.points.size() == rhs.playbackPath.points.size());
+    assert(lhs.playbackPath.segmentSpeedFactors.size() ==
+           rhs.playbackPath.segmentSpeedFactors.size());
+    assert(lhs.legInsights.size() == rhs.legInsights.size());
+
+    for (std::size_t i = 0; i < lhs.playbackPath.points.size(); ++i) {
+        assert(nearlyEqual(lhs.playbackPath.points[i].x, rhs.playbackPath.points[i].x));
+        assert(nearlyEqual(lhs.playbackPath.points[i].y, rhs.playbackPath.points[i].y));
+    }
+
+    for (std::size_t i = 0; i < lhs.playbackPath.segmentSpeedFactors.size(); ++i) {
+        assert(nearlyEqual(lhs.playbackPath.segmentSpeedFactors[i],
+                           rhs.playbackPath.segmentSpeedFactors[i]));
+    }
+
+    for (std::size_t i = 0; i < lhs.legInsights.size(); ++i) {
+        assert(nearlyEqual(lhs.legInsights[i].totalCost, rhs.legInsights[i].totalCost));
+        assert(nearlyEqual(lhs.legInsights[i].baseDistance, rhs.legInsights[i].baseDistance));
+    }
 }
 
 void testWeightedMatrixInstall() {
@@ -69,6 +141,17 @@ void testCityPresentationUsesExpandedStreetPath() {
         }
     }
     assert(orthogonalSegments >= 2);
+}
+
+void testCityStartsStormyOnFirstBuild() {
+    WasteSystem system;
+    system.initializeMap();
+    system.generateNewDayWithSeed(11u);
+
+    CityThemeRenderer city;
+    city.rebuildScene(system.getGraph(), system.getCurrentSeed());
+
+    assert(city.getWeather() == CityWeather::Stormy);
 }
 
 void testWeatherPenaltiesStayNonNegative() {
@@ -127,19 +210,138 @@ void testThemeWeightSwitchPreservesSimulationDay() {
     const int dayBefore = system.getDayNumber();
     const unsigned int seedBefore = system.getCurrentSeed();
 
-    SeaThemeRenderer sea;
-    sea.rebuildScene(system.getGraph(), system.getCurrentSeed());
-    sea.applyRouteWeights(system.getGraph());
-    const float seaDistance = system.getGraph().getDistance(0, 1);
+    EnvironmentController controller;
+    MapGraph weightedGraph = system.getGraph();
+    controller.rebuildScenes(weightedGraph);
+    controller.applyActiveWeights(weightedGraph);
+    const float seaDistance = weightedGraph.getDistance(0, 1);
 
-    CityThemeRenderer city;
-    city.rebuildScene(system.getGraph(), system.getCurrentSeed());
-    city.applyRouteWeights(system.getGraph());
-    const float cityDistance = system.getGraph().getDistance(0, 1);
+    controller.setActiveTheme(EnvironmentTheme::City, weightedGraph);
+    const float cityDistance = weightedGraph.getDistance(0, 1);
+
+    controller.setActiveTheme(EnvironmentTheme::Sea, weightedGraph);
+    const float seaDistanceAgain = weightedGraph.getDistance(0, 1);
 
     assert(system.getDayNumber() == dayBefore);
     assert(system.getCurrentSeed() == seedBefore);
     assert(!nearlyEqual(seaDistance, cityDistance, 0.01f));
+    assert(nearlyEqual(seaDistance, seaDistanceAgain, 0.01f));
+}
+
+void testEnvironmentSceneIsStableAcrossDaySeeds() {
+    WasteSystem firstDay;
+    firstDay.initializeMap();
+    firstDay.generateNewDayWithSeed(31415u);
+
+    WasteSystem secondDay;
+    secondDay.initializeMap();
+    secondDay.generateNewDayWithSeed(27182u);
+
+    MapGraph firstGraph = firstDay.getGraph();
+    EnvironmentController firstController;
+    firstController.rebuildScenes(firstGraph);
+    firstController.setActiveTheme(EnvironmentTheme::City, firstGraph);
+    firstController.activeRenderer().setWeather(CityWeather::Rainy);
+    firstController.applyActiveWeights(firstGraph);
+    const MissionPresentation firstPresentation =
+        firstController.buildMissionPresentation(buildDeterministicRoute(firstGraph),
+                                                firstGraph);
+
+    MapGraph secondGraph = secondDay.getGraph();
+    EnvironmentController secondController;
+    secondController.rebuildScenes(secondGraph);
+    secondController.setActiveTheme(EnvironmentTheme::City, secondGraph);
+    secondController.activeRenderer().setWeather(CityWeather::Rainy);
+    secondController.applyActiveWeights(secondGraph);
+    const MissionPresentation secondPresentation =
+        secondController.buildMissionPresentation(buildDeterministicRoute(secondGraph),
+                                                 secondGraph);
+
+    assertMatricesMatch(firstGraph, secondGraph);
+    assertPresentationMatches(firstPresentation, secondPresentation);
+}
+
+void testCityTrafficChangesAcrossNewDaysWhenWeatherNormalized() {
+    WasteSystem system;
+    system.initializeMap();
+
+    EnvironmentController controller;
+    controller.rebuildScenes(system.getGraph());
+    controller.setActiveTheme(EnvironmentTheme::City, system.getGraph());
+
+    system.generateNewDayWithSeed(1001u);
+    controller.randomizeCityTraffic(1001u, system.getGraph());
+    controller.activeRenderer().setWeather(CityWeather::Cloudy);
+    controller.applyActiveWeights(system.getGraph());
+    const MapGraph firstWeightedGraph = system.getGraph();
+
+    system.generateNewDayWithSeed(2002u);
+    controller.randomizeCityTraffic(2002u, system.getGraph());
+    controller.activeRenderer().setWeather(CityWeather::Cloudy);
+    controller.applyActiveWeights(system.getGraph());
+
+    assert(matricesDiffer(firstWeightedGraph, system.getGraph()));
+}
+
+void testWeatherRefreshKeepsTrafficWhenWeatherNormalized() {
+    WasteSystem system;
+    system.initializeMap();
+
+    EnvironmentController controller;
+    controller.rebuildScenes(system.getGraph());
+    controller.setActiveTheme(EnvironmentTheme::City, system.getGraph());
+
+    system.generateNewDayWithSeed(404u);
+    controller.randomizeCityTraffic(404u, system.getGraph());
+    controller.activeRenderer().setWeather(CityWeather::Cloudy);
+    controller.applyActiveWeights(system.getGraph());
+    const MapGraph baselineGraph = system.getGraph();
+
+    controller.randomizeCityWeather(909u, system.getGraph());
+    controller.activeRenderer().setWeather(CityWeather::Cloudy);
+    controller.applyActiveWeights(system.getGraph());
+
+    assertMatricesMatch(baselineGraph, system.getGraph());
+}
+
+void testCitySceneIsDeterministicForSeed() {
+    WasteSystem system;
+    system.initializeMap();
+    system.generateNewDayWithSeed(31415u);
+
+    CityThemeRenderer cityA;
+    cityA.rebuildScene(system.getGraph(), system.getCurrentSeed());
+    cityA.setWeather(CityWeather::Rainy);
+
+    CityThemeRenderer cityB;
+    cityB.rebuildScene(system.getGraph(), system.getCurrentSeed());
+    cityB.setWeather(CityWeather::Rainy);
+
+    MapGraph weightedA = system.getGraph();
+    cityA.applyRouteWeights(weightedA);
+    MapGraph weightedB = system.getGraph();
+    cityB.applyRouteWeights(weightedB);
+
+    assert(weightedA.getAdjacencyMatrix().size() == weightedB.getAdjacencyMatrix().size());
+    for (std::size_t row = 0; row < weightedA.getAdjacencyMatrix().size(); ++row) {
+        for (std::size_t col = 0; col < weightedA.getAdjacencyMatrix()[row].size(); ++col) {
+            assert(nearlyEqual(weightedA.getAdjacencyMatrix()[row][col],
+                               weightedB.getAdjacencyMatrix()[row][col]));
+        }
+    }
+
+    const int hqId = system.getGraph().getHQNode().getId();
+    const int targetId = firstEligibleNode(system);
+    RouteResult route;
+    route.algorithmName = "Deterministic";
+    route.visitOrder = {hqId, targetId, hqId};
+
+    const MissionPresentation presentationA =
+        cityA.buildMissionPresentation(route, system.getGraph());
+    const MissionPresentation presentationB =
+        cityB.buildMissionPresentation(route, system.getGraph());
+
+    assertPresentationMatches(presentationA, presentationB);
 }
 
 } // namespace
@@ -147,9 +349,14 @@ void testThemeWeightSwitchPreservesSimulationDay() {
 int main() {
     testWeightedMatrixInstall();
     testCityPresentationUsesExpandedStreetPath();
+    testCityStartsStormyOnFirstBuild();
     testWeatherPenaltiesStayNonNegative();
     testAlgorithmsReturnClosedTours();
     testThemeWeightSwitchPreservesSimulationDay();
+    testEnvironmentSceneIsStableAcrossDaySeeds();
+    testCityTrafficChangesAcrossNewDaysWhenWeatherNormalized();
+    testWeatherRefreshKeepsTrafficWhenWeatherNormalized();
+    testCitySceneIsDeterministicForSeed();
 
     std::cout << "EnvironmentCoreTests passed" << std::endl;
     return 0;

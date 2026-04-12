@@ -20,7 +20,7 @@ class TSPRouteAlgorithm : public RouteAlgorithm {
 public:
     RouteResult computeRoute(const MapGraph& graph,
                              const std::vector<int>& eligibleIds,
-                             int hqId) override;
+                             int hqId) const override;
 
     std::string algorithmName() const override;
     std::string description() const override;
@@ -31,7 +31,7 @@ private:
         const std::vector<std::vector<float>>& dp,
         const std::vector<std::vector<int>>& parent,
         const std::vector<std::vector<float>>& dist,
-        int n, int startIdx);
+        int n, int startIdx) const;
 };
 
 #endif // TSP_ROUTE_H

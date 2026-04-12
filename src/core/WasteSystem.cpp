@@ -36,6 +36,10 @@ unsigned int makeTimeSeed() {
     return static_cast<unsigned int>(
         std::chrono::steady_clock::now().time_since_epoch().count());
 }
+
+std::string buildMapInitializedMessage(int nodeCount) {
+    return "Map initialized with " + std::to_string(nodeCount) + " locations";
+}
 } // namespace
 
 WasteSystem::WasteSystem()
@@ -66,8 +70,7 @@ void WasteSystem::initializeMap() {
     graph.setDistanceScale(kDistanceScaleKmPerGridUnit);
     graph.buildFullyConnectedGraph();
 
-    eventLog.addEvent("Map initialized with " +
-                      std::to_string(graph.getNodeCount()) + " locations");
+    eventLog.addEvent(buildMapInitializedMessage(graph.getNodeCount()));
 }
 
 void WasteSystem::generateNewDay() {
@@ -119,6 +122,7 @@ std::vector<int> WasteSystem::getEligibleNodes(float thresholdOverride) const {
                                       : collectionThreshold;
 
     std::vector<int> eligibleNodeIds;
+    eligibleNodeIds.reserve(graph.getNodeCount());
     for (int i = 0; i < graph.getNodeCount(); ++i) {
         const WasteNode& node = graph.getNode(i);
         if (node.isEligible(activeThreshold)) {

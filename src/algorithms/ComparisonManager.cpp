@@ -5,6 +5,7 @@
 #include "algorithms/RegularRoute.h"
 #include "algorithms/TSPRoute.h"
 
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -21,8 +22,24 @@ RouteRequestContext buildRouteRequestContext(const WasteSystem& system) {
     };
 }
 
-RouteResult executeAlgorithm(RouteAlgorithm& algorithm,
-                             WasteSystem& system,
+void registerDefaultAlgorithms(
+    std::vector<std::unique_ptr<RouteAlgorithm>>& algorithms) {
+    algorithms.clear();
+
+    // Keep registration centralized so the dashboard, comparison table, and
+    // execution order all rely on the same algorithm list.
+    algorithms.push_back(std::make_unique<RegularRouteAlgorithm>());
+    algorithms.push_back(std::make_unique<GreedyRouteAlgorithm>());
+    algorithms.push_back(std::make_unique<MSTRouteAlgorithm>());
+    algorithms.push_back(std::make_unique<TSPRouteAlgorithm>());
+}
+
+bool isValidAlgorithmIndex(
+    int index, const std::vector<std::unique_ptr<RouteAlgorithm>>& algorithms) {
+    return index >= 0 && index < static_cast<int>(algorithms.size());
+}
+
+RouteResult executeAlgorithm(const RouteAlgorithm& algorithm, WasteSystem& system,
                              const RouteRequestContext& request) {
     // Each algorithm should evaluate the same simulated day from the same
     // collection state, otherwise the comparison would be misleading.
@@ -44,17 +61,8 @@ void logAlgorithmCompletion(WasteSystem& system,
 }
 } // namespace
 
-ComparisonManager::ComparisonManager() {}
-
 void ComparisonManager::initializeAlgorithms() {
-    algorithms.clear();
-
-    // Keep registration centralized so the dashboard, comparison table, and
-    // execution order all rely on the same algorithm list.
-    algorithms.push_back(std::make_unique<RegularRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<GreedyRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<MSTRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<TSPRouteAlgorithm>());
+    registerDefaultAlgorithms(algorithms);
 }
 
 void ComparisonManager::runAllAlgorithms(WasteSystem& system) {
@@ -78,7 +86,7 @@ void ComparisonManager::runAllAlgorithms(WasteSystem& system) {
 }
 
 RouteResult ComparisonManager::runSingleAlgorithm(int index, WasteSystem& system) {
-    if (index < 0 || index >= static_cast<int>(algorithms.size())) {
+    if (!isValidAlgorithmIndex(index, algorithms)) {
         throw std::out_of_range(
             "ComparisonManager::runSingleAlgorithm - invalid index");
     }
@@ -98,14 +106,14 @@ int ComparisonManager::getAlgorithmCount() const {
 }
 
 std::string ComparisonManager::getAlgorithmName(int index) const {
-    if (index < 0 || index >= static_cast<int>(algorithms.size())) {
+    if (!isValidAlgorithmIndex(index, algorithms)) {
         return "Unknown";
     }
     return algorithms[index]->algorithmName();
 }
 
 std::string ComparisonManager::getAlgorithmDescription(int index) const {
-    if (index < 0 || index >= static_cast<int>(algorithms.size())) {
+    if (!isValidAlgorithmIndex(index, algorithms)) {
         return "";
     }
     return algorithms[index]->description();
@@ -113,16 +121,16 @@ std::string ComparisonManager::getAlgorithmDescription(int index) const {
 
 int ComparisonManager::getBestAlgorithmIndex() const {
     int bestIndex = -1;
-    float lowestCost = 0.0f;
+    float lowestCost = std::numeric_limits<float>::max();
 
-    for (int i = 0; i < static_cast<int>(lastResults.size()); ++i) {
-        const RouteResult& result = lastResults[i];
+    for (std::size_t index = 0; index < lastResults.size(); ++index) {
+        const RouteResult& result = lastResults[index];
         if (!result.isValid()) {
             continue;
         }
 
-        if (bestIndex < 0 || result.totalCost < lowestCost) {
-            bestIndex = i;
+        if (result.totalCost < lowestCost) {
+            bestIndex = static_cast<int>(index);
             lowestCost = result.totalCost;
         }
     }

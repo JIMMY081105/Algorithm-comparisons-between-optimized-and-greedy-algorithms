@@ -1,6 +1,14 @@
 #include "core/WasteNode.h"
 #include <algorithm>
 
+namespace {
+constexpr float kMinimumWasteLevel = 0.0f;
+constexpr float kMaximumWasteLevel = 100.0f;
+constexpr float kHighUrgencyThreshold = 70.0f;
+constexpr float kMediumUrgencyThreshold = 40.0f;
+constexpr float kPercentToFraction = 0.01f;
+}
+
 WasteNode::WasteNode()
     : id(0), name("Unknown"), worldX(0.0f), worldY(0.0f),
       wasteLevel(0.0f), wasteCapacity(100.0f),
@@ -13,7 +21,7 @@ WasteNode::WasteNode(int id, const std::string& name, float x, float y,
       collected(false), isHQ(isHQ) {}
 
 int WasteNode::getId() const { return id; }
-std::string WasteNode::getName() const { return name; }
+const std::string& WasteNode::getName() const { return name; }
 float WasteNode::getWorldX() const { return worldX; }
 float WasteNode::getWorldY() const { return worldY; }
 float WasteNode::getWasteLevel() const { return wasteLevel; }
@@ -22,8 +30,7 @@ bool WasteNode::isCollected() const { return collected; }
 bool WasteNode::getIsHQ() const { return isHQ; }
 
 void WasteNode::setWasteLevel(float level) {
-    // Clamp to valid range
-    wasteLevel = std::max(0.0f, std::min(100.0f, level));
+    wasteLevel = std::clamp(level, kMinimumWasteLevel, kMaximumWasteLevel);
 }
 
 void WasteNode::setCollected(bool status) {
@@ -32,14 +39,13 @@ void WasteNode::setCollected(bool status) {
 
 UrgencyLevel WasteNode::getUrgency() const {
     if (isHQ) return UrgencyLevel::LOW;
-    if (wasteLevel >= 70.0f) return UrgencyLevel::HIGH;
-    if (wasteLevel >= 40.0f) return UrgencyLevel::MEDIUM;
+    if (wasteLevel >= kHighUrgencyThreshold) return UrgencyLevel::HIGH;
+    if (wasteLevel >= kMediumUrgencyThreshold) return UrgencyLevel::MEDIUM;
     return UrgencyLevel::LOW;
 }
 
 float WasteNode::getWasteAmount() const {
-    // Actual kg of waste = capacity * fill percentage
-    return wasteCapacity * (wasteLevel / 100.0f);
+    return wasteCapacity * (wasteLevel * kPercentToFraction);
 }
 
 bool WasteNode::isEligible(float thresholdPercent) const {

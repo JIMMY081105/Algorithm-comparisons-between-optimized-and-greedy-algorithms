@@ -13,7 +13,7 @@ class MSTRouteAlgorithm : public RouteAlgorithm {
 public:
     RouteResult computeRoute(const MapGraph& graph,
                              const std::vector<int>& eligibleIds,
-                             int hqId) override;
+                             int hqId) const override;
 
     std::string algorithmName() const override;
     std::string description() const override;
@@ -22,13 +22,13 @@ private:
     // Build MST using Prim's algorithm on the subgraph of relevant nodes.
     // Returns adjacency list of the MST.
     std::vector<std::vector<int>> buildMST(const MapGraph& graph,
-                                           const std::vector<int>& nodeIds);
+                                           const std::vector<int>& nodeIds) const;
 
     // DFS traversal of the MST to produce a visit order
     void dfsTraversal(const std::vector<std::vector<int>>& mstAdj,
                       int current,
                       std::vector<bool>& visited,
-                      std::vector<int>& order);
+                      std::vector<int>& order) const;
 };
 
 #endif // MST_ROUTE_H

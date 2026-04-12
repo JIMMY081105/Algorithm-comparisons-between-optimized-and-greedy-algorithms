@@ -32,7 +32,7 @@ public:
 
     // Getters
     int getId() const;
-    std::string getName() const;
+    const std::string& getName() const;
     float getWorldX() const;
     float getWorldY() const;
     float getWasteLevel() const;

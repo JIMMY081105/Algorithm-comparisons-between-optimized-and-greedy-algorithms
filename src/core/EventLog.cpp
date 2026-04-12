@@ -1,8 +1,21 @@
 #include "core/EventLog.h"
+
+#include <algorithm>
 #include <ctime>
-#include <sstream>
 #include <iomanip>
-#include <vector>
+#include <sstream>
+
+namespace {
+std::tm buildLocalTimestamp(std::time_t now) {
+    std::tm timestamp{};
+#ifdef _WIN32
+    localtime_s(&timestamp, &now);
+#else
+    localtime_r(&now, &timestamp);
+#endif
+    return timestamp;
+}
+} // namespace
 
 EventEntry::EventEntry(const std::string& ts, const std::string& msg)
     : timestamp(ts), message(msg), next(nullptr) {}
@@ -45,24 +58,27 @@ int EventLog::getCount() const {
 }
 
 std::vector<const EventEntry*> EventLog::getRecentEvents(int maxCount) const {
-    // Collect all events into a vector, then return the last N.
-    // For a production system with thousands of events we'd use a
-    // different approach, but for coursework this is clear and correct.
-    std::vector<const EventEntry*> all;
+    if (maxCount <= 0 || head == nullptr) {
+        return {};
+    }
+
+    const int retainedCount = std::min(count, maxCount);
+    const int skipCount = std::max(0, count - retainedCount);
+
+    std::vector<const EventEntry*> recent;
+    recent.reserve(retainedCount);
+
     const EventEntry* current = head;
-    while (current != nullptr) {
-        all.push_back(current);
+    for (int skipped = 0; skipped < skipCount && current != nullptr; ++skipped) {
         current = current->next;
     }
 
-    // Return the most recent events (from the end of the list)
-    std::vector<const EventEntry*> recent;
-    int start = static_cast<int>(all.size()) - maxCount;
-    if (start < 0) start = 0;
-
-    for (int i = static_cast<int>(all.size()) - 1; i >= start; i--) {
-        recent.push_back(all[i]);
+    while (current != nullptr) {
+        recent.push_back(current);
+        current = current->next;
     }
+
+    std::reverse(recent.begin(), recent.end());
     return recent;
 }
 
@@ -79,12 +95,11 @@ void EventLog::clear() {
 }
 
 std::string EventLog::getCurrentTimestamp() const {
-    std::time_t now = std::time(nullptr);
-    std::tm* localTime = std::localtime(&now);
+    const std::tm localTime = buildLocalTimestamp(std::time(nullptr));
     std::ostringstream oss;
     oss << std::setfill('0')
-        << std::setw(2) << localTime->tm_hour << ":"
-        << std::setw(2) << localTime->tm_min << ":"
-        << std::setw(2) << localTime->tm_sec;
+        << std::setw(2) << localTime.tm_hour << ":"
+        << std::setw(2) << localTime.tm_min << ":"
+        << std::setw(2) << localTime.tm_sec;
     return oss.str();
 }

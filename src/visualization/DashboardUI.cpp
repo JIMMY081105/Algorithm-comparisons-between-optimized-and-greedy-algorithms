@@ -174,7 +174,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
         actions.generateNewDay = true;
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Randomize waste levels and rebuild the active environment scene.");
+        ImGui::SetTooltip("Randomize waste levels, city weather, and traffic conditions while keeping the environment layout fixed.");
     }
 
     float threshold = system.getCollectionThreshold();

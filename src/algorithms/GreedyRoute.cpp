@@ -1,15 +1,15 @@
 #include "algorithms/GreedyRoute.h"
-#include <chrono>
+#include "AlgorithmUtils.h"
+
 #include <algorithm>
 #include <limits>
 
 RouteResult GreedyRouteAlgorithm::computeRoute(const MapGraph& graph,
-                                                const std::vector<int>& eligibleIds,
-                                                int hqId) {
-    auto startTime = std::chrono::high_resolution_clock::now();
+                                               const std::vector<int>& eligibleIds,
+                                               int hqId) const {
+    const auto startTime = AlgorithmUtils::RouteClock::now();
 
-    RouteResult result;
-    result.algorithmName = algorithmName();
+    RouteResult result = AlgorithmUtils::makeBaseResult(algorithmName());
 
     if (eligibleIds.empty()) {
         result.runtimeMs = 0.0;
@@ -28,43 +28,44 @@ RouteResult GreedyRouteAlgorithm::computeRoute(const MapGraph& graph,
     //   5. Repeat until all eligible nodes are visited
     //   6. Return to HQ
 
-    // Track which eligible nodes we still need to visit
-    std::vector<bool> visited(graph.getNodeCount(), false);
-    int hqIdx = graph.findNodeIndex(hqId);
-    visited[hqIdx] = true;
+    const std::vector<int> nodeIds =
+        AlgorithmUtils::buildWorkingNodeIds(eligibleIds, hqId);
+    std::vector<bool> visited(nodeIds.size(), false);
+    visited.front() = true;
 
     result.visitOrder.push_back(hqId);
     int currentId = hqId;
 
     // Keep picking the nearest unvisited eligible node
-    for (size_t step = 0; step < eligibleIds.size(); step++) {
-        float bestDist = std::numeric_limits<float>::max();
-        int bestId = -1;
+    for (std::size_t step = 1; step < nodeIds.size(); ++step) {
+        float bestDistance = std::numeric_limits<float>::max();
+        int bestNodeIndex = -1;
 
-        for (int candidateId : eligibleIds) {
-            int candidateIdx = graph.findNodeIndex(candidateId);
-            if (candidateIdx < 0 || visited[candidateIdx]) continue;
+        for (std::size_t candidateIndex = 1; candidateIndex < nodeIds.size(); ++candidateIndex) {
+            if (visited[candidateIndex]) {
+                continue;
+            }
 
-            float dist = graph.getDistance(currentId, candidateId);
-            if (dist < bestDist) {
-                bestDist = dist;
-                bestId = candidateId;
+            const float dist = graph.getDistance(currentId, nodeIds[candidateIndex]);
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                bestNodeIndex = static_cast<int>(candidateIndex);
             }
         }
 
-        if (bestId == -1) break;  // no more reachable unvisited nodes
+        if (bestNodeIndex < 0) {
+            break;
+        }
 
-        result.visitOrder.push_back(bestId);
-        visited[graph.findNodeIndex(bestId)] = true;
-        currentId = bestId;
+        const int nextNodeId = nodeIds[bestNodeIndex];
+        result.visitOrder.push_back(nextNodeId);
+        visited[bestNodeIndex] = true;
+        currentId = nextNodeId;
     }
 
     // Return to HQ to complete the circuit
     result.visitOrder.push_back(hqId);
-
-    auto endTime = std::chrono::high_resolution_clock::now();
-    result.runtimeMs = std::chrono::duration<double, std::milli>(
-        endTime - startTime).count();
+    AlgorithmUtils::finalizeRuntime(result, startTime);
 
     return result;
 }

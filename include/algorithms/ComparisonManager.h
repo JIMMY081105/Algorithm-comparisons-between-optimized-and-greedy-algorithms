@@ -16,7 +16,7 @@ private:
     std::vector<RouteResult> lastResults;
 
 public:
-    ComparisonManager();
+    ComparisonManager() = default;
 
     void initializeAlgorithms();
     void runAllAlgorithms(WasteSystem& system);

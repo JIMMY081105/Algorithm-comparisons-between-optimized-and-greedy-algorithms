@@ -25,9 +25,10 @@ public:
     ~EnvironmentController();
 
     bool init();
-    void rebuildScenes(const MapGraph& graph, unsigned int seed);
+    void rebuildScenes(const MapGraph& graph);
     bool setActiveTheme(EnvironmentTheme theme, MapGraph& graph);
     void applyActiveWeights(MapGraph& graph) const;
+    void randomizeCityTraffic(unsigned int seed, MapGraph& graph);
     void randomizeCityWeather(unsigned int seed, MapGraph& graph);
     void update(float deltaTime);
     void setLayerToggles(const SceneLayerToggles& toggles);

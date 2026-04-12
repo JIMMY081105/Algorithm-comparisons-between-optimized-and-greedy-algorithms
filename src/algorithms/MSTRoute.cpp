@@ -1,15 +1,15 @@
 #include "algorithms/MSTRoute.h"
-#include <chrono>
+#include "AlgorithmUtils.h"
+
 #include <limits>
 #include <algorithm>
 
 RouteResult MSTRouteAlgorithm::computeRoute(const MapGraph& graph,
-                                             const std::vector<int>& eligibleIds,
-                                             int hqId) {
-    auto startTime = std::chrono::high_resolution_clock::now();
+                                            const std::vector<int>& eligibleIds,
+                                            int hqId) const {
+    const auto startTime = AlgorithmUtils::RouteClock::now();
 
-    RouteResult result;
-    result.algorithmName = algorithmName();
+    RouteResult result = AlgorithmUtils::makeBaseResult(algorithmName());
 
     if (eligibleIds.empty()) {
         result.runtimeMs = 0.0;
@@ -18,16 +18,11 @@ RouteResult MSTRouteAlgorithm::computeRoute(const MapGraph& graph,
 
     // Build the set of nodes to include: HQ + all eligible nodes.
     // We include HQ so the MST connects the depot to the collection points.
-    std::vector<int> nodeIds;
-    nodeIds.push_back(hqId);
-    for (int id : eligibleIds) {
-        if (id != hqId) {
-            nodeIds.push_back(id);
-        }
-    }
+    const std::vector<int> nodeIds =
+        AlgorithmUtils::buildWorkingNodeIds(eligibleIds, hqId);
 
     // Step 1: Build MST over the relevant subgraph using Prim's algorithm
-    std::vector<std::vector<int>> mstAdj = buildMST(graph, nodeIds);
+    const std::vector<std::vector<int>> mstAdj = buildMST(graph, nodeIds);
 
     // Step 2: DFS traversal from HQ to get the visit order
     // The DFS gives us a walk through the tree that visits every node.
@@ -36,13 +31,7 @@ RouteResult MSTRouteAlgorithm::computeRoute(const MapGraph& graph,
     std::vector<int> localOrder;
 
     // Find HQ's position in the local node list
-    int hqLocal = 0;
-    for (int i = 0; i < static_cast<int>(nodeIds.size()); i++) {
-        if (nodeIds[i] == hqId) {
-            hqLocal = i;
-            break;
-        }
-    }
+    const int hqLocal = std::max(0, AlgorithmUtils::findNodePosition(nodeIds, hqId));
 
     dfsTraversal(mstAdj, hqLocal, visited, localOrder);
 
@@ -59,30 +48,29 @@ RouteResult MSTRouteAlgorithm::computeRoute(const MapGraph& graph,
         result.visitOrder.push_back(hqId);
     }
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    result.runtimeMs = std::chrono::duration<double, std::milli>(
-        endTime - startTime).count();
+    AlgorithmUtils::finalizeRuntime(result, startTime);
 
     return result;
 }
 
 std::vector<std::vector<int>> MSTRouteAlgorithm::buildMST(
-    const MapGraph& graph, const std::vector<int>& nodeIds) {
+    const MapGraph& graph, const std::vector<int>& nodeIds) const {
     // Prim's algorithm builds the MST by repeatedly adding the cheapest
     // edge that connects a visited node to an unvisited one.
     //
     // We work with local indices (0 to n-1) mapped to actual node IDs.
 
-    int n = static_cast<int>(nodeIds.size());
-    std::vector<std::vector<int>> adj(n);
+    const int nodeCount = static_cast<int>(nodeIds.size());
+    std::vector<std::vector<int>> adj(nodeCount);
 
-    if (n <= 1) return adj;
+    if (nodeCount <= 1) return adj;
 
     // Build a local distance matrix for just the nodes we care about
-    std::vector<std::vector<float>> localDist(n, std::vector<float>(n, 0.0f));
-    for (int i = 0; i < n; i++) {
-        for (int j = i + 1; j < n; j++) {
-            float d = graph.getDistance(nodeIds[i], nodeIds[j]);
+    std::vector<std::vector<float>> localDist(
+        nodeCount, std::vector<float>(nodeCount, 0.0f));
+    for (int i = 0; i < nodeCount; ++i) {
+        for (int j = i + 1; j < nodeCount; ++j) {
+            const float d = graph.getDistance(nodeIds[i], nodeIds[j]);
             localDist[i][j] = d;
             localDist[j][i] = d;
         }
@@ -90,18 +78,18 @@ std::vector<std::vector<int>> MSTRouteAlgorithm::buildMST(
 
     // Standard Prim's: track which nodes are in the MST and the minimum
     // edge weight to reach each node from the current MST
-    std::vector<bool> inMST(n, false);
-    std::vector<float> minEdge(n, std::numeric_limits<float>::max());
-    std::vector<int> parent(n, -1);
+    std::vector<bool> inMST(nodeCount, false);
+    std::vector<float> minEdge(nodeCount, std::numeric_limits<float>::max());
+    std::vector<int> parent(nodeCount, -1);
 
     // Start from node 0 (which is HQ)
     minEdge[0] = 0.0f;
 
-    for (int iter = 0; iter < n; iter++) {
+    for (int iter = 0; iter < nodeCount; ++iter) {
         // Find the unvisited node with the smallest edge to the MST
         int u = -1;
         float best = std::numeric_limits<float>::max();
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < nodeCount; ++i) {
             if (!inMST[i] && minEdge[i] < best) {
                 best = minEdge[i];
                 u = i;
@@ -118,7 +106,7 @@ std::vector<std::vector<int>> MSTRouteAlgorithm::buildMST(
         }
 
         // Update edge weights for neighbors of u
-        for (int v = 0; v < n; v++) {
+        for (int v = 0; v < nodeCount; ++v) {
             if (!inMST[v] && localDist[u][v] < minEdge[v]) {
                 minEdge[v] = localDist[u][v];
                 parent[v] = u;
@@ -130,9 +118,9 @@ std::vector<std::vector<int>> MSTRouteAlgorithm::buildMST(
 }
 
 void MSTRouteAlgorithm::dfsTraversal(const std::vector<std::vector<int>>& mstAdj,
-                                      int current,
-                                      std::vector<bool>& visited,
-                                      std::vector<int>& order) {
+                                     int current,
+                                     std::vector<bool>& visited,
+                                     std::vector<int>& order) const {
     visited[current] = true;
     order.push_back(current);
 

@@ -1,13 +1,13 @@
 #include "algorithms/RegularRoute.h"
-#include <chrono>
+#include "AlgorithmUtils.h"
 
 RouteResult RegularRouteAlgorithm::computeRoute(const MapGraph& graph,
-                                                 const std::vector<int>& eligibleIds,
-                                                 int hqId) {
-    auto startTime = std::chrono::high_resolution_clock::now();
+                                                const std::vector<int>& eligibleIds,
+                                                int hqId) const {
+    const auto startTime = AlgorithmUtils::RouteClock::now();
+    (void)graph;
 
-    RouteResult result;
-    result.algorithmName = algorithmName();
+    RouteResult result = AlgorithmUtils::makeBaseResult(algorithmName());
 
     if (eligibleIds.empty()) {
         result.runtimeMs = 0.0;
@@ -19,20 +19,9 @@ RouteResult RegularRouteAlgorithm::computeRoute(const MapGraph& graph,
     // The truck starts at HQ, visits each eligible node sequentially,
     // and returns to HQ at the end.
 
+    result.visitOrder = AlgorithmUtils::buildWorkingNodeIds(eligibleIds, hqId);
     result.visitOrder.push_back(hqId);
-
-    for (int nodeId : eligibleIds) {
-        if (nodeId != hqId) {
-            result.visitOrder.push_back(nodeId);
-        }
-    }
-
-    // Return to HQ at the end
-    result.visitOrder.push_back(hqId);
-
-    auto endTime = std::chrono::high_resolution_clock::now();
-    result.runtimeMs = std::chrono::duration<double, std::milli>(
-        endTime - startTime).count();
+    AlgorithmUtils::finalizeRuntime(result, startTime);
 
     return result;
 }

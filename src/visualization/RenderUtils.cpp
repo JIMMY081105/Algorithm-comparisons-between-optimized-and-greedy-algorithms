@@ -175,9 +175,9 @@ Color getUrgencyColor(UrgencyLevel urgency) {
         case UrgencyLevel::LOW:
             return Color(0.18f, 0.78f, 0.96f);   // cyan-blue
         case UrgencyLevel::MEDIUM:
-            return Color(0.95f, 0.75f, 0.15f);   // yellow-amber
+            return Color(0.99f, 0.90f, 0.12f);   // high-contrast yellow
         case UrgencyLevel::HIGH:
-            return Color(0.90f, 0.22f, 0.20f);   // red
+            return Color(0.84f, 0.08f, 0.12f);   // deep red
         default:
             return Color(0.5f, 0.5f, 0.5f);
     }

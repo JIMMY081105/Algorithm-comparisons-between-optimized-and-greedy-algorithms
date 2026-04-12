@@ -1,12 +1,19 @@
 #include "persistence/ResultLogger.h"
 
-ResultLogger::ResultLogger() {}
+namespace {
+std::string logExportEvent(WasteSystem& system,
+                           const std::string& filename,
+                           const char* successMessage) {
+    system.getEventLog().addEvent(std::string(successMessage) + filename);
+    return filename;
+}
+} // namespace
 
 std::string ResultLogger::logCurrentResult(const RouteResult& result,
                                            WasteSystem& system) {
-    const std::string filename = exporter.exportSummaryTxt(result, system);
-    system.getEventLog().addEvent("Exported summary to: " + filename);
-    return filename;
+    return logExportEvent(system,
+                          exporter.exportSummaryTxt(result, system),
+                          "Exported summary to: ");
 }
 
 std::string ResultLogger::logComparison(const ComparisonManager& compMgr,
@@ -18,18 +25,18 @@ std::string ResultLogger::logComparison(const ComparisonManager& compMgr,
         return "";
     }
 
-    const std::string filename = exporter.exportComparisonCsv(results, system);
-    system.getEventLog().addEvent("Exported comparison CSV to: " + filename);
-    return filename;
+    return logExportEvent(system,
+                          exporter.exportComparisonCsv(results, system),
+                          "Exported comparison CSV to: ");
 }
 
 std::string ResultLogger::logRouteDetails(const RouteResult& result,
                                           WasteSystem& system) {
-    const std::string filename = exporter.exportRouteDetailsTxt(result, system);
-    system.getEventLog().addEvent("Exported route details to: " + filename);
-    return filename;
+    return logExportEvent(system,
+                          exporter.exportRouteDetailsTxt(result, system),
+                          "Exported route details to: ");
 }
 
-std::string ResultLogger::getOutputPath() const {
+const std::string& ResultLogger::getOutputPath() const {
     return exporter.getOutputDirectory();
 }

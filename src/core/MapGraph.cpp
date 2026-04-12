@@ -4,6 +4,32 @@
 #include <cmath>
 #include <stdexcept>
 
+namespace {
+
+int checkedNodeIndex(int index, std::size_t nodeCount, const char* functionName) {
+    if (index < 0 || index >= static_cast<int>(nodeCount)) {
+        throw std::out_of_range(std::string(functionName) + " - index out of bounds");
+    }
+    return index;
+}
+
+void validateWeightedMatrixShape(const std::vector<std::vector<float>>& matrix,
+                                 std::size_t expectedNodeCount) {
+    if (matrix.size() != expectedNodeCount) {
+        throw std::invalid_argument(
+            "MapGraph::installWeightedMatrix - row count does not match nodes");
+    }
+
+    for (const auto& row : matrix) {
+        if (row.size() != expectedNodeCount) {
+            throw std::invalid_argument(
+                "MapGraph::installWeightedMatrix - column count does not match nodes");
+        }
+    }
+}
+
+} // namespace
+
 MapGraph::MapGraph() : distanceScale(1.5f) {}
 
 float MapGraph::computeEuclidean(const WasteNode& a, const WasteNode& b) const {
@@ -41,19 +67,7 @@ void MapGraph::buildFullyConnectedGraph() {
 }
 
 void MapGraph::installWeightedMatrix(const std::vector<std::vector<float>>& matrix) {
-    const std::size_t expected = nodes.size();
-    if (matrix.size() != expected) {
-        throw std::invalid_argument(
-            "MapGraph::installWeightedMatrix - row count does not match nodes");
-    }
-
-    for (const auto& row : matrix) {
-        if (row.size() != expected) {
-            throw std::invalid_argument(
-                "MapGraph::installWeightedMatrix - column count does not match nodes");
-        }
-    }
-
+    validateWeightedMatrixShape(matrix, nodes.size());
     adjacencyMatrix = matrix;
 }
 
@@ -66,17 +80,11 @@ int MapGraph::getNodeCount() const {
 }
 
 const WasteNode& MapGraph::getNode(int index) const {
-    if (index < 0 || index >= static_cast<int>(nodes.size())) {
-        throw std::out_of_range("MapGraph::getNode - index out of bounds");
-    }
-    return nodes[index];
+    return nodes[checkedNodeIndex(index, nodes.size(), "MapGraph::getNode")];
 }
 
 WasteNode& MapGraph::getNodeMutable(int index) {
-    if (index < 0 || index >= static_cast<int>(nodes.size())) {
-        throw std::out_of_range("MapGraph::getNodeMutable - index out of bounds");
-    }
-    return nodes[index];
+    return nodes[checkedNodeIndex(index, nodes.size(), "MapGraph::getNodeMutable")];
 }
 
 float MapGraph::getDistance(int fromId, int toId) const {
@@ -97,12 +105,14 @@ const std::vector<WasteNode>& MapGraph::getNodes() const {
 }
 
 int MapGraph::findNodeIndex(int nodeId) const {
-    for (int i = 0; i < static_cast<int>(nodes.size()); ++i) {
-        if (nodes[i].getId() == nodeId) {
-            return i;
-        }
+    const auto it = std::find_if(nodes.begin(), nodes.end(),
+                                 [nodeId](const WasteNode& node) {
+                                     return node.getId() == nodeId;
+                                 });
+    if (it == nodes.end()) {
+        return -1;
     }
-    return -1;
+    return static_cast<int>(std::distance(nodes.begin(), it));
 }
 
 std::vector<std::pair<int, float>> MapGraph::getNeighbors(int nodeId) const {
@@ -112,6 +122,7 @@ std::vector<std::pair<int, float>> MapGraph::getNeighbors(int nodeId) const {
         return neighbors;
     }
 
+    neighbors.reserve(nodes.size() > 0 ? nodes.size() - 1 : 0);
     for (int i = 0; i < static_cast<int>(nodes.size()); ++i) {
         if (i != idx && adjacencyMatrix[idx][i] > 0.0f) {
             neighbors.push_back({nodes[i].getId(), adjacencyMatrix[idx][i]});
@@ -129,19 +140,23 @@ float MapGraph::calculateRouteDistance(const std::vector<int>& route) const {
 }
 
 const WasteNode& MapGraph::getHQNode() const {
-    for (const auto& node : nodes) {
-        if (node.getIsHQ()) {
-            return node;
-        }
+    const auto it = std::find_if(nodes.begin(), nodes.end(),
+                                 [](const WasteNode& node) {
+                                     return node.getIsHQ();
+                                 });
+    if (it == nodes.end()) {
+        throw std::runtime_error("MapGraph::getHQNode - no HQ node found in graph");
     }
-    throw std::runtime_error("MapGraph::getHQNode - no HQ node found in graph");
+    return *it;
 }
 
 int MapGraph::getHQIndex() const {
-    for (int i = 0; i < static_cast<int>(nodes.size()); ++i) {
-        if (nodes[i].getIsHQ()) {
-            return i;
-        }
+    const auto it = std::find_if(nodes.begin(), nodes.end(),
+                                 [](const WasteNode& node) {
+                                     return node.getIsHQ();
+                                 });
+    if (it == nodes.end()) {
+        throw std::runtime_error("MapGraph::getHQIndex - no HQ node found in graph");
     }
-    throw std::runtime_error("MapGraph::getHQIndex - no HQ node found in graph");
+    return static_cast<int>(std::distance(nodes.begin(), it));
 }

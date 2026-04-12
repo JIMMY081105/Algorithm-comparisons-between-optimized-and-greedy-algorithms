@@ -14,12 +14,12 @@ private:
     FileExporter exporter;
 
 public:
-    ResultLogger();
+    ResultLogger() = default;
 
     std::string logCurrentResult(const RouteResult& result, WasteSystem& system);
     std::string logComparison(const ComparisonManager& compMgr, WasteSystem& system);
     std::string logRouteDetails(const RouteResult& result, WasteSystem& system);
-    std::string getOutputPath() const;
+    const std::string& getOutputPath() const;
 };
 
 #endif // RESULT_LOGGER_H

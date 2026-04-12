@@ -1,16 +1,15 @@
 #include "algorithms/TSPRoute.h"
-#include <chrono>
+#include "AlgorithmUtils.h"
+
 #include <limits>
-#include <cmath>
 #include <algorithm>
 
 RouteResult TSPRouteAlgorithm::computeRoute(const MapGraph& graph,
-                                             const std::vector<int>& eligibleIds,
-                                             int hqId) {
-    auto startTime = std::chrono::high_resolution_clock::now();
+                                            const std::vector<int>& eligibleIds,
+                                            int hqId) const {
+    const auto startTime = AlgorithmUtils::RouteClock::now();
 
-    RouteResult result;
-    result.algorithmName = algorithmName();
+    RouteResult result = AlgorithmUtils::makeBaseResult(algorithmName());
 
     if (eligibleIds.empty()) {
         result.runtimeMs = 0.0;
@@ -19,20 +18,15 @@ RouteResult TSPRouteAlgorithm::computeRoute(const MapGraph& graph,
 
     // Build the working set: HQ must be index 0, then eligible nodes.
     // We need HQ in the set because TSP must start and end there.
-    std::vector<int> nodeIds;
-    nodeIds.push_back(hqId);
-    for (int id : eligibleIds) {
-        if (id != hqId) {
-            nodeIds.push_back(id);
-        }
-    }
-
-    int n = static_cast<int>(nodeIds.size());
+    const std::vector<int> nodeIds =
+        AlgorithmUtils::buildWorkingNodeIds(eligibleIds, hqId);
+    const int nodeCount = static_cast<int>(nodeIds.size());
 
     // Build a local distance matrix for just our subset of nodes
-    std::vector<std::vector<float>> dist(n, std::vector<float>(n, 0.0f));
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
+    std::vector<std::vector<float>> dist(
+        nodeCount, std::vector<float>(nodeCount, 0.0f));
+    for (int i = 0; i < nodeCount; ++i) {
+        for (int j = 0; j < nodeCount; ++j) {
             if (i != j) {
                 dist[i][j] = graph.getDistance(nodeIds[i], nodeIds[j]);
             }
@@ -52,29 +46,31 @@ RouteResult TSPRouteAlgorithm::computeRoute(const MapGraph& graph,
     // Answer: min over all i of (dp[fullMask][i] + dist[i][0]),
     //         which accounts for returning to HQ.
 
-    int fullMask = (1 << n) - 1;
-    const float INF = std::numeric_limits<float>::max() / 2.0f;
+    const int fullMask = (1 << nodeCount) - 1;
+    const float kInfinity = std::numeric_limits<float>::max() / 2.0f;
 
     // dp[mask][i] and parent[mask][i] for path reconstruction
-    std::vector<std::vector<float>> dp(1 << n, std::vector<float>(n, INF));
-    std::vector<std::vector<int>> parent(1 << n, std::vector<int>(n, -1));
+    std::vector<std::vector<float>> dp(
+        1 << nodeCount, std::vector<float>(nodeCount, kInfinity));
+    std::vector<std::vector<int>> parent(
+        1 << nodeCount, std::vector<int>(nodeCount, -1));
 
     // Start at HQ (local index 0)
     dp[1][0] = 0.0f;
 
     // Fill the DP table
-    for (int mask = 1; mask < (1 << n); mask++) {
-        for (int u = 0; u < n; u++) {
+    for (int mask = 1; mask < (1 << nodeCount); ++mask) {
+        for (int u = 0; u < nodeCount; ++u) {
             // Skip if u is not in the current visited set
             if (!(mask & (1 << u))) continue;
-            if (dp[mask][u] >= INF) continue;
+            if (dp[mask][u] >= kInfinity) continue;
 
             // Try extending to each unvisited node
-            for (int v = 0; v < n; v++) {
+            for (int v = 0; v < nodeCount; ++v) {
                 if (mask & (1 << v)) continue;  // already visited
 
-                int newMask = mask | (1 << v);
-                float newDist = dp[mask][u] + dist[u][v];
+                const int newMask = mask | (1 << v);
+                const float newDist = dp[mask][u] + dist[u][v];
 
                 if (newDist < dp[newMask][v]) {
                     dp[newMask][v] = newDist;
@@ -85,18 +81,17 @@ RouteResult TSPRouteAlgorithm::computeRoute(const MapGraph& graph,
     }
 
     // Find the best final node to return to HQ from
-    result.visitOrder = reconstructPath(dp, parent, dist, n, 0);
+    result.visitOrder = reconstructPath(dp, parent, dist, nodeCount, 0);
 
     // Map local indices back to actual node IDs
     std::vector<int> actualRoute;
-    for (int localIdx : result.visitOrder) {
+    actualRoute.reserve(result.visitOrder.size());
+    for (const int localIdx : result.visitOrder) {
         actualRoute.push_back(nodeIds[localIdx]);
     }
     result.visitOrder = actualRoute;
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    result.runtimeMs = std::chrono::duration<double, std::milli>(
-        endTime - startTime).count();
+    AlgorithmUtils::finalizeRuntime(result, startTime);
 
     return result;
 }
@@ -105,7 +100,7 @@ std::vector<int> TSPRouteAlgorithm::reconstructPath(
     const std::vector<std::vector<float>>& dp,
     const std::vector<std::vector<int>>& parent,
     const std::vector<std::vector<float>>& dist,
-    int n, int startIdx) {
+    int n, int startIdx) const {
 
     int fullMask = (1 << n) - 1;
     const float INF = std::numeric_limits<float>::max() / 2.0f;

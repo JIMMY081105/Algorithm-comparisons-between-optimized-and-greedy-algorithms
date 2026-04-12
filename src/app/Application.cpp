@@ -10,6 +10,30 @@
 #include <iostream>
 #include <stdexcept>
 
+namespace {
+constexpr float kMaxFrameDeltaTime = 0.1f;
+constexpr unsigned int kWeatherSeedDayMultiplier = 97u;
+constexpr unsigned int kTrafficSeedDayMultiplier = 131u;
+constexpr double kMillisecondsPerSecond = 1000.0;
+
+float clampFrameDelta(float deltaTime) {
+    return (deltaTime > kMaxFrameDeltaTime) ? kMaxFrameDeltaTime : deltaTime;
+}
+
+unsigned int buildWeatherSeed(const WasteSystem& system) {
+    return system.getCurrentSeed() +
+           static_cast<unsigned int>(system.getDayNumber()) *
+               kWeatherSeedDayMultiplier +
+           static_cast<unsigned int>(glfwGetTime() * kMillisecondsPerSecond);
+}
+
+unsigned int buildTrafficSeed(const WasteSystem& system) {
+    return system.getCurrentSeed() ^
+           (static_cast<unsigned int>(system.getDayNumber()) *
+            kTrafficSeedDayMultiplier);
+}
+} // namespace
+
 // GLFW error callback — logs errors to stderr
 static void glfwErrorCallback(int error, const char* description) {
     std::cerr << "GLFW Error " << error << ": " << description << std::endl;
@@ -184,10 +208,12 @@ void Application::initSimulation() {
         throw std::runtime_error("Failed to initialize environment themes");
     }
 
-    // Generate the first day immediately so the user sees waste data
+    environmentController.rebuildScenes(wasteSystem.getGraph());
     wasteSystem.generateNewDay();
-    environmentController.rebuildScenes(wasteSystem.getGraph(),
-                                        wasteSystem.getCurrentSeed());
+    environmentController.randomizeCityTraffic(buildTrafficSeed(wasteSystem),
+                                               wasteSystem.getGraph());
+    environmentController.randomizeCityWeather(buildWeatherSeed(wasteSystem),
+                                               wasteSystem.getGraph());
     environmentController.applyActiveWeights(wasteSystem.getGraph());
 
     lastFrameTime = static_cast<float>(glfwGetTime());
@@ -208,7 +234,7 @@ void Application::run() {
         lastFrameTime = currentTime;
 
         // Prevent large dt spikes from pauses/breakpoints
-        if (deltaTime > 0.1f) deltaTime = 0.1f;
+        deltaTime = clampFrameDelta(deltaTime);
 
         update(deltaTime);
         renderFrame();
@@ -322,6 +348,102 @@ void Application::handleCollectedNode(int collectedNodeId) {
     }
 }
 
+void Application::handleThemeChange(EnvironmentTheme theme) {
+    if (!environmentController.setActiveTheme(theme, wasteSystem.getGraph())) {
+        return;
+    }
+
+    resetMissionSession();
+    wasteSystem.getEventLog().addEvent(
+        std::string("Environment switched to ") + toDisplayString(theme));
+}
+
+void Application::refreshCityWeather() {
+    if (environmentController.getActiveTheme() != EnvironmentTheme::City) {
+        return;
+    }
+
+    environmentController.randomizeCityWeather(buildWeatherSeed(wasteSystem),
+                                               wasteSystem.getGraph());
+    resetMissionSession();
+    wasteSystem.getEventLog().addEvent("City weather refreshed");
+}
+
+void Application::generateNewDay() {
+    wasteSystem.generateNewDay();
+    environmentController.randomizeCityTraffic(buildTrafficSeed(wasteSystem),
+                                               wasteSystem.getGraph());
+    environmentController.randomizeCityWeather(buildWeatherSeed(wasteSystem),
+                                               wasteSystem.getGraph());
+    environmentController.applyActiveWeights(wasteSystem.getGraph());
+    resetMissionSession();
+}
+
+void Application::runSelectedAlgorithm(int algorithmIndex) {
+    try {
+        loadMissionRoute(
+            comparisonManager.runSingleAlgorithm(algorithmIndex, wasteSystem),
+            true);
+    } catch (const std::exception& e) {
+        logRuntimeError("Error: ", e);
+    }
+}
+
+void Application::compareAllAlgorithms() {
+    try {
+        comparisonManager.runAllAlgorithms(wasteSystem);
+
+        const int bestIndex = comparisonManager.getBestAlgorithmIndex();
+        if (bestIndex < 0) {
+            return;
+        }
+
+        loadMissionRoute(comparisonManager.getResults()[bestIndex], false);
+    } catch (const std::exception& e) {
+        logRuntimeError("Comparison error: ", e);
+    }
+}
+
+void Application::playOrRestartMission() {
+    if (!currentResult.isValid()) {
+        return;
+    }
+
+    if (animController.isFinished()) {
+        replayCurrentMission();
+        return;
+    }
+
+    wasteSystem.resetCollectionStatus();
+    animController.play();
+}
+
+void Application::exportCurrentResult() {
+    if (!currentResult.isValid()) {
+        return;
+    }
+
+    try {
+        const std::string filename =
+            resultLogger.logCurrentResult(currentResult, wasteSystem);
+        wasteSystem.getEventLog().addEvent("Saved: " + filename);
+    } catch (const std::exception& e) {
+        logRuntimeError("Export error: ", e);
+    }
+}
+
+void Application::exportComparisonResults() {
+    try {
+        const std::string filename =
+            resultLogger.logComparison(comparisonManager, wasteSystem);
+        if (!filename.empty()) {
+            wasteSystem.getEventLog().addEvent("Saved: " + filename);
+        }
+    } catch (const std::exception& e) {
+        logRuntimeError("Export error: ", e);
+    }
+}
+
 void Application::resetMissionSession() {
     currentResult = RouteResult();
     currentMission = MissionPresentation();
@@ -363,99 +485,39 @@ void Application::handleUIActions(const DashboardUI::UIActions& actions) {
     }
 
     if (actions.changeTheme) {
-        if (environmentController.setActiveTheme(actions.selectedTheme,
-                                                 wasteSystem.getGraph())) {
-            resetMissionSession();
-            wasteSystem.getEventLog().addEvent(
-                std::string("Environment switched to ") +
-                toDisplayString(actions.selectedTheme));
-        }
+        handleThemeChange(actions.selectedTheme);
     }
 
-    if (actions.randomizeWeather &&
-        environmentController.getActiveTheme() == EnvironmentTheme::City) {
-        const unsigned int weatherSeed =
-            wasteSystem.getCurrentSeed() +
-            static_cast<unsigned int>(wasteSystem.getDayNumber() * 97) +
-            static_cast<unsigned int>(glfwGetTime() * 1000.0);
-        environmentController.randomizeCityWeather(weatherSeed,
-                                                   wasteSystem.getGraph());
-        resetMissionSession();
-        wasteSystem.getEventLog().addEvent("City weather refreshed");
+    if (actions.randomizeWeather) {
+        refreshCityWeather();
     }
-    // Generate New Day — randomize waste levels
+
     if (actions.generateNewDay) {
-        wasteSystem.generateNewDay();
-        environmentController.rebuildScenes(wasteSystem.getGraph(),
-                                            wasteSystem.getCurrentSeed());
-        environmentController.applyActiveWeights(wasteSystem.getGraph());
-        resetMissionSession();
+        generateNewDay();
     }
 
-    // Run a single selected algorithm
     if (actions.runSelectedAlgorithm && actions.algorithmToRun >= 0) {
-        try {
-            const RouteResult result = comparisonManager.runSingleAlgorithm(
-                actions.algorithmToRun, wasteSystem);
-            loadMissionRoute(result, true);
-        } catch (const std::exception& e) {
-            logRuntimeError("Error: ", e);
-        }
+        runSelectedAlgorithm(actions.algorithmToRun);
     }
 
-    // Compare all four algorithms
     if (actions.compareAll) {
-        try {
-            comparisonManager.runAllAlgorithms(wasteSystem);
-
-            // Load the best algorithm's route for animation
-            const int bestIdx = comparisonManager.getBestAlgorithmIndex();
-            if (bestIdx >= 0) {
-                const auto& results = comparisonManager.getResults();
-                loadMissionRoute(results[bestIdx], false);
-            }
-        } catch (const std::exception& e) {
-            logRuntimeError("Comparison error: ", e);
-        }
+        compareAllAlgorithms();
     }
 
-    // Play / start animation
-    if (actions.playPause && currentResult.isValid()) {
-        if (animController.isFinished()) {
-            replayCurrentMission();
-        } else {
-            wasteSystem.resetCollectionStatus();
-            animController.play();
-        }
+    if (actions.playPause) {
+        playOrRestartMission();
     }
 
-    // Replay animation from start
     if (actions.replay) {
         replayCurrentMission();
     }
 
-    // Export summary to TXT
-    if (actions.exportResults && currentResult.isValid()) {
-        try {
-            const std::string file = resultLogger.logCurrentResult(
-                currentResult, wasteSystem);
-            wasteSystem.getEventLog().addEvent("Saved: " + file);
-        } catch (const std::exception& e) {
-            logRuntimeError("Export error: ", e);
-        }
+    if (actions.exportResults) {
+        exportCurrentResult();
     }
 
-    // Export comparison to CSV
     if (actions.exportComparison) {
-        try {
-            const std::string file = resultLogger.logComparison(
-                comparisonManager, wasteSystem);
-            if (!file.empty()) {
-                wasteSystem.getEventLog().addEvent("Saved: " + file);
-            }
-        } catch (const std::exception& e) {
-            logRuntimeError("Export error: ", e);
-        }
+        exportComparisonResults();
     }
 }
 

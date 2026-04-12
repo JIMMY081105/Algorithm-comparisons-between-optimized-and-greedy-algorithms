@@ -11,7 +11,7 @@ class RegularRouteAlgorithm : public RouteAlgorithm {
 public:
     RouteResult computeRoute(const MapGraph& graph,
                              const std::vector<int>& eligibleIds,
-                             int hqId) override;
+                             int hqId) const override;
 
     std::string algorithmName() const override;
     std::string description() const override;

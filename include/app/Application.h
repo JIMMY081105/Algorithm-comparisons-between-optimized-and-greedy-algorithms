@@ -45,6 +45,14 @@ private:
     void renderFrame();
     void handleZoomInput();
     void handleCollectedNode(int collectedNodeId);
+    void handleThemeChange(EnvironmentTheme theme);
+    void refreshCityWeather();
+    void generateNewDay();
+    void runSelectedAlgorithm(int algorithmIndex);
+    void compareAllAlgorithms();
+    void playOrRestartMission();
+    void exportCurrentResult();
+    void exportComparisonResults();
 
     // Mission/session helpers keep UI event handling declarative.
     void resetMissionSession();

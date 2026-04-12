@@ -21,7 +21,7 @@ public:
     //   hqId         — the ID of the HQ/depot node
     virtual RouteResult computeRoute(const MapGraph& graph,
                                      const std::vector<int>& eligibleIds,
-                                     int hqId) = 0;
+                                     int hqId) const = 0;
 
     // Human-readable name for display in the UI and export files
     virtual std::string algorithmName() const = 0;

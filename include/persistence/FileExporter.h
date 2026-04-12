@@ -28,7 +28,7 @@ public:
                                     const WasteSystem& system);
     std::string exportRouteDetailsTxt(const RouteResult& result,
                                       const WasteSystem& system);
-    std::string getOutputDirectory() const;
+    const std::string& getOutputDirectory() const;
 };
 
 #endif // FILE_EXPORTER_H
