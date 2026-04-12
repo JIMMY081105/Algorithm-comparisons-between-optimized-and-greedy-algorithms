@@ -9,7 +9,7 @@ namespace {
 constexpr float kSidebarWidth = 290.0f;
 constexpr float kPanelMargin = 10.0f;
 constexpr float kWorldPadding = 3.2f;
-constexpr float kTallStructureAllowanceTop = 112.0f;
+constexpr float kTallStructureAllowanceTop = 185.0f;
 constexpr float kTallStructureAllowanceBottom = 30.0f;
 constexpr float kMinUserZoom = 0.55f;
 constexpr float kMaxUserZoom = 2.40f;

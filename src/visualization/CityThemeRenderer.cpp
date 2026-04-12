@@ -1,4 +1,5 @@
 #include "visualization/CityThemeRenderer.h"
+#include "visualization/CityAssetLibrary.h"
 
 #include "environment/MissionPresentationUtils.h"
 #include "visualization/IsometricRenderer.h"
@@ -20,9 +21,11 @@ constexpr float kPeripheralBandX = 5.8f;
 constexpr float kPeripheralBandY = 4.8f;
 constexpr float kCongestionPenaltyScale = 0.75f;
 constexpr float kIncidentPenaltyScale = 1.75f;
-constexpr int kLotGrid = 5;
-constexpr int kLotCells = kLotGrid * kLotGrid;
 constexpr float kTwoPi = 6.28318530718f;
+constexpr unsigned int kNorthEdge = 1u;
+constexpr unsigned int kEastEdge = 2u;
+constexpr unsigned int kSouthEdge = 4u;
+constexpr unsigned int kWestEdge = 8u;
 
 float clamp01(float value) {
     return std::max(0.0f, std::min(1.0f, value));
@@ -228,6 +231,8 @@ CityThemeRenderer::CityThemeRenderer()
       trafficClock(0.0f),
       gridColumns(0),
       gridRows(0),
+      primaryBoulevardColumn(0),
+      primaryBoulevardRow(0),
       sceneMinX(0.0f),
       sceneMaxX(0.0f),
       sceneMinY(0.0f),
@@ -263,7 +268,9 @@ void CityThemeRenderer::rebuildScene(const MapGraph& graph, unsigned int seed) {
 
     std::mt19937 layoutRng(seed ^ 0xD741B29u);
     generateBlocks(layoutRng);
-    generateBuildings(graph, layoutRng);
+    buildings.clear();
+    landscapeFeatures.clear();
+    populateFromAssetLibrary(graph, layoutRng);
     generatePeripheralScene(layoutRng);
     generateAmbientCars(layoutRng);
 
@@ -382,7 +389,7 @@ MissionPresentation CityThemeRenderer::buildMissionPresentation(
 
     const float avgCongestion = dashboardInfo.congestionLevel * 100.0f;
     presentation.narrative =
-        std::string("City mode follows the street graph through the illuminated operational district under ") +
+        std::string("City mode follows the district street graph through commercial, residential, campus, park, and landmark zones under ") +
         toDisplayString(weather) + " conditions. Average live congestion load is " +
         std::to_string(static_cast<int>(avgCongestion)) + "%.";
     return presentation;
@@ -445,39 +452,39 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
     const float right = left + static_cast<float>(viewport[2]);
     const float bottom = top + static_cast<float>(viewport[3]);
 
-    Color skyTop(0.22f, 0.30f, 0.44f, 1.0f);
-    Color skyBottom(0.10f, 0.13f, 0.19f, 1.0f);
-    Color groundBase(0.12f, 0.14f, 0.17f, 0.98f);
-    Color districtLift(0.34f, 0.42f, 0.54f, 0.14f);
-    Color wetTint(0.14f, 0.20f, 0.28f, 0.12f);
+    Color skyTop(0.22f, 0.30f, 0.40f, 1.0f);
+    Color skyBottom(0.11f, 0.14f, 0.18f, 1.0f);
+    Color groundBase(0.17f, 0.18f, 0.16f, 0.98f);
+    Color districtLift(0.42f, 0.46f, 0.50f, 0.13f);
+    Color wetTint(0.14f, 0.20f, 0.26f, 0.10f);
 
     switch (weather) {
         case CityWeather::Sunny:
-            skyTop = Color(0.24f, 0.32f, 0.46f, 1.0f);
-            skyBottom = Color(0.12f, 0.15f, 0.22f, 1.0f);
-            groundBase = Color(0.14f, 0.15f, 0.18f, 0.98f);
-            districtLift = Color(0.96f, 0.74f, 0.38f, 0.16f);
-            wetTint = Color(0.14f, 0.19f, 0.24f, 0.08f);
+            skyTop = Color(0.26f, 0.34f, 0.46f, 1.0f);
+            skyBottom = Color(0.13f, 0.16f, 0.22f, 1.0f);
+            groundBase = Color(0.18f, 0.18f, 0.15f, 0.98f);
+            districtLift = Color(0.98f, 0.78f, 0.40f, 0.16f);
+            wetTint = Color(0.14f, 0.18f, 0.22f, 0.05f);
             break;
         case CityWeather::Cloudy:
-            skyTop = Color(0.18f, 0.23f, 0.32f, 1.0f);
-            skyBottom = Color(0.10f, 0.13f, 0.19f, 1.0f);
-            groundBase = Color(0.12f, 0.14f, 0.17f, 0.98f);
-            districtLift = Color(0.52f, 0.60f, 0.72f, 0.14f);
+            skyTop = Color(0.20f, 0.24f, 0.30f, 1.0f);
+            skyBottom = Color(0.10f, 0.12f, 0.17f, 1.0f);
+            groundBase = Color(0.16f, 0.17f, 0.16f, 0.98f);
+            districtLift = Color(0.54f, 0.58f, 0.64f, 0.12f);
             wetTint = Color(0.14f, 0.18f, 0.24f, 0.10f);
             break;
         case CityWeather::Rainy:
-            skyTop = Color(0.13f, 0.18f, 0.26f, 1.0f);
-            skyBottom = Color(0.07f, 0.10f, 0.15f, 1.0f);
-            groundBase = Color(0.10f, 0.12f, 0.15f, 0.99f);
-            districtLift = Color(0.42f, 0.50f, 0.62f, 0.12f);
+            skyTop = Color(0.14f, 0.18f, 0.24f, 1.0f);
+            skyBottom = Color(0.07f, 0.10f, 0.14f, 1.0f);
+            groundBase = Color(0.12f, 0.13f, 0.14f, 0.99f);
+            districtLift = Color(0.42f, 0.48f, 0.56f, 0.12f);
             wetTint = Color(0.16f, 0.24f, 0.34f, 0.14f);
             break;
         case CityWeather::Stormy:
-            skyTop = Color(0.10f, 0.13f, 0.19f, 1.0f);
-            skyBottom = Color(0.05f, 0.07f, 0.11f, 1.0f);
-            groundBase = Color(0.08f, 0.10f, 0.13f, 1.0f);
-            districtLift = Color(0.36f, 0.42f, 0.52f, 0.11f);
+            skyTop = Color(0.09f, 0.12f, 0.18f, 1.0f);
+            skyBottom = Color(0.05f, 0.07f, 0.10f, 1.0f);
+            groundBase = Color(0.09f, 0.10f, 0.12f, 1.0f);
+            districtLift = Color(0.34f, 0.40f, 0.48f, 0.11f);
             wetTint = Color(0.18f, 0.26f, 0.36f, 0.16f);
             break;
     }
@@ -511,32 +518,67 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
     for (const BlockZone& block : blocks) {
         const float spanX = block.maxX - block.minX;
         const float spanY = block.maxY - block.minY;
-        const float insetX = spanX * 0.07f;
-        const float insetY = spanY * 0.08f;
+        const float insetX = spanX * 0.05f;
+        const float insetY = spanY * 0.06f;
 
-        Color basePave(0.16f, 0.17f, 0.20f, 0.94f);
-        Color focusPave(0.30f, 0.32f, 0.38f, 0.96f);
-        Color patch = mixColor(basePave, focusPave, block.focusWeight * 0.88f);
-        patch = mixColor(patch, wetTint,
-                         (weather == CityWeather::Rainy || weather == CityWeather::Stormy)
-                             ? 0.32f : 0.0f);
-
-        if (block.openPocket) {
-            patch = block.serviceCourt
-                ? Color(0.12f, 0.12f, 0.13f, 0.88f)
-                : Color(0.14f, 0.13f, 0.12f, 0.82f);
+        Color patch(0.18f, 0.18f, 0.17f, 0.96f);
+        Color curb(0.11f, 0.11f, 0.12f, 0.92f);
+        switch (block.district) {
+            case DistrictType::Landmark:
+                patch = Color(0.30f, 0.31f, 0.34f, 0.96f);
+                curb = Color(0.16f, 0.17f, 0.20f, 0.96f);
+                break;
+            case DistrictType::Commercial:
+                patch = Color(0.24f, 0.24f, 0.25f, 0.96f);
+                curb = Color(0.12f, 0.12f, 0.13f, 0.94f);
+                break;
+            case DistrictType::Mixed:
+                patch = Color(0.22f, 0.22f, 0.21f, 0.96f);
+                curb = Color(0.11f, 0.11f, 0.12f, 0.94f);
+                break;
+            case DistrictType::Residential:
+                patch = Color(0.18f, 0.20f, 0.17f, 0.96f);
+                curb = Color(0.11f, 0.12f, 0.11f, 0.92f);
+                break;
+            case DistrictType::Campus:
+                patch = Color(0.20f, 0.22f, 0.18f, 0.96f);
+                curb = Color(0.12f, 0.13f, 0.12f, 0.92f);
+                break;
+            case DistrictType::Park:
+                patch = Color(0.18f, 0.26f, 0.16f, 0.94f);
+                curb = Color(0.10f, 0.13f, 0.10f, 0.90f);
+                break;
+            case DistrictType::Service:
+                patch = Color(0.18f, 0.18f, 0.18f, 0.96f);
+                curb = Color(0.10f, 0.10f, 0.10f, 0.92f);
+                break;
         }
 
+        patch = mixColor(patch, wetTint,
+                         (weather == CityWeather::Rainy || weather == CityWeather::Stormy)
+                             ? 0.26f : 0.0f);
+
+        drawWorldQuadPatch(block.minX + insetX * 0.36f, block.minY + insetY * 0.36f,
+                           block.maxX - insetX * 0.36f, block.maxY - insetY * 0.36f,
+                           curb);
         drawWorldQuadPatch(block.minX + insetX, block.minY + insetY,
                            block.maxX - insetX, block.maxY - insetY,
                            patch);
 
-        if (block.visualTier == VisualTier::Focus) {
+        if (block.visualTier == VisualTier::Focus || block.district == DistrictType::Landmark) {
             drawWorldQuadPatch(block.centerX - spanX * 0.16f,
                                block.centerY - spanY * 0.16f,
                                block.centerX + spanX * 0.16f,
                                block.centerY + spanY * 0.16f,
-                               Color(0.24f, 0.29f, 0.36f, 0.16f));
+                               Color(0.32f, 0.36f, 0.42f, 0.12f));
+        }
+
+        if (block.district == DistrictType::Park || block.district == DistrictType::Campus) {
+            drawWorldQuadPatch(block.centerX - spanX * 0.10f,
+                               block.centerY - spanY * 0.10f,
+                               block.centerX + spanX * 0.10f,
+                               block.centerY + spanY * 0.10f,
+                               Color(0.22f, 0.34f, 0.18f, 0.12f));
         }
     }
 }
@@ -585,9 +627,13 @@ void CityThemeRenderer::drawTransitNetwork(
         if (road.incident && layerToggles.showIncidents) {
             roadColor = mixColor(roadColor, Color(0.82f, 0.14f, 0.12f, 1.0f), 0.60f);
         }
+        if (road.arterial) {
+            roadColor = mixColor(roadColor, Color(0.24f, 0.25f, 0.27f, roadColor.a), 0.24f);
+            centerLine = mixColor(centerLine, Color(0.92f, 0.86f, 0.58f, centerLine.a), 0.36f);
+        }
 
-        const float curbWidth = 8.8f + roadFocus * 3.4f;
-        const float asphaltWidth = 6.6f + roadFocus * 2.8f;
+        const float curbWidth = 8.8f + roadFocus * 3.4f + (road.arterial ? 2.0f : 0.0f);
+        const float asphaltWidth = 6.6f + roadFocus * 2.8f + (road.arterial ? 1.4f : 0.0f);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y, curbColor, curbWidth);
         if (road.visualTier == VisualTier::Focus) {
             renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
@@ -606,8 +652,8 @@ void CityThemeRenderer::drawTransitNetwork(
                                        0.05f + roadFocus * 0.08f));
     }
 
-    for (const auto& building : buildings) {
-        drawBuildingLot(renderer, building);
+    for (const auto& placed : presetBuildings) {
+        drawPresetBuilding(renderer, placed);
     }
 
     if (layerToggles.showIncidents) {
@@ -790,30 +836,16 @@ void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
                           1.2f);
     }
 
-    for (const BlockZone& block : blocks) {
-        if (!block.openPocket) {
-            continue;
-        }
+    for (const auto& env : presetEnvironments) {
+        drawPresetEnvironment(renderer, env, animationTime);
+    }
 
-        const float spanX = block.maxX - block.minX;
-        const float spanY = block.maxY - block.minY;
-        const float insetX = spanX * 0.18f;
-        const float insetY = spanY * 0.18f;
-        const float minX = block.minX + insetX;
-        const float maxX = block.maxX - insetX;
-        const float minY = block.minY + insetY;
-        const float maxY = block.maxY - insetY;
+    for (const auto& prop : presetRoadProps) {
+        drawPresetRoadProp(renderer, prop, animationTime);
+    }
 
-        const Color courtColor = block.serviceCourt
-            ? Color(0.10f, 0.11f, 0.12f, 0.58f)
-            : Color(0.14f, 0.13f, 0.12f, 0.46f);
-        drawWorldQuadPatch(minX, minY, maxX, maxY, courtColor);
-
-        if (!block.serviceCourt) {
-            const IsoCoord centerIso = RenderUtils::worldToIso(block.centerX, block.centerY);
-            renderer.drawDiamond(centerIso.x, centerIso.y, 6.2f, 2.8f,
-                                 Color(0.74f, 0.62f, 0.38f, 0.08f + pulse * 0.03f));
-        }
+    for (const auto& vehicle : presetVehicles) {
+        drawPresetVehicle(renderer, vehicle);
     }
 
     for (const auto& building : backgroundBuildings) {
@@ -905,8 +937,10 @@ void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937&
     roads.clear();
     roadAdjacency.clear();
 
-    gridColumns = 6;
-    gridRows = 5;
+    gridColumns = 8;
+    gridRows = 6;
+    primaryBoulevardColumn = gridColumns / 2;
+    primaryBoulevardRow = gridRows / 2;
 
     float minX = std::numeric_limits<float>::max();
     float maxX = std::numeric_limits<float>::lowest();
@@ -923,20 +957,58 @@ void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937&
     const float endX = maxX + kCityPaddingX;
     const float startY = minY - kCityPaddingY;
     const float endY = maxY + kCityPaddingY;
-    const float stepX = (endX - startX) / static_cast<float>(gridColumns - 1);
-    const float stepY = (endY - startY) / static_cast<float>(gridRows - 1);
 
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
     std::uniform_real_distribution<float> cycleDistribution(0.0f, 4.0f);
+
+    auto buildAxisPositions = [&](int count, float start, float end,
+                                  int boulevardIndex, float boulevardBoost) {
+        std::vector<float> spans(std::max(0, count - 1), 1.0f);
+        for (int i = 0; i < static_cast<int>(spans.size()); ++i) {
+            float spanWeight = 0.90f + unit(rng) * 0.45f;
+            if (i == boulevardIndex) {
+                spanWeight += boulevardBoost;
+            } else if (std::abs(i - boulevardIndex) == 1) {
+                spanWeight += boulevardBoost * 0.28f;
+            } else if (i == 0 || i == static_cast<int>(spans.size()) - 1) {
+                spanWeight += 0.18f;
+            }
+            spans[i] = spanWeight;
+        }
+
+        const float totalSpan = std::accumulate(spans.begin(), spans.end(), 0.0f);
+        std::vector<float> positions(count, start);
+        float cursor = start;
+        for (int i = 1; i < count; ++i) {
+            cursor += (end - start) * (spans[i - 1] / totalSpan);
+            positions[i] = cursor;
+        }
+        positions.front() = start;
+        positions.back() = end;
+        return positions;
+    };
+
+    const std::vector<float> columnPositions = buildAxisPositions(
+        gridColumns, startX, endX, std::max(0, primaryBoulevardColumn - 1), 0.78f);
+    const std::vector<float> rowPositions = buildAxisPositions(
+        gridRows, startY, endY, std::max(0, primaryBoulevardRow - 1), 0.62f);
+
     for (int row = 0; row < gridRows; ++row) {
         for (int col = 0; col < gridColumns; ++col) {
-            const bool hasLight = row > 0 && row < gridRows - 1 &&
-                                  col > 0 && col < gridColumns - 1 &&
-                                  ((row + col + static_cast<int>(layoutSeed % 3)) % 2 == 0);
+            const bool onBoulevard =
+                row == primaryBoulevardRow || col == primaryBoulevardColumn;
+            const bool innerCollector =
+                row == std::max(1, primaryBoulevardRow - 2) ||
+                col == std::max(1, primaryBoulevardColumn - 2);
+            const bool hasLight =
+                row > 0 && row < gridRows - 1 &&
+                col > 0 && col < gridColumns - 1 &&
+                (onBoulevard || ((row + col + static_cast<int>(layoutSeed % 3)) % 2 == 0));
             intersections.push_back(Intersection{
                 row * gridColumns + col,
-                startX + col * stepX,
-                startY + row * stepY,
-                hasLight,
+                columnPositions[col],
+                rowPositions[row],
+                hasLight || innerCollector,
                 cycleDistribution(rng)
             });
         }
@@ -947,6 +1019,11 @@ void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937&
     auto addRoad = [&](int from, int to) {
         const Intersection& a = intersections[from];
         const Intersection& b = intersections[to];
+        const bool verticalRoad = a.x == b.x;
+        const int lineIndex = verticalRoad ? (from % gridColumns) : (from / gridColumns);
+        const bool arterial = verticalRoad
+            ? lineIndex == primaryBoulevardColumn
+            : lineIndex == primaryBoulevardRow;
 
         const int roadIndex = static_cast<int>(roads.size());
         roads.push_back(RoadSegment{
@@ -957,6 +1034,7 @@ void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937&
             false,
             0.0f,
             0.0f,
+            arterial,
             VisualTier::Support
         });
         roadAdjacency[from].push_back(roadIndex);
@@ -1043,7 +1121,8 @@ void CityThemeRenderer::updateSceneFocus(const MapGraph& graph) {
         const Intersection& to = intersections[road.to];
         const float midX = (from.x + to.x) * 0.5f;
         const float midY = (from.y + to.y) * 0.5f;
-        road.focusWeight = computeOperationalFocus(midX, midY);
+        road.focusWeight = clamp01(
+            computeOperationalFocus(midX, midY) + (road.arterial ? 0.16f : 0.0f));
         road.visualTier = visualTierFromFocus(road.focusWeight);
     }
 }
@@ -1052,7 +1131,7 @@ void CityThemeRenderer::generateBlocks(std::mt19937& rng) {
     blocks.clear();
     blocks.reserve((gridRows - 1) * (gridColumns - 1));
 
-    std::uniform_real_distribution<float> focusJitter(-0.06f, 0.06f);
+    std::uniform_real_distribution<float> focusJitter(-0.05f, 0.05f);
 
     for (int row = 0; row + 1 < gridRows; ++row) {
         for (int col = 0; col + 1 < gridColumns; ++col) {
@@ -1062,29 +1141,98 @@ void CityThemeRenderer::generateBlocks(std::mt19937& rng) {
             const float centerX = (a.x + b.x) * 0.5f;
             const float centerY = (a.y + c.y) * 0.5f;
             const float focus = clamp01(computeOperationalFocus(centerX, centerY) + focusJitter(rng));
-            const DistrictType district = districtFromFocus(focus);
+            unsigned int arterialEdges = 0;
+            if (row + 1 == primaryBoulevardRow) arterialEdges |= kNorthEdge;
+            if (col == primaryBoulevardColumn) arterialEdges |= kEastEdge;
+            if (row == primaryBoulevardRow) arterialEdges |= kSouthEdge;
+            if (col + 1 == primaryBoulevardColumn) arterialEdges |= kWestEdge;
 
-            float occupancyTarget = 0.90f;
+            const bool edgeBlock =
+                row == 0 || col == 0 ||
+                row == gridRows - 2 || col == gridColumns - 2;
+            const float arterialBoost = arterialEdges == 0 ? 0.0f : 0.12f;
+
+            DistrictType district = DistrictType::Mixed;
+            if (edgeBlock && focus < 0.34f) {
+                district = DistrictType::Service;
+            } else if (focus >= 0.56f) {
+                district = DistrictType::Commercial;
+            } else if (focus >= 0.38f) {
+                district = DistrictType::Mixed;
+            } else if (focus >= 0.22f) {
+                district = DistrictType::Residential;
+            } else {
+                district = DistrictType::Service;
+            }
+
+            float occupancyTarget = 0.55f;
+            float greenRatio = 0.18f;
+            float streetSetback = 0.12f;
+            float interiorMargin = 0.10f;
+            float heightBias = focus + arterialBoost;
             switch (district) {
-                case DistrictType::Core: occupancyTarget = 0.98f; break;
-                case DistrictType::Mixed: occupancyTarget = 0.92f; break;
-                case DistrictType::Residential: occupancyTarget = 0.86f; break;
-                case DistrictType::Utility: occupancyTarget = 0.78f; break;
+                case DistrictType::Commercial:
+                    occupancyTarget = 0.84f;
+                    greenRatio = 0.10f;
+                    streetSetback = 0.08f;
+                    interiorMargin = 0.06f;
+                    break;
+                case DistrictType::Mixed:
+                    occupancyTarget = 0.68f;
+                    greenRatio = 0.18f;
+                    streetSetback = 0.11f;
+                    interiorMargin = 0.09f;
+                    break;
+                case DistrictType::Residential:
+                    occupancyTarget = 0.48f;
+                    greenRatio = 0.34f;
+                    streetSetback = 0.16f;
+                    interiorMargin = 0.12f;
+                    break;
+                case DistrictType::Campus:
+                    occupancyTarget = 0.34f;
+                    greenRatio = 0.44f;
+                    streetSetback = 0.18f;
+                    interiorMargin = 0.14f;
+                    break;
+                case DistrictType::Park:
+                    occupancyTarget = 0.08f;
+                    greenRatio = 0.84f;
+                    streetSetback = 0.20f;
+                    interiorMargin = 0.18f;
+                    break;
+                case DistrictType::Service:
+                    occupancyTarget = 0.40f;
+                    greenRatio = 0.22f;
+                    streetSetback = 0.14f;
+                    interiorMargin = 0.10f;
+                    break;
+                case DistrictType::Landmark:
+                    occupancyTarget = 0.78f;
+                    greenRatio = 0.12f;
+                    streetSetback = 0.08f;
+                    interiorMargin = 0.06f;
+                    break;
             }
 
             blocks.push_back(BlockZone{
                 row,
                 col,
-                RenderUtils::lerp(a.x, b.x, 0.10f),
-                RenderUtils::lerp(a.x, b.x, 0.90f),
-                RenderUtils::lerp(a.y, c.y, 0.12f),
-                RenderUtils::lerp(a.y, c.y, 0.88f),
+                RenderUtils::lerp(a.x, b.x, 0.07f),
+                RenderUtils::lerp(a.x, b.x, 0.93f),
+                RenderUtils::lerp(a.y, c.y, 0.08f),
+                RenderUtils::lerp(a.y, c.y, 0.92f),
                 centerX,
                 centerY,
                 focus,
                 occupancyTarget,
+                greenRatio,
+                streetSetback,
+                interiorMargin,
+                heightBias,
+                arterialEdges,
                 district,
-                visualTierFromFocus(focus),
+                visualTierFromFocus(clamp01(focus + arterialBoost)),
                 false,
                 false,
                 false
@@ -1092,292 +1240,406 @@ void CityThemeRenderer::generateBlocks(std::mt19937& rng) {
         }
     }
 
-    std::vector<int> coreBlocks;
-    std::vector<int> nonCoreBlocks;
+    int landmarkIndex = -1;
+    float bestLandmarkScore = std::numeric_limits<float>::max();
     for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
-        if (blocks[i].district == DistrictType::Core) {
-            coreBlocks.push_back(i);
-        } else {
-            nonCoreBlocks.push_back(i);
+        const BlockZone& block = blocks[i];
+        if (block.arterialEdges == 0u || block.district == DistrictType::Service) {
+            continue;
+        }
+
+        const float centerDistance =
+            pointDistance(block.centerX, block.centerY,
+                          operationalCenterX, operationalCenterY);
+        const float arterialPenalty = (block.arterialEdges & (kNorthEdge | kSouthEdge)) &&
+                                      (block.arterialEdges & (kEastEdge | kWestEdge))
+            ? -1.0f
+            : 0.0f;
+        const float score = centerDistance - block.focusWeight * 2.4f + arterialPenalty;
+        if (score < bestLandmarkScore) {
+            bestLandmarkScore = score;
+            landmarkIndex = i;
         }
     }
 
-    std::shuffle(coreBlocks.begin(), coreBlocks.end(), rng);
-    std::shuffle(nonCoreBlocks.begin(), nonCoreBlocks.end(), rng);
-
-    const int landmarkCount = std::min<int>(static_cast<int>(coreBlocks.size()),
-                                            1 + static_cast<int>((layoutSeed >> 1) & 1u));
-    for (int i = 0; i < landmarkCount; ++i) {
-        blocks[coreBlocks[i]].landmarkCluster = true;
-        blocks[coreBlocks[i]].occupancyTarget = 0.92f;
-        blocks[coreBlocks[i]].focusWeight = clamp01(blocks[coreBlocks[i]].focusWeight + 0.08f);
-        blocks[coreBlocks[i]].visualTier = VisualTier::Focus;
+    if (landmarkIndex >= 0) {
+        BlockZone& block = blocks[landmarkIndex];
+        block.district = DistrictType::Landmark;
+        block.landmarkCluster = true;
+        block.occupancyTarget = 0.76f;
+        block.greenRatio = 0.10f;
+        block.streetSetback = 0.07f;
+        block.interiorMargin = 0.05f;
+        block.heightBias = clamp01(block.heightBias + 0.35f);
+        block.visualTier = VisualTier::Focus;
     }
 
-    const int openPocketCount = std::min<int>(static_cast<int>(nonCoreBlocks.size()),
-                                              2 + static_cast<int>(layoutSeed & 1u));
-    for (int i = 0; i < openPocketCount; ++i) {
-        BlockZone& block = blocks[nonCoreBlocks[i]];
-        block.openPocket = true;
-        block.serviceCourt = (i % 2 == 0);
-        block.occupancyTarget = block.serviceCourt ? 0.70f : 0.64f;
-        block.focusWeight = clamp01(block.focusWeight - 0.05f);
+    int campusIndex = -1;
+    float bestCampusScore = std::numeric_limits<float>::max();
+    for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
+        const BlockZone& block = blocks[i];
+        if (i == landmarkIndex || block.arterialEdges == 0u) {
+            continue;
+        }
+        const float focusGap = std::abs(block.focusWeight - 0.48f);
+        const float centerDistance =
+            pointDistance(block.centerX, block.centerY,
+                          operationalCenterX, operationalCenterY);
+        const float score = focusGap + centerDistance * 0.08f;
+        if (score < bestCampusScore) {
+            bestCampusScore = score;
+            campusIndex = i;
+        }
+    }
+
+    if (campusIndex >= 0) {
+        BlockZone& block = blocks[campusIndex];
+        block.district = DistrictType::Campus;
+        block.civicAnchor = true;
+        block.occupancyTarget = 0.32f;
+        block.greenRatio = 0.46f;
+        block.streetSetback = 0.18f;
+        block.interiorMargin = 0.14f;
+        block.heightBias = clamp01(block.heightBias * 0.78f);
+        if (block.visualTier == VisualTier::Peripheral) {
+            block.visualTier = VisualTier::Support;
+        }
+    }
+
+    std::vector<std::pair<float, int>> parkCandidates;
+    for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
+        const BlockZone& block = blocks[i];
+        if (i == landmarkIndex || i == campusIndex) {
+            continue;
+        }
+        if (block.district == DistrictType::Commercial || block.focusWeight > 0.62f) {
+            continue;
+        }
+
+        const float residentialAffinity =
+            (block.district == DistrictType::Residential ? -0.24f : 0.0f) +
+            (block.arterialEdges == 0u ? -0.10f : 0.04f);
+        const float score =
+            std::abs(block.focusWeight - 0.34f) +
+            pointDistance(block.centerX, block.centerY, nodeCentroidX, nodeCentroidY) * 0.02f +
+            residentialAffinity;
+        parkCandidates.push_back({score, i});
+    }
+
+    std::sort(parkCandidates.begin(), parkCandidates.end(),
+              [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+    const int parkCount = std::min<int>(4, static_cast<int>(parkCandidates.size()));
+    for (int i = 0; i < parkCount; ++i) {
+        BlockZone& block = blocks[parkCandidates[i].second];
+        block.district = DistrictType::Park;
+        block.parkAnchor = true;
+        block.occupancyTarget = 0.06f;
+        block.greenRatio = 0.88f;
+        block.streetSetback = 0.20f;
+        block.interiorMargin = 0.18f;
+        block.heightBias = 0.10f;
+        block.visualTier = VisualTier::Support;
+    }
+
+    for (BlockZone& block : blocks) {
+        if (block.district == DistrictType::Landmark ||
+            block.district == DistrictType::Campus ||
+            block.district == DistrictType::Park) {
+            continue;
+        }
+
+        const float distanceToLandmark = landmarkIndex >= 0
+            ? pointDistance(block.centerX, block.centerY,
+                            blocks[landmarkIndex].centerX, blocks[landmarkIndex].centerY)
+            : std::numeric_limits<float>::max();
+
+        if (distanceToLandmark < 8.5f &&
+            block.district != DistrictType::Service) {
+            block.district = DistrictType::Commercial;
+            block.occupancyTarget = std::max(block.occupancyTarget, 0.76f);
+            block.greenRatio = std::min(block.greenRatio, 0.14f);
+            block.streetSetback = std::min(block.streetSetback, 0.09f);
+            block.interiorMargin = std::min(block.interiorMargin, 0.07f);
+            const float proximityBoost = 1.0f - clamp01(distanceToLandmark / 8.5f);
+            block.heightBias = clamp01(block.heightBias + 0.10f + proximityBoost * 0.22f);
+            block.visualTier = VisualTier::Focus;
+        } else if (block.district == DistrictType::Service &&
+                   block.arterialEdges == 0u && block.focusWeight > 0.24f) {
+            block.district = DistrictType::Residential;
+            block.occupancyTarget = 0.46f;
+            block.greenRatio = 0.36f;
+            block.streetSetback = 0.17f;
+            block.interiorMargin = 0.12f;
+        }
     }
 }
 
 void CityThemeRenderer::generateBuildings(const MapGraph& graph, std::mt19937& rng) {
+    (void)graph;
+    (void)rng;
+
     buildings.clear();
-    buildings.reserve(blocks.size() * 6);
+    landscapeFeatures.clear();
+    return;
+}
+
+void CityThemeRenderer::populateFromAssetLibrary(const MapGraph& graph,
+                                                  std::mt19937& rng) {
+    presetBuildings.clear();
+    presetEnvironments.clear();
+    presetVehicles.clear();
+    presetRoadProps.clear();
+    buildings.clear();
+    landscapeFeatures.clear();
 
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
-    std::uniform_real_distribution<float> signedJitter(-0.12f, 0.12f);
-    std::uniform_real_distribution<float> hueDistribution(-0.04f, 0.04f);
+    std::uniform_real_distribution<float> authoredJitter(-0.08f, 0.08f);
+    std::uniform_real_distribution<float> slotJitter(-0.06f, 0.06f);
 
-    auto chooseFamily = [&](const BlockZone& block) {
-        const float roll = unit(rng);
-        if (block.landmarkCluster && roll < 0.24f) {
-            return BuildingFamily::Landmark;
-        }
-        if (block.openPocket && block.serviceCourt) {
-            return (roll < 0.72f) ? BuildingFamily::Utility : BuildingFamily::Commercial;
-        }
+    const std::vector<PlaybackPoint> baseSlots{
+        {-0.32f, -0.24f}, { 0.00f, -0.26f}, { 0.30f, -0.22f},
+        {-0.34f,  0.00f}, {-0.04f,  0.02f}, { 0.28f,  0.00f},
+        {-0.30f,  0.24f}, { 0.02f,  0.26f}, { 0.32f,  0.22f}
+    };
+    const std::vector<PlaybackPoint> denseEdgeSlots{
+        {-0.46f, -0.30f}, {-0.16f, -0.40f}, { 0.16f, -0.40f}, { 0.44f, -0.28f},
+        {-0.48f, -0.04f}, { 0.46f, -0.02f}, {-0.44f,  0.24f}, {-0.14f,  0.38f},
+        { 0.18f,  0.38f}, { 0.46f,  0.24f}, {-0.18f,  0.00f}, { 0.14f,  0.02f}
+    };
+    const std::vector<PlaybackPoint> landmarkSlots{
+        { 0.00f, -0.16f}, {-0.24f,  0.10f}, { 0.24f,  0.10f}, { 0.00f,  0.28f}
+    };
+    const std::vector<PlaybackPoint> campusSlots{
+        {-0.26f, -0.18f}, { 0.24f, -0.18f}, {-0.20f,  0.14f},
+        { 0.22f,  0.16f}, { 0.00f, -0.30f}, { 0.00f,  0.00f}
+    };
+    const std::vector<PlaybackPoint> roadSlots{
+        {-0.34f, -0.42f}, { 0.00f, -0.42f}, { 0.34f, -0.40f},
+        {-0.42f, -0.08f}, { 0.42f, -0.04f},
+        {-0.38f,  0.36f}, { 0.00f,  0.38f}, { 0.38f,  0.36f}
+    };
+    const std::vector<PlaybackPoint> vehicleSlots{
+        {-0.24f, -0.36f}, { 0.12f, -0.34f}, {-0.30f,  0.32f},
+        { 0.08f,  0.34f}, {-0.40f,  0.02f}, { 0.40f,  0.04f}
+    };
 
-        switch (block.district) {
-            case DistrictType::Core:
-                if (roll < 0.50f) return BuildingFamily::Commercial;
-                if (roll < 0.78f) return BuildingFamily::Residential;
-                return BuildingFamily::Utility;
-            case DistrictType::Mixed:
-                if (roll < 0.42f) return BuildingFamily::Commercial;
-                if (roll < 0.76f) return BuildingFamily::Residential;
-                return BuildingFamily::Utility;
-            case DistrictType::Residential:
-                if (roll < 0.64f) return BuildingFamily::Residential;
-                if (roll < 0.84f) return BuildingFamily::Commercial;
-                return BuildingFamily::Utility;
-            case DistrictType::Utility:
-            default:
-                if (roll < 0.70f) return BuildingFamily::Utility;
-                if (roll < 0.88f) return BuildingFamily::Commercial;
-                return BuildingFamily::Residential;
+    auto targetTotalRange = [](DistrictType district) {
+        switch (district) {
+            case DistrictType::Landmark: return std::pair<int, int>{2, 4};
+            case DistrictType::Commercial: return std::pair<int, int>{8, 14};
+            case DistrictType::Mixed: return std::pair<int, int>{6, 10};
+            case DistrictType::Residential: return std::pair<int, int>{5, 8};
+            case DistrictType::Service: return std::pair<int, int>{4, 7};
+            case DistrictType::Campus: return std::pair<int, int>{2, 4};
+            case DistrictType::Park:
+            default: return std::pair<int, int>{0, 1};
         }
     };
 
-    auto chooseRoof = [&](BuildingFamily family, const BlockZone& block) {
-        const float roll = unit(rng);
-        if (family == BuildingFamily::Landmark) {
-            return (roll < 0.60f) ? RoofProfile::Crown : RoofProfile::Stepped;
+    auto heightScaleRange = [](DistrictType district) {
+        switch (district) {
+            case DistrictType::Commercial: return std::pair<float, float>{0.90f, 1.22f};
+            case DistrictType::Mixed: return std::pair<float, float>{0.88f, 1.12f};
+            case DistrictType::Residential: return std::pair<float, float>{0.82f, 1.00f};
+            case DistrictType::Service: return std::pair<float, float>{0.80f, 0.96f};
+            case DistrictType::Landmark: return std::pair<float, float>{1.00f, 1.06f};
+            case DistrictType::Campus: return std::pair<float, float>{0.84f, 0.96f};
+            case DistrictType::Park:
+            default: return std::pair<float, float>{0.82f, 0.94f};
         }
-        if (family == BuildingFamily::Residential) {
-            return (roll < 0.46f) ? RoofProfile::Terrace : RoofProfile::Crown;
-        }
-        if (family == BuildingFamily::Utility || block.serviceCourt) {
-            return RoofProfile::Flat;
-        }
-        return (roll < 0.50f) ? RoofProfile::Stepped : RoofProfile::Terrace;
     };
 
-    for (const BlockZone& block : blocks) {
-        bool occupied[kLotGrid][kLotGrid] = {};
-        const float buildMinX = block.minX + (block.maxX - block.minX) * 0.02f;
-        const float buildMaxX = block.maxX - (block.maxX - block.minX) * 0.02f;
-        const float buildMinY = block.minY + (block.maxY - block.minY) * 0.02f;
-        const float buildMaxY = block.maxY - (block.maxY - block.minY) * 0.02f;
-        const float cellSpanX = (buildMaxX - buildMinX) / static_cast<float>(kLotGrid);
-        const float cellSpanY = (buildMaxY - buildMinY) / static_cast<float>(kLotGrid);
-
-        int targetCells = static_cast<int>(std::round(block.occupancyTarget * static_cast<float>(kLotCells)));
-        targetCells = std::clamp(targetCells, 2, kLotCells);
-
-        std::vector<int> cellOrder(kLotCells);
-        std::iota(cellOrder.begin(), cellOrder.end(), 0);
-        std::shuffle(cellOrder.begin(), cellOrder.end(), rng);
-
-        int usedCells = 0;
-        for (int cellIndex : cellOrder) {
-            if (usedCells >= targetCells) {
+    auto slotPoolFor = [&](DistrictType district) {
+        std::vector<PlaybackPoint> slots = baseSlots;
+        switch (district) {
+            case DistrictType::Commercial:
+                slots.insert(slots.end(), denseEdgeSlots.begin(), denseEdgeSlots.end());
                 break;
+            case DistrictType::Mixed:
+                slots.insert(slots.end(), denseEdgeSlots.begin(), denseEdgeSlots.begin() + 9);
+                break;
+            case DistrictType::Residential:
+                slots.insert(slots.end(), denseEdgeSlots.begin(), denseEdgeSlots.begin() + 6);
+                break;
+            case DistrictType::Service:
+                slots.insert(slots.end(), denseEdgeSlots.begin(), denseEdgeSlots.begin() + 5);
+                break;
+            case DistrictType::Campus:
+                slots = campusSlots;
+                break;
+            case DistrictType::Park:
+                slots = {{0.00f, 0.00f}};
+                break;
+            case DistrictType::Landmark:
+            default:
+                slots = landmarkSlots;
+                break;
+        }
+        return slots;
+    };
+
+    auto pushBuildingIfSafe = [&](const CityAssets::BuildingPreset& preset,
+                                  float worldX,
+                                  float worldY,
+                                  float heightScale) {
+        const float clearance = 0.38f + std::max(preset.width, preset.depth) * 0.5f;
+        if (isReservedVisualArea(worldX, worldY, clearance, graph)) {
+            return false;
+        }
+
+        presetBuildings.push_back({&preset, worldX, worldY, heightScale});
+        return true;
+    };
+
+    for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
+        const BlockZone& block = blocks[i];
+        const float spanX = block.maxX - block.minX;
+        const float spanY = block.maxY - block.minY;
+
+        const int districtOrd = static_cast<int>(block.district);
+        const CityAssets::ZoneType zone = CityAssets::classifyZone(districtOrd);
+        const CityAssets::TileAssignment tile =
+            CityAssets::assignTile(zone, i, layoutSeed);
+
+        int placedBuildingsForBlock = 0;
+
+        for (const auto& bp : tile.buildings) {
+            const float wx =
+                block.centerX + bp.offsetX * spanX + authoredJitter(rng) * spanX * 0.08f;
+            const float wy =
+                block.centerY + bp.offsetY * spanY + authoredJitter(rng) * spanY * 0.08f;
+            if (pushBuildingIfSafe(bp.preset, wx, wy, bp.heightScale)) {
+                ++placedBuildingsForBlock;
             }
+        }
 
-            const int cellRow = cellIndex / kLotGrid;
-            const int cellCol = cellIndex % kLotGrid;
-            if (occupied[cellRow][cellCol]) {
-                continue;
-            }
+        for (const auto& ep : tile.environment) {
+            const float wx = block.centerX + ep.offsetX * spanX;
+            const float wy = block.centerY + ep.offsetY * spanY;
+            const float envSpanX =
+                spanX * ((block.district == DistrictType::Park)
+                    ? 0.34f
+                    : (block.district == DistrictType::Campus ? 0.31f : 0.28f));
+            const float envSpanY =
+                spanY * ((block.district == DistrictType::Park)
+                    ? 0.30f
+                    : (block.district == DistrictType::Campus ? 0.27f : 0.24f));
+            presetEnvironments.push_back({&ep.preset, wx, wy, envSpanX, envSpanY});
+        }
 
-            BuildingFamily family = chooseFamily(block);
-            int spanCols = 1;
-            int spanRows = 1;
+        for (const auto& vp : tile.vehicles) {
+            const float wx = block.centerX + vp.offsetX * spanX;
+            const float wy = block.centerY + vp.offsetY * spanY;
+            presetVehicles.push_back({&vp.preset, wx, wy});
+        }
 
-            const bool canWide = cellCol + 1 < kLotGrid && !occupied[cellRow][cellCol + 1];
-            const bool canTall = cellRow + 1 < kLotGrid && !occupied[cellRow + 1][cellCol];
-            const bool canSquare = canWide && canTall && !occupied[cellRow + 1][cellCol + 1];
+        for (const auto& rp : tile.roadProps) {
+            const float wx = block.centerX + rp.offsetX * spanX;
+            const float wy = block.centerY + rp.offsetY * spanY;
+            presetRoadProps.push_back({&rp.preset, wx, wy});
+        }
 
-            const float mergeRoll = unit(rng);
-            if (family == BuildingFamily::Landmark && canSquare && mergeRoll < 0.72f) {
-                spanCols = 2;
-                spanRows = 2;
-            } else if (family == BuildingFamily::Utility && canWide && mergeRoll < 0.54f) {
-                spanCols = 2;
-            } else if (family == BuildingFamily::Commercial && canWide && mergeRoll < 0.42f) {
-                spanCols = 2;
-            } else if (family == BuildingFamily::Commercial && canTall && mergeRoll < 0.62f) {
-                spanRows = 2;
-            } else if (family == BuildingFamily::Residential && canTall && mergeRoll < 0.40f) {
-                spanRows = 2;
-            } else if (block.serviceCourt && canWide && mergeRoll < 0.35f) {
-                spanCols = 2;
-            }
+        if (!tile.buildings.empty()) {
+            const auto [minTotal, maxTotal] = targetTotalRange(block.district);
+            std::uniform_int_distribution<int> totalDistribution(minTotal, maxTotal);
+            const int targetTotal = totalDistribution(rng);
+            const int targetExtraBuildings = std::max(0, targetTotal - placedBuildingsForBlock);
 
-            const int spanCells = spanCols * spanRows;
-            if (usedCells + spanCells > targetCells + 1) {
-                spanCols = 1;
-                spanRows = 1;
-            }
+            if (targetExtraBuildings > 0) {
+                std::vector<PlaybackPoint> slotPool = slotPoolFor(block.district);
+                std::shuffle(slotPool.begin(), slotPool.end(), rng);
 
-            const float lotMinX = buildMinX + static_cast<float>(cellCol) * cellSpanX;
-            const float lotMaxX = buildMinX + static_cast<float>(cellCol + spanCols) * cellSpanX;
-            const float lotMinY = buildMinY + static_cast<float>(cellRow) * cellSpanY;
-            const float lotMaxY = buildMinY + static_cast<float>(cellRow + spanRows) * cellSpanY;
-            const float lotSpanX = lotMaxX - lotMinX;
-            const float lotSpanY = lotMaxY - lotMinY;
-            const float centerX = (lotMinX + lotMaxX) * 0.5f + lotSpanX * signedJitter(rng) * 0.08f;
-            const float centerY = (lotMinY + lotMaxY) * 0.5f + lotSpanY * signedJitter(rng) * 0.08f;
+                const auto [heightMin, heightMax] = heightScaleRange(block.district);
+                const std::size_t slotCount = slotPool.size();
+                const int maxAttempts =
+                    std::max(targetExtraBuildings * 5, static_cast<int>(slotCount) * 3);
 
-            if (isReservedVisualArea(centerX, centerY,
-                                     0.55f + static_cast<float>(std::max(spanCols, spanRows)) * 0.10f,
-                                     graph)) {
-                continue;
-            }
+                int placedExtras = 0;
+                int attempts = 0;
+                while (placedExtras < targetExtraBuildings && attempts < maxAttempts) {
+                    const PlaybackPoint& slot =
+                        slotPool[static_cast<std::size_t>(attempts) % slotCount];
+                    const auto& source =
+                        tile.buildings[static_cast<std::size_t>(attempts) % tile.buildings.size()];
 
-            for (int r = 0; r < spanRows; ++r) {
-                for (int c = 0; c < spanCols; ++c) {
-                    occupied[cellRow + r][cellCol + c] = true;
+                    const float worldX =
+                        block.centerX + slot.x * spanX + slotJitter(rng) * spanX;
+                    const float worldY =
+                        block.centerY + slot.y * spanY + slotJitter(rng) * spanY;
+                    const float extraHeightScale =
+                        heightMin + (heightMax - heightMin) * unit(rng);
+
+                    if (pushBuildingIfSafe(source.preset, worldX, worldY, extraHeightScale)) {
+                        ++placedExtras;
+                    }
+                    ++attempts;
                 }
             }
-            usedCells += spanCells;
+        }
 
-            const float shapeRoll = unit(rng);
-            float widthFill = 0.94f;
-            float depthFill = 0.92f;
-            switch (family) {
-                case BuildingFamily::Utility:
-                    widthFill = 0.95f + unit(rng) * 0.04f;
-                    depthFill = 0.90f + unit(rng) * 0.08f;
-                    break;
-                case BuildingFamily::Commercial:
-                    widthFill = 0.92f + unit(rng) * 0.06f;
-                    depthFill = 0.90f + unit(rng) * 0.08f;
-                    break;
-                case BuildingFamily::Residential:
-                    widthFill = 0.88f + unit(rng) * 0.10f;
-                    depthFill = 0.86f + unit(rng) * 0.10f;
-                    break;
-                case BuildingFamily::Landmark:
-                    widthFill = 0.94f + unit(rng) * 0.04f;
-                    depthFill = 0.92f + unit(rng) * 0.06f;
-                    break;
-            }
-            if (shapeRoll < 0.18f && family != BuildingFamily::Landmark) {
-                widthFill *= 0.72f;
-            } else if (shapeRoll > 0.86f && family != BuildingFamily::Landmark) {
-                depthFill *= 0.72f;
-            }
+        int extraVehicleCount = 0;
+        int extraRoadPropCount = 0;
+        switch (block.district) {
+            case DistrictType::Commercial:
+                extraVehicleCount = 3 + static_cast<int>(rng() % 3u);
+                extraRoadPropCount = 3 + static_cast<int>(rng() % 2u);
+                break;
+            case DistrictType::Mixed:
+                extraVehicleCount = 2 + static_cast<int>(rng() % 2u);
+                extraRoadPropCount = 2 + static_cast<int>(rng() % 2u);
+                break;
+            case DistrictType::Service:
+                extraVehicleCount = 1 + static_cast<int>(rng() % 2u);
+                extraRoadPropCount = 1 + static_cast<int>(rng() % 2u);
+                break;
+            case DistrictType::Residential:
+                extraVehicleCount = 1;
+                break;
+            default:
+                break;
+        }
 
-            const float focusCurve = block.focusWeight * block.focusWeight;
-            const float centerBoost = 0.28f + focusCurve * 2.4f;
-            float height = 6.0f + focusCurve * 14.0f + unit(rng) * 4.0f;
-            switch (family) {
-                case BuildingFamily::Utility:
-                    height = 3.8f + unit(rng) * 3.6f + spanCols * 0.8f;
-                    break;
-                case BuildingFamily::Commercial:
-                    height = 5.5f + focusCurve * 26.0f + unit(rng) * 5.0f +
-                             static_cast<float>(spanCols + spanRows - 1) * 1.6f;
-                    break;
-                case BuildingFamily::Residential:
-                    height = 5.0f + focusCurve * 14.0f + unit(rng) * 6.0f +
-                             static_cast<float>(spanRows) * 1.8f;
-                    break;
-                case BuildingFamily::Landmark:
-                    height = 28.0f + focusCurve * 32.0f + unit(rng) * 10.0f;
-                    break;
+        if (!tile.vehicles.empty() && extraVehicleCount > 0) {
+            std::vector<PlaybackPoint> vehicleSlotPool = vehicleSlots;
+            std::shuffle(vehicleSlotPool.begin(), vehicleSlotPool.end(), rng);
+            for (int extra = 0; extra < extraVehicleCount; ++extra) {
+                const PlaybackPoint& slot =
+                    vehicleSlotPool[static_cast<std::size_t>(extra) % vehicleSlotPool.size()];
+                const auto& source =
+                    tile.vehicles[static_cast<std::size_t>(extra) % tile.vehicles.size()];
+                const float worldX =
+                    block.centerX + slot.x * spanX + authoredJitter(rng) * spanX * 0.04f;
+                const float worldY =
+                    block.centerY + slot.y * spanY + authoredJitter(rng) * spanY * 0.04f;
+                if (!isReservedVisualArea(worldX, worldY, 0.18f, graph)) {
+                    presetVehicles.push_back({&source.preset, worldX, worldY});
+                }
             }
+        }
 
-            if (family != BuildingFamily::Landmark && family != BuildingFamily::Utility) {
-                height *= 0.55f + centerBoost * 0.45f;
+        if (!tile.roadProps.empty() && extraRoadPropCount > 0) {
+            std::vector<PlaybackPoint> roadSlotPool = roadSlots;
+            std::shuffle(roadSlotPool.begin(), roadSlotPool.end(), rng);
+            for (int extra = 0; extra < extraRoadPropCount; ++extra) {
+                const PlaybackPoint& slot =
+                    roadSlotPool[static_cast<std::size_t>(extra) % roadSlotPool.size()];
+                const auto& source =
+                    tile.roadProps[static_cast<std::size_t>(extra) % tile.roadProps.size()];
+                const float worldX =
+                    block.centerX + slot.x * spanX + authoredJitter(rng) * spanX * 0.03f;
+                const float worldY =
+                    block.centerY + slot.y * spanY + authoredJitter(rng) * spanY * 0.03f;
+                if (!isReservedVisualArea(worldX, worldY, 0.16f, graph)) {
+                    presetRoadProps.push_back({&source.preset, worldX, worldY});
+                }
             }
-            if (block.visualTier == VisualTier::Peripheral) {
-                height *= 0.62f;
-            } else if (block.visualTier == VisualTier::Support) {
-                height *= 0.82f;
-            }
-            if (block.openPocket && family != BuildingFamily::Landmark) {
-                height *= block.serviceCourt ? 0.78f : 0.88f;
-            }
-
-            const float baseHue = hueDistribution(rng);
-            const float saturation = (family == BuildingFamily::Commercial)
-                ? 0.18f + block.focusWeight * 0.10f
-                : (family == BuildingFamily::Residential)
-                    ? 0.14f + block.focusWeight * 0.08f
-                    : 0.08f + block.focusWeight * 0.05f;
-            const float facadeBrightness = 0.55f + block.focusWeight * 0.30f + unit(rng) * 0.12f;
-            const float edgeHighlight = 0.38f + block.focusWeight * 0.40f + unit(rng) * 0.14f;
-            const float windowWarmth = (family == BuildingFamily::Residential)
-                ? 0.52f + unit(rng) * 0.34f
-                : (family == BuildingFamily::Commercial)
-                    ? 0.24f + unit(rng) * 0.24f
-                    : 0.12f + unit(rng) * 0.18f;
-            const float windowDensity = (family == BuildingFamily::Utility)
-                ? 0.18f + unit(rng) * 0.20f
-                : (family == BuildingFamily::Landmark)
-                    ? 0.48f + unit(rng) * 0.22f
-                    : 0.34f + unit(rng) * 0.30f;
-            const float occupancy = (block.visualTier == VisualTier::Focus)
-                ? 0.55f + unit(rng) * 0.35f
-                : 0.26f + unit(rng) * 0.42f;
-            const float podiumRatio = (family == BuildingFamily::Utility)
-                ? 0.22f + unit(rng) * 0.10f
-                : (family == BuildingFamily::Residential)
-                    ? 0.16f + unit(rng) * 0.08f
-                    : 0.20f + unit(rng) * 0.16f;
-            const float taper = (family == BuildingFamily::Residential)
-                ? 0.58f + unit(rng) * 0.14f
-                : (family == BuildingFamily::Landmark)
-                    ? 0.50f + unit(rng) * 0.12f
-                    : 0.74f + unit(rng) * 0.12f;
-
-            buildings.push_back(BuildingLot{
-                centerX,
-                centerY,
-                lotSpanX * widthFill,
-                lotSpanY * depthFill,
-                height,
-                baseHue,
-                saturation,
-                facadeBrightness,
-                edgeHighlight,
-                windowWarmth,
-                windowDensity,
-                occupancy,
-                podiumRatio,
-                taper,
-                block.district,
-                family,
-                chooseRoof(family, block),
-                block.visualTier,
-                family == BuildingFamily::Landmark || block.landmarkCluster
-            });
         }
     }
 
-    std::sort(buildings.begin(), buildings.end(),
-              [](const BuildingLot& lhs, const BuildingLot& rhs) {
-                  if (std::abs(lhs.y - rhs.y) > 0.02f) {
-                      return lhs.y < rhs.y;
-                  }
-                  return lhs.x < rhs.x;
+    std::sort(presetBuildings.begin(), presetBuildings.end(),
+              [](const PlacedPresetBuilding& a, const PlacedPresetBuilding& b) {
+                  if (std::abs(a.worldY - b.worldY) > 0.02f) return a.worldY < b.worldY;
+                  return a.worldX < b.worldX;
               });
 }
 
@@ -1389,7 +1651,8 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     std::uniform_real_distribution<float> hueDistribution(-0.03f, 0.02f);
 
     auto addBackgroundLot = [&](float x, float y, float width, float depth, float height,
-                                BuildingFamily family, float brightnessBias) {
+                                BuildingFamily family, BuildingForm form,
+                                float brightnessBias) {
         backgroundBuildings.push_back(BuildingLot{
             x,
             y,
@@ -1405,9 +1668,13 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
             0.12f + unit(rng) * 0.16f,
             0.18f + unit(rng) * 0.08f,
             0.82f,
-            DistrictType::Utility,
+            0.0f,
+            0.10f + unit(rng) * 0.08f,
+            0.16f + unit(rng) * 0.18f,
+            DistrictType::Service,
             family,
             RoofProfile::Flat,
+            form,
             VisualTier::Peripheral,
             false
         });
@@ -1423,6 +1690,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
                          0.8f + unit(rng) * 1.4f,
                          9.0f + unit(rng) * 12.0f,
                          (i % 4 == 0) ? BuildingFamily::Residential : BuildingFamily::Commercial,
+                         (i % 4 == 0) ? BuildingForm::Slab : BuildingForm::Tower,
                          0.02f);
     }
 
@@ -1436,6 +1704,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
                          0.8f + unit(rng) * 1.2f,
                          8.0f + unit(rng) * 10.0f,
                          (i % 3 == 0) ? BuildingFamily::Utility : BuildingFamily::Residential,
+                         (i % 3 == 0) ? BuildingForm::Pavilion : BuildingForm::Terrace,
                          0.00f);
     }
 
@@ -1449,6 +1718,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
                          1.0f + unit(rng) * 1.2f,
                          7.0f + unit(rng) * 9.0f,
                          BuildingFamily::Utility,
+                         BuildingForm::Slab,
                          -0.01f);
     }
 
@@ -1462,6 +1732,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
                          0.9f + unit(rng) * 1.3f,
                          8.0f + unit(rng) * 11.0f,
                          (i % 2 == 0) ? BuildingFamily::Commercial : BuildingFamily::Residential,
+                         (i % 2 == 0) ? BuildingForm::Tower : BuildingForm::Slab,
                          0.01f);
     }
 
@@ -1472,7 +1743,20 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
                   }
                   return lhs.x < rhs.x;
               });
-
+    const int streetCount = 7;
+    for (int i = 0; i < streetCount; ++i) {
+        const float y = peripheralMinY +
+            (static_cast<float>(i) + 0.5f) * ((peripheralMaxY - peripheralMinY) / streetCount);
+        ambientStreets.push_back(AmbientStreet{
+            peripheralMinX,
+            y + unit(rng) * 0.6f - 0.3f,
+            peripheralMaxX,
+            y + unit(rng) * 0.6f - 0.3f,
+            3.8f + unit(rng) * 2.2f,
+            0.10f + unit(rng) * 0.10f,
+            VisualTier::Peripheral
+        });
+    }
 }
 
 void CityThemeRenderer::generateAmbientCars(std::mt19937& rng) {
@@ -1509,6 +1793,7 @@ void CityThemeRenderer::applyTrafficConditions(std::mt19937& rng) {
         return;
     }
 
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
     std::uniform_real_distribution<float> congestionDistribution(0.05f, 0.55f);
     std::bernoulli_distribution incidentDistribution(0.10);
     std::uniform_int_distribution<int> hotRowDistribution(0, std::max(0, gridRows - 1));
@@ -1522,6 +1807,9 @@ void CityThemeRenderer::applyTrafficConditions(std::mt19937& rng) {
         const Intersection& to = intersections[road.to];
 
         float congestion = congestionDistribution(rng);
+        if (road.arterial) {
+            congestion += 0.10f + unit(rng) * 0.14f;
+        }
         if (road.from / gridColumns == hotRow || road.to / gridColumns == hotRow ||
             road.from % gridColumns == hotCol || road.to % gridColumns == hotCol) {
             congestion = std::min(0.92f, congestion + 0.24f);
@@ -1726,10 +2014,10 @@ float CityThemeRenderer::computeOperationalFocus(float x, float y) const {
 }
 
 CityThemeRenderer::DistrictType CityThemeRenderer::districtFromFocus(float focusWeight) const {
-    if (focusWeight >= 0.72f) return DistrictType::Core;
+    if (focusWeight >= 0.68f) return DistrictType::Commercial;
     if (focusWeight >= 0.48f) return DistrictType::Mixed;
     if (focusWeight >= 0.28f) return DistrictType::Residential;
-    return DistrictType::Utility;
+    return DistrictType::Service;
 }
 
 CityThemeRenderer::VisualTier CityThemeRenderer::visualTierFromFocus(float focusWeight) const {
@@ -1780,12 +2068,12 @@ void CityThemeRenderer::refreshDashboardInfo() {
     dashboardInfo.theme = EnvironmentTheme::City;
     dashboardInfo.themeLabel = "City";
     dashboardInfo.weatherLabel = toDisplayString(weather);
-    dashboardInfo.subtitle = "Operational urban district";
+    dashboardInfo.subtitle = "District-planned urban map";
     dashboardInfo.atmosphereLabel =
-        (weather == CityWeather::Sunny) ? "Clear-night arterial flow"
-        : (weather == CityWeather::Cloudy) ? "Muted district circulation"
-        : (weather == CityWeather::Rainy) ? "Wet-surface logistics slowdown"
-        : "Storm-driven logistics pressure";
+        (weather == CityWeather::Sunny) ? "Satellite-lit mixed districts and boulevard flow"
+        : (weather == CityWeather::Cloudy) ? "Soft-density urban fabric under muted circulation"
+        : (weather == CityWeather::Rainy) ? "Wet-surface district logistics through parks and campus blocks"
+        : "Storm-loaded boulevard routing across dense landmark districts";
     dashboardInfo.congestionLevel = roads.empty()
         ? 0.0f
         : congestionSum / static_cast<float>(roads.size());
@@ -1853,6 +2141,95 @@ void CityThemeRenderer::drawRoutePath(IsometricRenderer& renderer,
     }
 }
 
+void CityThemeRenderer::drawLandscapeFeature(IsometricRenderer& renderer,
+                                             const LandscapeFeature& feature,
+                                             float animationTime) const {
+    const float minX = feature.x - feature.width * 0.5f;
+    const float maxX = feature.x + feature.width * 0.5f;
+    const float minY = feature.y - feature.depth * 0.5f;
+    const float maxY = feature.y + feature.depth * 0.5f;
+    const float zf = currentZoomFactor();
+    const float wetBlend =
+        (weather == CityWeather::Rainy || weather == CityWeather::Stormy) ? 0.20f : 0.0f;
+
+    switch (feature.type) {
+        case LandscapeFeatureType::Lawn: {
+            Color lawn = (feature.district == DistrictType::Park)
+                ? Color(0.20f, 0.36f, 0.17f, 0.82f)
+                : Color(0.24f, 0.34f, 0.18f, 0.78f);
+            lawn = mixColor(lawn, Color(0.16f, 0.24f, 0.28f, lawn.a), wetBlend);
+            drawWorldQuadPatch(minX, minY, maxX, maxY, lawn);
+            drawWorldQuadPatch(feature.x - feature.width * 0.24f,
+                               feature.y - feature.depth * 0.24f,
+                               feature.x + feature.width * 0.24f,
+                               feature.y + feature.depth * 0.24f,
+                               withAlpha(scaleColor(lawn, 1.06f), 0.26f));
+            break;
+        }
+        case LandscapeFeatureType::Path: {
+            Color path = Color(0.54f, 0.52f, 0.46f, 0.48f);
+            path = mixColor(path, Color(0.28f, 0.32f, 0.36f, path.a), wetBlend * 0.85f);
+            drawWorldQuadPatch(minX, minY, maxX, maxY, path);
+            break;
+        }
+        case LandscapeFeatureType::Plaza: {
+            Color plaza = (feature.district == DistrictType::Landmark)
+                ? Color(0.44f, 0.46f, 0.50f, 0.54f)
+                : Color(0.34f, 0.34f, 0.32f, 0.48f);
+            plaza = mixColor(plaza, Color(0.22f, 0.26f, 0.30f, plaza.a), wetBlend);
+            drawWorldQuadPatch(minX, minY, maxX, maxY, plaza);
+            break;
+        }
+        case LandscapeFeatureType::Water: {
+            Color water = mixColor(Color(0.08f, 0.34f, 0.48f, 0.58f),
+                                   Color(0.12f, 0.48f, 0.62f, 0.62f),
+                                   0.5f + 0.5f * std::sin(animationTime * 0.9f + feature.x));
+            drawWorldQuadPatch(minX, minY, maxX, maxY, water);
+            const IsoCoord iso = RenderUtils::worldToIso(feature.x, feature.y);
+            renderer.drawDiamond(iso.x, iso.y, feature.width * 10.0f * zf,
+                                 feature.depth * 4.8f * zf,
+                                 Color(0.72f, 0.90f, 0.98f, 0.08f));
+            break;
+        }
+        case LandscapeFeatureType::Court: {
+            const bool campusCourt = feature.district == DistrictType::Campus;
+            const Color court = campusCourt
+                ? Color(0.22f, 0.44f, 0.26f, 0.64f)
+                : Color(0.32f, 0.22f, 0.16f, 0.56f);
+            drawWorldQuadPatch(minX, minY, maxX, maxY, court);
+            const IsoCoord p0 = RenderUtils::worldToIso(minX, minY);
+            const IsoCoord p1 = RenderUtils::worldToIso(maxX, minY);
+            const IsoCoord p2 = RenderUtils::worldToIso(maxX, maxY);
+            const IsoCoord p3 = RenderUtils::worldToIso(minX, maxY);
+            renderer.drawLine(p0.x, p0.y, p1.x, p1.y, Color(0.92f, 0.96f, 0.90f, 0.20f), 1.0f);
+            renderer.drawLine(p1.x, p1.y, p2.x, p2.y, Color(0.92f, 0.96f, 0.90f, 0.20f), 1.0f);
+            renderer.drawLine(p2.x, p2.y, p3.x, p3.y, Color(0.92f, 0.96f, 0.90f, 0.20f), 1.0f);
+            renderer.drawLine(p3.x, p3.y, p0.x, p0.y, Color(0.92f, 0.96f, 0.90f, 0.20f), 1.0f);
+            break;
+        }
+        case LandscapeFeatureType::Grove: {
+            const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.6f + feature.accent * 8.0f);
+            const std::array<PlaybackPoint, 3> offsets{{
+                {feature.width * -0.16f, feature.depth * -0.08f},
+                {feature.width * 0.18f, feature.depth * 0.04f},
+                {feature.width * -0.02f, feature.depth * 0.18f}
+            }};
+            for (const PlaybackPoint& offset : offsets) {
+                const IsoCoord iso = RenderUtils::worldToIso(feature.x + offset.x,
+                                                             feature.y + offset.y);
+                renderer.drawFilledCircle(iso.x, iso.y + 5.0f * zf,
+                                          (4.2f + feature.accent * 2.4f) * zf,
+                                          Color(0.20f * pulse, 0.36f * pulse,
+                                                0.18f * pulse, 0.74f));
+                renderer.drawLine(iso.x, iso.y + 5.0f * zf,
+                                  iso.x, iso.y - 4.0f * zf,
+                                  Color(0.30f, 0.22f, 0.14f, 0.46f), 1.0f);
+            }
+            break;
+        }
+    }
+}
+
 void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                                         const BuildingLot& building) const {
     const IsoCoord iso = RenderUtils::worldToIso(building.x, building.y);
@@ -1862,20 +2239,24 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
     Color accent(0.58f, 0.64f, 0.72f, 0.98f);
     switch (building.family) {
         case BuildingFamily::Utility:
-            material = Color(0.46f, 0.42f, 0.34f, 0.98f);
-            accent = Color(0.64f, 0.56f, 0.42f, 0.98f);
+            material = Color(0.42f, 0.38f, 0.32f, 0.98f);
+            accent = Color(0.62f, 0.56f, 0.44f, 0.98f);
             break;
         case BuildingFamily::Commercial:
-            material = Color(0.34f, 0.46f, 0.60f, 0.98f);
-            accent = Color(0.52f, 0.68f, 0.84f, 0.98f);
+            material = Color(0.30f, 0.40f, 0.54f, 0.98f);
+            accent = Color(0.56f, 0.72f, 0.88f, 0.98f);
             break;
         case BuildingFamily::Residential:
-            material = Color(0.56f, 0.38f, 0.32f, 0.98f);
-            accent = Color(0.76f, 0.54f, 0.42f, 0.98f);
+            material = Color(0.54f, 0.44f, 0.38f, 0.98f);
+            accent = Color(0.82f, 0.68f, 0.56f, 0.98f);
+            break;
+        case BuildingFamily::Civic:
+            material = Color(0.50f, 0.52f, 0.48f, 0.98f);
+            accent = Color(0.82f, 0.84f, 0.78f, 0.98f);
             break;
         case BuildingFamily::Landmark:
-            material = Color(0.58f, 0.48f, 0.28f, 0.98f);
-            accent = Color(0.86f, 0.72f, 0.40f, 0.98f);
+            material = Color(0.58f, 0.64f, 0.72f, 0.98f);
+            accent = Color(0.92f, 0.96f, 1.0f, 0.98f);
             break;
     }
 
@@ -1893,10 +2274,12 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
     const Color facade = mixColor(material, accent, 0.35f + building.saturation * 0.6f);
     const Color roof = scaleColor(mixColor(facade, Color(0.82f, 0.86f, 0.92f, 0.98f), 0.18f),
                                   0.88f + brightness * 0.45f);
-    const Color leftSide = scaleColor(facade,
+    const Color leftFacade = biasColor(facade, -0.04f, -0.02f, 0.05f);
+    const Color rightFacade = biasColor(facade, 0.04f, 0.02f, -0.03f);
+    const Color leftSide = scaleColor(leftFacade,
                                       0.72f + brightness * 0.30f +
                                       building.edgeHighlight * 0.08f);
-    const Color rightSide = scaleColor(facade,
+    const Color rightSide = scaleColor(rightFacade,
                                        0.92f + brightness * 0.34f +
                                        building.edgeHighlight * 0.12f);
     const Color outline = withAlpha(scaleColor(Color(0.92f, 0.94f, 0.98f, 1.0f),
@@ -1911,7 +2294,9 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
 
     const float baseWidth = std::max(4.0f * zf, building.width * 38.0f * zf);
     const float baseDepth = std::max(3.0f * zf, building.depth * 28.0f * zf);
-    const float totalHeight = std::max(7.0f * zf, building.height * 1.38f * zf);
+    const float totalHeight = std::max(
+        6.0f * zf,
+        building.height * (building.form == BuildingForm::TwinTower ? 1.46f : 1.32f) * zf);
     const float shadowScale = (building.visualTier == VisualTier::Focus) ? 1.12f : 1.04f;
     renderer.drawDiamond(iso.x, iso.y + 8.5f * zf, baseWidth * shadowScale,
                          baseDepth * 0.54f, Color(0.02f, 0.02f, 0.03f, 0.24f));
@@ -1939,69 +2324,190 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
         return faces;
     };
 
-    const float podiumHeight = std::max(2.6f * zf, totalHeight * building.podiumRatio);
-    const float mainHeight = std::max(4.4f * zf, totalHeight - podiumHeight);
+    const float podiumHeight = std::max(2.4f * zf, totalHeight * building.podiumRatio);
+    const float mainHeight = std::max(4.0f * zf, totalHeight - podiumHeight);
 
-    if (building.family == BuildingFamily::Utility) {
-        drawMass(0.0f, 1.2f * zf, baseWidth * 0.96f, baseDepth * 0.90f,
-                 podiumHeight + mainHeight * 0.52f, 0.55f);
-        if (building.width > 1.1f) {
-            drawMass(baseWidth * 0.14f, 4.2f * zf,
-                     baseWidth * 0.42f, baseDepth * 0.46f,
-                     std::max(2.4f * zf, mainHeight * 0.24f), 0.28f);
-        }
-    } else {
-        drawMass(0.0f, 1.4f * zf, baseWidth, baseDepth, podiumHeight, 0.38f);
-
-        float towerWidth = baseWidth * building.taper;
-        float towerDepth = baseDepth * (building.taper + 0.02f);
-        if (building.family == BuildingFamily::Residential) {
-            towerWidth = baseWidth * (building.taper - 0.06f);
-            towerDepth = baseDepth * (building.taper - 0.04f);
-        }
-        if (building.family == BuildingFamily::Landmark) {
-            towerWidth = baseWidth * (building.taper - 0.02f);
-            towerDepth = baseDepth * (building.taper - 0.02f);
-        }
-
-        const BlockFaces mainFaces = drawMass(0.0f, -podiumHeight,
-                                              towerWidth, towerDepth, mainHeight, 1.0f);
-
-        if (building.family == BuildingFamily::Residential) {
-            drawMass(-baseWidth * 0.22f, 3.4f * zf,
-                     baseWidth * 0.30f, baseDepth * 0.38f,
-                     std::max(2.4f * zf, podiumHeight * 0.28f), 0.24f);
-        }
-
+    auto drawRoofAccent = [&](const BlockFaces& faces,
+                              float offsetY,
+                              float width,
+                              float depth,
+                              float height,
+                              float windowScale) {
         switch (building.roofProfile) {
             case RoofProfile::Flat:
-                drawMass(baseWidth * 0.06f, -podiumHeight - mainHeight,
-                         towerWidth * 0.22f, towerDepth * 0.24f,
-                         std::max(1.6f * zf, mainHeight * 0.08f), 0.16f);
+                drawMass(baseWidth * 0.04f, offsetY,
+                         width * 0.26f, depth * 0.24f,
+                         std::max(1.4f * zf, height * 0.10f), windowScale * 0.25f);
                 break;
             case RoofProfile::Stepped:
-                drawMass(0.0f, -podiumHeight - mainHeight,
-                         towerWidth * 0.72f, towerDepth * 0.72f,
-                         std::max(2.0f * zf, mainHeight * 0.18f), 0.40f);
+                drawMass(0.0f, offsetY,
+                         width * 0.70f, depth * 0.70f,
+                         std::max(1.8f * zf, height * 0.18f), windowScale * 0.38f);
                 break;
             case RoofProfile::Terrace:
-                drawMass(-towerWidth * 0.12f, -podiumHeight - mainHeight + 1.0f * zf,
-                         towerWidth * 0.56f, towerDepth * 0.58f,
-                         std::max(2.1f * zf, mainHeight * 0.14f), 0.36f);
-                renderer.drawDiamond(mainFaces.top[0].x,
-                                     mainFaces.top[0].y + towerDepth * 0.48f,
-                                     towerWidth * 0.12f, towerDepth * 0.06f,
+                drawMass(-width * 0.12f, offsetY + 0.8f * zf,
+                         width * 0.56f, depth * 0.58f,
+                         std::max(1.8f * zf, height * 0.14f), windowScale * 0.32f);
+                renderer.drawDiamond(faces.top[0].x,
+                                     faces.top[0].y + depth * 0.48f,
+                                     width * 0.12f, depth * 0.06f,
                                      Color(0.94f, 0.74f, 0.40f, 0.10f));
                 break;
             case RoofProfile::Crown:
-                drawMass(0.0f, -podiumHeight - mainHeight,
-                         towerWidth * 0.32f, towerDepth * 0.34f,
-                         std::max(2.2f * zf, mainHeight * 0.12f), 0.44f);
-                renderer.drawLine(iso.x, iso.y - podiumHeight - mainHeight - 2.0f * zf,
-                                  iso.x, iso.y - podiumHeight - mainHeight - 9.0f * zf,
-                                  Color(0.78f, 0.84f, 0.92f, 0.18f + building.edgeHighlight * 0.12f),
-                                  1.0f);
+                drawMass(0.0f, offsetY,
+                         width * 0.34f, depth * 0.34f,
+                         std::max(2.0f * zf, height * 0.12f), windowScale * 0.40f);
+                renderer.drawLine(faces.top[0].x, faces.top[0].y,
+                                  faces.top[0].x, faces.top[0].y - 7.0f * zf,
+                                  Color(0.82f, 0.88f, 0.96f, 0.18f), 1.0f);
                 break;
+            case RoofProfile::Spire:
+                drawMass(0.0f, offsetY,
+                         width * 0.30f, depth * 0.32f,
+                         std::max(1.8f * zf, height * 0.10f), windowScale * 0.40f);
+                renderer.drawLine(faces.top[0].x, faces.top[0].y - 1.0f * zf,
+                                  faces.top[0].x, faces.top[0].y - 12.0f * zf,
+                                  Color(0.90f, 0.96f, 1.0f, 0.28f), 1.2f);
+                break;
+        }
+    };
+
+    switch (building.form) {
+        case BuildingForm::Pavilion: {
+            const BlockFaces faces = drawMass(0.0f, 1.0f * zf,
+                                              baseWidth * 0.88f, baseDepth * 0.82f,
+                                              podiumHeight + mainHeight * 0.36f, 0.42f);
+            drawRoofAccent(faces,
+                           -podiumHeight - mainHeight * 0.36f,
+                           baseWidth * 0.88f, baseDepth * 0.82f,
+                           podiumHeight, 0.24f);
+            break;
+        }
+
+        case BuildingForm::Terrace: {
+            const int units = 3 + (building.annexRatio > 0.30f ? 1 : 0);
+            for (int i = 0; i < units; ++i) {
+                const float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(units);
+                const float offsetX = RenderUtils::lerp(-baseWidth * 0.28f, baseWidth * 0.28f, t);
+                const float width = baseWidth * (0.18f + (i % 2 == 0 ? 0.02f : -0.01f));
+                const float height = podiumHeight * 0.82f + mainHeight * (0.38f + 0.06f * (i % 2));
+                drawMass(offsetX, 2.0f * zf,
+                         width, baseDepth * 0.40f,
+                         height, 0.30f);
+            }
+            break;
+        }
+
+        case BuildingForm::Slab: {
+            const BlockFaces slabFaces = drawMass(0.0f, 1.0f * zf,
+                                                  baseWidth * 0.96f, baseDepth * 0.86f,
+                                                  podiumHeight * 0.78f + mainHeight * 0.56f,
+                                                  0.72f);
+            if (building.family == BuildingFamily::Civic) {
+                drawMass(-baseWidth * 0.22f, -podiumHeight * 0.10f,
+                         baseWidth * 0.36f, baseDepth * 0.34f,
+                         mainHeight * 0.24f, 0.22f);
+            } else if (building.annexRatio > 0.28f) {
+                drawMass(baseWidth * 0.22f, 3.2f * zf,
+                         baseWidth * 0.30f, baseDepth * 0.28f,
+                         podiumHeight * 0.28f, 0.18f);
+            }
+            drawRoofAccent(slabFaces,
+                           -(podiumHeight * 0.78f + mainHeight * 0.56f),
+                           baseWidth * 0.96f, baseDepth * 0.86f,
+                           mainHeight, 0.30f);
+            break;
+        }
+
+        case BuildingForm::Courtyard: {
+            const float wingHeight = podiumHeight * 0.70f + mainHeight * 0.46f;
+            const float wingW = baseWidth * 0.28f;
+            const float wingD = baseDepth * 0.26f;
+            drawMass(-baseWidth * 0.22f, 0.8f * zf, wingW, baseDepth * 0.72f, wingHeight, 0.42f);
+            drawMass(baseWidth * 0.22f, 0.8f * zf, wingW, baseDepth * 0.72f, wingHeight, 0.42f);
+            drawMass(0.0f, -baseDepth * 0.18f, baseWidth * 0.70f, wingD,
+                     wingHeight * 0.92f, 0.34f);
+            const IsoCoord courtIso = RenderUtils::worldToIso(building.x, building.y + building.depth * 0.10f);
+            renderer.drawDiamond(courtIso.x, courtIso.y, baseWidth * 0.16f, baseDepth * 0.08f,
+                                 Color(0.26f, 0.34f, 0.22f, 0.16f));
+            break;
+        }
+
+        case BuildingForm::TwinTower: {
+            const float podiumW = baseWidth * 1.12f;
+            const float podiumD = baseDepth * 0.94f;
+            drawMass(0.0f, 2.2f * zf, podiumW, podiumD, podiumHeight * 0.92f, 0.34f);
+
+            const float towerOffset = baseWidth * 0.18f;
+            const float towerW = baseWidth * 0.34f;
+            const float towerD = baseDepth * 0.32f;
+            const float towerH = mainHeight * 0.96f;
+            const BlockFaces leftTower = drawMass(-towerOffset, -podiumHeight * 0.90f,
+                                                  towerW, towerD, towerH, 1.10f);
+            const BlockFaces rightTower = drawMass(towerOffset, -podiumHeight * 0.90f,
+                                                   towerW, towerD, towerH * 0.98f, 1.10f);
+
+            drawMass(-towerOffset, -podiumHeight - towerH,
+                     towerW * 0.76f, towerD * 0.76f,
+                     towerH * 0.18f, 0.46f);
+            drawMass(towerOffset, -podiumHeight - towerH * 0.98f,
+                     towerW * 0.76f, towerD * 0.76f,
+                     towerH * 0.18f, 0.46f);
+
+            const float bridgeY = iso.y - podiumHeight - towerH * 0.46f;
+            glColor4f(0.82f, 0.88f, 0.96f, 0.46f);
+            glBegin(GL_QUADS);
+            glVertex2f(iso.x - towerOffset * 0.74f, bridgeY - 3.2f * zf);
+            glVertex2f(iso.x + towerOffset * 0.74f, bridgeY - 3.2f * zf);
+            glVertex2f(iso.x + towerOffset * 0.68f, bridgeY + 2.4f * zf);
+            glVertex2f(iso.x - towerOffset * 0.68f, bridgeY + 2.4f * zf);
+            glEnd();
+
+            renderer.drawLine(leftTower.top[0].x, leftTower.top[0].y - 1.0f * zf,
+                              leftTower.top[0].x, leftTower.top[0].y - 14.0f * zf,
+                              Color(0.94f, 0.98f, 1.0f, 0.30f), 1.2f);
+            renderer.drawLine(rightTower.top[0].x, rightTower.top[0].y - 1.0f * zf,
+                              rightTower.top[0].x, rightTower.top[0].y - 13.0f * zf,
+                              Color(0.94f, 0.98f, 1.0f, 0.30f), 1.2f);
+            renderer.drawDiamond(iso.x, iso.y - podiumHeight - towerH * 0.44f,
+                                 baseWidth * 0.18f, baseDepth * 0.06f,
+                                 Color(0.82f, 0.90f, 0.98f, 0.10f));
+            break;
+        }
+
+        case BuildingForm::Tower:
+        default: {
+            drawMass(0.0f, 1.4f * zf, baseWidth, baseDepth, podiumHeight, 0.38f);
+
+            float towerWidth = baseWidth * building.taper;
+            float towerDepth = baseDepth * (building.taper + 0.02f);
+            if (building.family == BuildingFamily::Residential) {
+                towerWidth = baseWidth * (building.taper - 0.08f);
+                towerDepth = baseDepth * (building.taper - 0.06f);
+            }
+            if (building.family == BuildingFamily::Landmark) {
+                towerWidth = baseWidth * (building.taper - 0.02f);
+                towerDepth = baseDepth * (building.taper - 0.02f);
+            }
+
+            const BlockFaces mainFaces = drawMass(0.0f, -podiumHeight,
+                                                  towerWidth, towerDepth, mainHeight, 1.0f);
+
+            if (building.family == BuildingFamily::Residential) {
+                drawMass(-baseWidth * 0.20f, 3.2f * zf,
+                         baseWidth * 0.28f, baseDepth * 0.34f,
+                         std::max(2.2f * zf, podiumHeight * 0.28f), 0.22f);
+            } else if (building.family == BuildingFamily::Commercial && building.annexRatio > 0.22f) {
+                drawMass(baseWidth * 0.20f, 3.0f * zf,
+                         baseWidth * 0.26f, baseDepth * 0.24f,
+                         std::max(2.0f * zf, podiumHeight * 0.24f), 0.18f);
+            }
+
+            drawRoofAccent(mainFaces,
+                           -podiumHeight - mainHeight,
+                           towerWidth, towerDepth,
+                           mainHeight, 0.40f);
+            break;
         }
     }
 
@@ -2009,6 +2515,361 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
         renderer.drawDiamond(iso.x, iso.y - totalHeight - 2.0f * zf,
                              baseWidth * 0.18f, baseDepth * 0.08f,
                              Color(0.70f, 0.82f, 0.96f, 0.04f + building.edgeHighlight * 0.05f));
+    }
+}
+
+// ============================================================================
+// ASSET LIBRARY DRAW FUNCTIONS
+// ============================================================================
+
+void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
+                                            const PlacedPresetBuilding& placed) const {
+    const CityAssets::BuildingPreset& p = *placed.preset;
+    const IsoCoord iso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
+    const float zf = currentZoomFactor();
+
+    // Compute authored dual-tone colors from preset
+    const Color facade = mixColor(p.material, p.accent, 0.40f);
+    const float brightness = (p.category == CityAssets::BuildingCategory::Landmark) ? 1.18f : 1.04f;
+
+    const Color roof = scaleColor(
+        mixColor(facade, Color(0.84f, 0.88f, 0.94f, 0.98f), 0.20f),
+        0.90f + brightness * 0.40f);
+    const Color leftSide = scaleColor(
+        biasColor(facade, p.leftBias.dr, p.leftBias.dg, p.leftBias.db),
+        0.74f + brightness * 0.28f);
+    const Color rightSide = scaleColor(
+        biasColor(facade, p.rightBias.dr, p.rightBias.dg, p.rightBias.db),
+        0.94f + brightness * 0.32f);
+    const Color outline = withAlpha(
+        scaleColor(Color(0.92f, 0.94f, 0.98f, 1.0f), 0.60f),
+        0.44f);
+    const Color windowColor = withAlpha(
+        mixColor(Color(0.54f, 0.66f, 0.82f, 1.0f),
+                 Color(0.96f, 0.72f, 0.34f, 1.0f),
+                 p.windowWarmth),
+        0.06f + p.windowDensity * 0.12f);
+
+    const float baseWidth = std::max(4.0f * zf, p.width * 38.0f * zf);
+    const float baseDepth = std::max(3.0f * zf, p.depth * 28.0f * zf);
+    const float totalHeight = std::max(6.0f * zf,
+        p.height * placed.heightScale * (p.isTwinTower ? 1.46f : 1.32f) * zf);
+
+    // Shadow
+    const float shadowScale = (p.category == CityAssets::BuildingCategory::Landmark) ? 1.14f : 1.06f;
+    renderer.drawDiamond(iso.x, iso.y + 8.5f * zf, baseWidth * shadowScale,
+                         baseDepth * 0.54f, Color(0.02f, 0.02f, 0.03f, 0.24f));
+
+    // Drawing helper
+    auto drawMass = [&](float offsetX, float offsetY,
+                        float w, float d, float h,
+                        float windowScale) -> BlockFaces {
+        const BlockFaces faces = makeBlockFaces(iso.x + offsetX, iso.y + offsetY,
+                                                w, d, h);
+        drawBlockMass(faces, roof, leftSide, rightSide);
+
+        const int bands = std::max(1, static_cast<int>(std::round(
+            h / (5.4f * zf) * p.windowDensity * windowScale)));
+        drawFaceBands(faces.left, bands, 0.10f,
+                      withAlpha(windowColor, windowColor.a * 0.82f),
+                      0.8f * zf + 0.35f);
+        drawFaceBands(faces.right, bands, 0.12f,
+                      windowColor, 0.8f * zf + 0.35f);
+        drawOutlineLoop(faces.top, outline, std::max(0.8f, 0.85f * zf));
+        renderer.drawLine(faces.top[1].x, faces.top[1].y,
+                          faces.right[2].x, faces.right[2].y,
+                          outline, std::max(0.8f, 0.9f * zf));
+        renderer.drawLine(faces.top[3].x, faces.top[3].y,
+                          faces.left[2].x, faces.left[2].y,
+                          outline, std::max(0.8f, 0.9f * zf));
+        return faces;
+    };
+
+    const float podiumHeight = std::max(2.4f * zf, totalHeight * p.podiumRatio);
+    const float mainHeight = std::max(4.0f * zf, totalHeight - podiumHeight);
+
+    if (p.isTwinTower) {
+        // === TWIN TOWER FORM ===
+        const float podiumW = baseWidth * 1.14f;
+        const float podiumD = baseDepth * 0.96f;
+        drawMass(0.0f, 2.2f * zf, podiumW, podiumD, podiumHeight * 0.92f, 0.34f);
+
+        const float towerOffset = baseWidth * 0.20f;
+        const float towerW = baseWidth * 0.36f;
+        const float towerD = baseDepth * 0.34f;
+        const float towerH = mainHeight * 0.96f;
+        const BlockFaces leftTower = drawMass(-towerOffset, -podiumHeight * 0.90f,
+                                              towerW, towerD, towerH, 1.12f);
+        const BlockFaces rightTower = drawMass(towerOffset, -podiumHeight * 0.90f,
+                                               towerW, towerD, towerH * 0.98f, 1.12f);
+
+        // Upper tier narrowing
+        drawMass(-towerOffset, -podiumHeight - towerH,
+                 towerW * 0.74f, towerD * 0.74f,
+                 towerH * 0.20f, 0.48f);
+        drawMass(towerOffset, -podiumHeight - towerH * 0.98f,
+                 towerW * 0.74f, towerD * 0.74f,
+                 towerH * 0.20f, 0.48f);
+
+        // Third tier
+        drawMass(-towerOffset, -podiumHeight - towerH * 1.20f,
+                 towerW * 0.52f, towerD * 0.52f,
+                 towerH * 0.10f, 0.30f);
+        drawMass(towerOffset, -podiumHeight - towerH * 1.18f,
+                 towerW * 0.52f, towerD * 0.52f,
+                 towerH * 0.10f, 0.30f);
+
+        // Skybridge
+        const float bridgeY = iso.y - podiumHeight - towerH * 0.46f;
+        glColor4f(0.84f, 0.90f, 0.98f, 0.50f);
+        glBegin(GL_QUADS);
+        glVertex2f(iso.x - towerOffset * 0.76f, bridgeY - 3.4f * zf);
+        glVertex2f(iso.x + towerOffset * 0.76f, bridgeY - 3.4f * zf);
+        glVertex2f(iso.x + towerOffset * 0.70f, bridgeY + 2.6f * zf);
+        glVertex2f(iso.x - towerOffset * 0.70f, bridgeY + 2.6f * zf);
+        glEnd();
+
+        // Spires
+        renderer.drawLine(leftTower.top[0].x, leftTower.top[0].y - 1.0f * zf,
+                          leftTower.top[0].x, leftTower.top[0].y - 18.0f * zf,
+                          Color(0.94f, 0.98f, 1.0f, 0.34f), 1.4f);
+        renderer.drawLine(rightTower.top[0].x, rightTower.top[0].y - 1.0f * zf,
+                          rightTower.top[0].x, rightTower.top[0].y - 17.0f * zf,
+                          Color(0.94f, 0.98f, 1.0f, 0.34f), 1.4f);
+
+        // Glow halo at top
+        renderer.drawDiamond(iso.x, iso.y - podiumHeight - towerH * 0.44f,
+                             baseWidth * 0.20f, baseDepth * 0.08f,
+                             Color(0.84f, 0.92f, 0.98f, 0.12f));
+    } else {
+        // === STANDARD BUILDING FORM ===
+        // Podium base
+        drawMass(0.0f, 1.4f * zf, baseWidth, baseDepth, podiumHeight, 0.38f);
+
+        // Main tower
+        const float towerWidth = baseWidth * p.taper;
+        const float towerDepth = baseDepth * (p.taper + 0.02f);
+        const BlockFaces mainFaces = drawMass(0.0f, -podiumHeight,
+                                              towerWidth, towerDepth, mainHeight, 1.0f);
+
+        // Roof accent based on preset style
+        switch (p.roof) {
+            case CityAssets::RoofStyle::Flat:
+                drawMass(baseWidth * 0.04f, -podiumHeight - mainHeight,
+                         towerWidth * 0.26f, towerDepth * 0.24f,
+                         std::max(1.4f * zf, mainHeight * 0.10f), 0.25f);
+                break;
+            case CityAssets::RoofStyle::Stepped:
+                drawMass(0.0f, -podiumHeight - mainHeight,
+                         towerWidth * 0.72f, towerDepth * 0.72f,
+                         std::max(1.8f * zf, mainHeight * 0.18f), 0.38f);
+                break;
+            case CityAssets::RoofStyle::Crown:
+                drawMass(0.0f, -podiumHeight - mainHeight,
+                         towerWidth * 0.36f, towerDepth * 0.36f,
+                         std::max(2.0f * zf, mainHeight * 0.12f), 0.40f);
+                renderer.drawLine(mainFaces.top[0].x, mainFaces.top[0].y,
+                                  mainFaces.top[0].x, mainFaces.top[0].y - 7.0f * zf,
+                                  Color(0.82f, 0.88f, 0.96f, 0.20f), 1.0f);
+                break;
+            case CityAssets::RoofStyle::Spire:
+                drawMass(0.0f, -podiumHeight - mainHeight,
+                         towerWidth * 0.30f, towerDepth * 0.32f,
+                         std::max(1.8f * zf, mainHeight * 0.10f), 0.40f);
+                renderer.drawLine(mainFaces.top[0].x, mainFaces.top[0].y - 1.0f * zf,
+                                  mainFaces.top[0].x, mainFaces.top[0].y - 14.0f * zf,
+                                  Color(0.90f, 0.96f, 1.0f, 0.30f), 1.2f);
+                break;
+        }
+    }
+
+    // Focus glow for landmarks
+    if (p.category == CityAssets::BuildingCategory::Landmark ||
+        p.category == CityAssets::BuildingCategory::OfficeTower) {
+        renderer.drawDiamond(iso.x, iso.y - totalHeight - 2.0f * zf,
+                             baseWidth * 0.18f, baseDepth * 0.08f,
+                             Color(0.70f, 0.82f, 0.96f, 0.04f));
+    }
+}
+
+void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
+                                               const PlacedEnvironment& placed,
+                                               float animationTime) const {
+    const CityAssets::EnvironmentPreset& p = *placed.preset;
+    const float zf = currentZoomFactor();
+    const float halfW = placed.spanX * 0.5f;
+    const float halfD = placed.spanY * 0.5f;
+
+    switch (p.category) {
+    case CityAssets::EnvironmentCategory::Park: {
+        // Green ground patch
+        drawWorldQuadPatch(placed.worldX - halfW, placed.worldY - halfD,
+                           placed.worldX + halfW, placed.worldY + halfD,
+                           p.primary);
+        // Inner accent
+        drawWorldQuadPatch(placed.worldX - halfW * 0.5f, placed.worldY - halfD * 0.5f,
+                           placed.worldX + halfW * 0.5f, placed.worldY + halfD * 0.5f,
+                           p.secondary);
+        // Tree clusters
+        for (int t = 0; t < p.featureCount; ++t) {
+            const float angle = 6.28318f * static_cast<float>(t) / static_cast<float>(std::max(1, p.featureCount));
+            const float tx = placed.worldX + std::cos(angle) * halfW * 0.55f;
+            const float ty = placed.worldY + std::sin(angle) * halfD * 0.45f;
+            const IsoCoord treeIso = RenderUtils::worldToIso(tx, ty);
+            const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.6f + static_cast<float>(t));
+            renderer.drawFilledCircle(treeIso.x, treeIso.y + 4.0f * zf,
+                                      (4.0f + static_cast<float>(t % 2) * 1.4f) * zf,
+                                      Color(0.18f * pulse, 0.34f * pulse,
+                                            0.16f * pulse, 0.76f));
+            renderer.drawLine(treeIso.x, treeIso.y + 4.0f * zf,
+                              treeIso.x, treeIso.y - 2.0f * zf,
+                              Color(0.30f, 0.22f, 0.14f, 0.46f), 1.0f);
+        }
+        // Central pond/fountain
+        if (p.hasCentralFeature) {
+            const IsoCoord cIso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
+            const Color water = mixColor(
+                Color(0.08f, 0.34f, 0.48f, 0.58f),
+                Color(0.12f, 0.48f, 0.62f, 0.62f),
+                0.5f + 0.5f * std::sin(animationTime * 0.9f));
+            renderer.drawDiamond(cIso.x, cIso.y, halfW * 16.0f * zf, halfD * 8.0f * zf, water);
+        }
+        break;
+    }
+
+    case CityAssets::EnvironmentCategory::Plaza: {
+        drawWorldQuadPatch(placed.worldX - halfW, placed.worldY - halfD,
+                           placed.worldX + halfW, placed.worldY + halfD,
+                           p.primary);
+        if (p.hasBorder) {
+            const IsoCoord corners[] = {
+                RenderUtils::worldToIso(placed.worldX - halfW, placed.worldY - halfD),
+                RenderUtils::worldToIso(placed.worldX + halfW, placed.worldY - halfD),
+                RenderUtils::worldToIso(placed.worldX + halfW, placed.worldY + halfD),
+                RenderUtils::worldToIso(placed.worldX - halfW, placed.worldY + halfD)
+            };
+            for (int e = 0; e < 4; ++e) {
+                const int next = (e + 1) % 4;
+                renderer.drawLine(corners[e].x, corners[e].y,
+                                  corners[next].x, corners[next].y,
+                                  Color(0.72f, 0.74f, 0.78f, 0.22f), 1.0f);
+            }
+        }
+        if (p.hasCentralFeature) {
+            const IsoCoord cIso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
+            renderer.drawDiamond(cIso.x, cIso.y, halfW * 10.0f * zf, halfD * 5.0f * zf,
+                                 p.secondary);
+        }
+        break;
+    }
+
+    case CityAssets::EnvironmentCategory::TreeCluster: {
+        for (int t = 0; t < p.featureCount; ++t) {
+            const float angle = 6.28318f * static_cast<float>(t) / static_cast<float>(std::max(1, p.featureCount));
+            const float r = 0.3f + static_cast<float>(t % 3) * 0.2f;
+            const float tx = placed.worldX + std::cos(angle) * halfW * r;
+            const float ty = placed.worldY + std::sin(angle) * halfD * r;
+            const IsoCoord treeIso = RenderUtils::worldToIso(tx, ty);
+            const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.4f + static_cast<float>(t) * 0.8f);
+            const float rad = (3.6f + static_cast<float>(t % 3) * 1.8f) * zf;
+            renderer.drawFilledCircle(treeIso.x, treeIso.y + 4.0f * zf, rad,
+                                      Color(p.primary.r * pulse, p.primary.g * pulse,
+                                            p.primary.b * pulse, p.primary.a));
+            renderer.drawLine(treeIso.x, treeIso.y + 4.0f * zf,
+                              treeIso.x, treeIso.y - 2.0f * zf,
+                              Color(0.30f, 0.22f, 0.14f, 0.40f), 1.0f);
+        }
+        break;
+    }
+
+    case CityAssets::EnvironmentCategory::RoadsideTrees: {
+        for (int t = 0; t < p.featureCount; ++t) {
+            const float frac = (static_cast<float>(t) + 0.5f) / static_cast<float>(p.featureCount);
+            const float tx = placed.worldX - halfW + frac * halfW * 2.0f;
+            const float ty = placed.worldY;
+            const IsoCoord treeIso = RenderUtils::worldToIso(tx, ty);
+            const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.5f + static_cast<float>(t));
+            renderer.drawFilledCircle(treeIso.x, treeIso.y + 3.5f * zf,
+                                      (3.2f + static_cast<float>(t % 2) * 0.8f) * zf,
+                                      Color(p.primary.r * pulse, p.primary.g * pulse,
+                                            p.primary.b * pulse, p.primary.a));
+            renderer.drawLine(treeIso.x, treeIso.y + 3.5f * zf,
+                              treeIso.x, treeIso.y - 2.0f * zf,
+                              Color(0.30f, 0.22f, 0.14f, 0.42f), 1.0f);
+        }
+        break;
+    }
+    }
+}
+
+void CityThemeRenderer::drawPresetVehicle(IsometricRenderer& renderer,
+                                           const PlacedVehicle& placed) const {
+    const CityAssets::VehiclePreset& v = *placed.preset;
+    const IsoCoord iso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
+    renderer.drawDiamond(iso.x, iso.y, v.length, v.width, v.body);
+    renderer.drawDiamondOutline(iso.x, iso.y, v.length, v.width, v.outline, 1.0f);
+
+    // Windshield highlight for sedans and vans
+    if (v.category == CityAssets::VehicleCategory::Sedan ||
+        v.category == CityAssets::VehicleCategory::Van) {
+        renderer.drawDiamond(iso.x, iso.y - v.width * 0.15f,
+                             v.length * 0.35f, v.width * 0.45f,
+                             Color(0.58f, 0.68f, 0.82f, 0.28f));
+    }
+}
+
+void CityThemeRenderer::drawPresetRoadProp(IsometricRenderer& renderer,
+                                            const PlacedRoadProp& placed,
+                                            float animationTime) const {
+    const CityAssets::RoadPropPreset& rp = *placed.preset;
+    const IsoCoord iso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
+    const float zf = currentZoomFactor();
+
+    switch (rp.category) {
+    case CityAssets::RoadPropCategory::TrafficLight: {
+        // Pole
+        renderer.drawLine(iso.x, iso.y + 6.0f, iso.x, iso.y - rp.height * 0.6f * zf,
+                          rp.poleColor, 1.2f);
+        // Housing
+        renderer.drawDiamond(iso.x, iso.y - rp.height * 0.7f * zf,
+                             2.8f, 1.6f,
+                             Color(0.08f, 0.08f, 0.10f, 0.94f));
+        // Signal lights
+        const float phase = std::fmod(animationTime + placed.worldX * 0.7f, 6.0f);
+        const bool green = phase < 2.8f;
+        renderer.drawFilledCircle(iso.x - 0.9f, iso.y - rp.height * 0.7f * zf, 0.9f,
+                                  green ? Color(0.26f, 0.26f, 0.28f, 0.62f) : rp.signalRed);
+        renderer.drawFilledCircle(iso.x + 0.9f, iso.y - rp.height * 0.7f * zf, 0.9f,
+                                  green ? rp.lightColor : Color(0.26f, 0.26f, 0.28f, 0.62f));
+        break;
+    }
+
+    case CityAssets::RoadPropCategory::Streetlight: {
+        renderer.drawLine(iso.x, iso.y + 4.0f, iso.x, iso.y - rp.height * 0.6f * zf,
+                          rp.poleColor, 1.0f);
+        // Lamp glow
+        const float pulse = 0.7f + 0.3f * std::sin(animationTime * 1.2f + placed.worldX);
+        renderer.drawFilledCircle(iso.x, iso.y - rp.height * 0.6f * zf, 2.0f * zf,
+                                  withAlpha(rp.lightColor, rp.lightColor.a * pulse));
+        break;
+    }
+
+    case CityAssets::RoadPropCategory::Divider: {
+        renderer.drawDiamond(iso.x, iso.y, rp.width * zf, rp.height * 0.3f * zf,
+                             rp.poleColor);
+        break;
+    }
+
+    case CityAssets::RoadPropCategory::Crosswalk: {
+        const int stripes = 5;
+        for (int s = 0; s < stripes; ++s) {
+            const float t = (static_cast<float>(s) + 0.5f) / static_cast<float>(stripes);
+            const float offsetY = RenderUtils::lerp(-rp.width * 0.4f, rp.width * 0.4f, t);
+            const IsoCoord sIso = RenderUtils::worldToIso(placed.worldX, placed.worldY + offsetY);
+            renderer.drawDiamond(sIso.x, sIso.y, 4.0f * zf, 0.8f * zf, rp.poleColor);
+        }
+        break;
+    }
     }
 }
 
@@ -2029,4 +2890,9 @@ void CityThemeRenderer::drawTrafficLight(IsometricRenderer& renderer,
                                     : Color(0.34f, 0.34f, 0.36f, 0.62f));
 }
 
-void CityThemeRenderer::cleanup() {}
+void CityThemeRenderer::cleanup() {
+    presetBuildings.clear();
+    presetEnvironments.clear();
+    presetVehicles.clear();
+    presetRoadProps.clear();
+}

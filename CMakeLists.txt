@@ -73,6 +73,7 @@ set(VISUALIZATION_SOURCES
     src/visualization/IsometricRenderer.cpp
     src/visualization/SeaThemeRenderer.cpp
     src/visualization/CityThemeRenderer.cpp
+    src/visualization/CityAssetLibrary.cpp
     src/visualization/OceanShader.cpp
     src/visualization/AnimationController.cpp
     src/visualization/DashboardStyle.cpp
@@ -141,6 +142,7 @@ add_executable(EnvironmentCoreTests
     src/visualization/IsometricRenderer.cpp
     src/visualization/SeaThemeRenderer.cpp
     src/visualization/CityThemeRenderer.cpp
+    src/visualization/CityAssetLibrary.cpp
     src/visualization/OceanShader.cpp
 )
 
