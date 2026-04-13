@@ -25,8 +25,6 @@ struct BottomOverlayLayout {
     ImVec2 comparisonSize;
     ImVec2 routeOrderPos;
     ImVec2 routeOrderSize;
-    ImVec2 eventLogPos;
-    ImVec2 eventLogSize;
 };
 
 SidebarLayout buildSidebarLayout();

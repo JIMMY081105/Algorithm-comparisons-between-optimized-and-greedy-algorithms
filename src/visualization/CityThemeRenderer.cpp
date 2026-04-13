@@ -13,6 +13,14 @@
 #include <numeric>
 #include <queue>
 
+#ifdef min
+#undef min
+#endif
+
+#ifdef max
+#undef max
+#endif
+
 namespace {
 
 constexpr float kCityPaddingX = 2.0f;
@@ -359,6 +367,70 @@ void drawOutlineLoop(const std::array<IsoCoord, 4>& pts, const Color& color, flo
     }
     glEnd();
     glLineWidth(1.0f);
+}
+
+struct TreePalette {
+    Color shadow;
+    Color trunkTop;
+    Color trunkLeft;
+    Color trunkRight;
+    Color canopyTop;
+    Color canopyLeft;
+    Color canopyRight;
+    Color canopyHighlight;
+};
+
+void drawStylizedTree(IsometricRenderer& renderer,
+                      float worldX, float worldY,
+                      float zf,
+                      float crownScale,
+                      float trunkScale,
+                      float swayX,
+                      const TreePalette& palette) {
+    const IsoCoord iso = RenderUtils::worldToIso(worldX, worldY);
+    const float groundY = iso.y + 0.9f * zf;
+    const float trunkWidth = std::max(0.9f * zf, (1.0f + crownScale * 0.28f) * zf);
+    const float trunkDepth = std::max(0.7f * zf, (0.78f + crownScale * 0.18f) * zf);
+    const float trunkHeight = (4.4f + trunkScale * 2.7f) * zf;
+    const float canopyWidth = (4.6f + crownScale * 2.6f) * zf;
+    const float canopyDepth = (2.6f + crownScale * 1.3f) * zf;
+    const float canopyHeight = (4.2f + crownScale * 1.5f) * zf;
+    const float shadowDepth = canopyDepth * 0.36f;
+
+    renderer.drawDiamond(iso.x + swayX * 0.25f, groundY + shadowDepth,
+                         canopyWidth * 0.78f, shadowDepth, palette.shadow);
+
+    const BlockFaces trunk = makeBlockFaces(
+        iso.x + swayX * 0.18f, groundY, trunkWidth, trunkDepth, trunkHeight);
+    drawBlockMass(trunk, palette.trunkTop, palette.trunkLeft, palette.trunkRight);
+
+    const float canopyBaseY = groundY - trunkHeight + 1.8f * zf;
+    auto drawCanopyMass = [&](float offsetX, float offsetY,
+                              float widthScale, float depthScale, float heightScale,
+                              float highlightMix) {
+        const float width = canopyWidth * widthScale;
+        const float depth = canopyDepth * depthScale;
+        const float height = canopyHeight * heightScale;
+        const float cx = iso.x + swayX + offsetX;
+        const float cy = canopyBaseY + offsetY;
+        const BlockFaces canopy = makeBlockFaces(cx, cy, width, depth, height);
+        drawBlockMass(
+            canopy,
+            mixColor(palette.canopyTop, palette.canopyHighlight, highlightMix),
+            mixColor(palette.canopyLeft, palette.canopyHighlight, highlightMix * 0.35f),
+            mixColor(palette.canopyRight, palette.canopyHighlight, highlightMix * 0.25f));
+
+        const float roofY = cy - height;
+        renderer.drawDiamond(
+            cx + swayX * 0.08f, roofY,
+            width * 0.14f, depth * 0.10f,
+            withAlpha(palette.canopyHighlight, palette.canopyHighlight.a * (0.26f + highlightMix * 0.3f)));
+    };
+
+    drawCanopyMass(0.0f, 0.8f * zf, 1.00f, 1.00f, 1.00f, 0.08f);
+    drawCanopyMass(-canopyWidth * 0.24f, 0.2f * zf, 0.72f, 0.80f, 0.90f, 0.04f);
+    drawCanopyMass(canopyWidth * 0.24f, 0.1f * zf, 0.70f, 0.78f, 0.86f, 0.12f);
+    drawCanopyMass(0.0f, -canopyHeight * 0.54f, 0.56f, 0.62f, 0.74f, 0.18f);
 }
 
 } // namespace
@@ -2734,15 +2806,24 @@ void CityThemeRenderer::drawLandscapeFeature(IsometricRenderer& renderer,
                 {feature.width * -0.02f, feature.depth * 0.18f}
             }};
             for (const PlaybackPoint& offset : offsets) {
-                const IsoCoord iso = RenderUtils::worldToIso(feature.x + offset.x,
-                                                             feature.y + offset.y);
-                renderer.drawFilledCircle(iso.x, iso.y + 5.0f * zf,
-                                          (4.2f + feature.accent * 2.4f) * zf,
-                                          Color(0.20f * pulse, 0.36f * pulse,
-                                                0.18f * pulse, 0.74f));
-                renderer.drawLine(iso.x, iso.y + 5.0f * zf,
-                                  iso.x, iso.y - 4.0f * zf,
-                                  Color(0.30f, 0.22f, 0.14f, 0.46f), 1.0f);
+                const float sway = std::sin(animationTime * 1.3f + offset.x * 7.0f) * 0.45f * zf;
+                const TreePalette palette{
+                    Color(0.02f, 0.04f, 0.02f, 0.16f),
+                    Color(0.36f, 0.28f, 0.18f, 0.70f),
+                    Color(0.26f, 0.20f, 0.12f, 0.72f),
+                    Color(0.34f, 0.24f, 0.14f, 0.72f),
+                    Color(0.22f * pulse, 0.40f * pulse, 0.18f * pulse, 0.78f),
+                    Color(0.16f * pulse, 0.30f * pulse, 0.14f * pulse, 0.78f),
+                    Color(0.18f * pulse, 0.35f * pulse, 0.15f * pulse, 0.78f),
+                    Color(0.38f * pulse, 0.58f * pulse, 0.24f * pulse, 0.22f)
+                };
+                drawStylizedTree(renderer,
+                                 feature.x + offset.x, feature.y + offset.y,
+                                 zf,
+                                 1.10f + feature.accent * 0.55f,
+                                 0.96f + feature.accent * 0.35f,
+                                 sway,
+                                 palette);
             }
             break;
         }
@@ -2855,14 +2936,35 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
     const float totalHeight = std::max(
         6.0f * zf,
         building.height * (building.form == BuildingForm::TwinTower ? 1.46f : 1.32f) * zf);
+    float groundCenterOffset = 1.0f * zf;
+    switch (building.form) {
+        case BuildingForm::TwinTower:
+            groundCenterOffset = 2.2f * zf;
+            break;
+        case BuildingForm::Terrace:
+            groundCenterOffset = 2.0f * zf;
+            break;
+        case BuildingForm::Tower:
+            groundCenterOffset = 1.4f * zf;
+            break;
+        case BuildingForm::Courtyard:
+            groundCenterOffset = 0.8f * zf;
+            break;
+        case BuildingForm::Pavilion:
+        case BuildingForm::Slab:
+        default:
+            break;
+    }
+    const float groundCenterY = iso.y + groundCenterOffset;
+    const float shadowDepth = baseDepth * 0.52f;
     const float shadowScale = (building.visualTier == VisualTier::Focus) ? 1.12f : 1.04f;
-    renderer.drawDiamond(iso.x, iso.y + 8.5f * zf, baseWidth * shadowScale,
-                         baseDepth * 0.54f, shadowColor);
+    renderer.drawDiamond(iso.x, groundCenterY + shadowDepth, baseWidth * shadowScale,
+                         shadowDepth, shadowColor);
 
     auto drawMass = [&](float offsetX, float offsetY,
                         float width, float depth, float height,
                         float windowScale) -> BlockFaces {
-        const BlockFaces faces = makeBlockFaces(iso.x + offsetX, iso.y + offsetY,
+        const BlockFaces faces = makeBlockFaces(iso.x + offsetX, groundCenterY + offsetY,
                                                 width, depth, height);
         drawBlockMass(faces, attenuatedRoof, attenuatedLeft, attenuatedRight);
 
@@ -3004,7 +3106,8 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
             drawMass(0.0f, -baseDepth * 0.18f, baseWidth * 0.70f, wingD,
                      wingHeight * 0.92f, 0.34f);
             const IsoCoord courtIso = RenderUtils::worldToIso(building.x, building.y + building.depth * 0.10f);
-            renderer.drawDiamond(courtIso.x, courtIso.y, baseWidth * 0.16f, baseDepth * 0.08f,
+            renderer.drawDiamond(courtIso.x, courtIso.y + groundCenterOffset,
+                                 baseWidth * 0.16f, baseDepth * 0.08f,
                                  Color(0.26f, 0.34f, 0.22f, 0.16f));
             break;
         }
@@ -3030,7 +3133,7 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                      towerW * 0.76f, towerD * 0.76f,
                      towerH * 0.18f, 0.46f);
 
-            const float bridgeY = iso.y - podiumHeight - towerH * 0.46f;
+            const float bridgeY = groundCenterY - podiumHeight - towerH * 0.46f;
             glColor4f(0.82f, 0.88f, 0.96f, 0.46f);
             glBegin(GL_QUADS);
             glVertex2f(iso.x - towerOffset * 0.74f, bridgeY - 3.2f * zf);
@@ -3057,10 +3160,10 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                                   0.40f,
                                   0.06f,
                                   0.08f), 1.2f);
-            renderer.drawDiamond(iso.x, iso.y - podiumHeight - towerH * 0.44f,
+            renderer.drawDiamond(iso.x, groundCenterY - podiumHeight - towerH * 0.44f,
                                  baseWidth * 0.18f, baseDepth * 0.06f,
                                  attenuateToZone(
-                                     Color(0.82f, 0.90f, 0.98f, 0.10f),
+                                      Color(0.82f, 0.90f, 0.98f, 0.10f),
                                      zone,
                                      Color(0.02f, 0.03f, 0.05f, 0.10f),
                                      0.28f,
@@ -3106,10 +3209,10 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
     }
 
     if (building.visualTier == VisualTier::Focus) {
-        renderer.drawDiamond(iso.x, iso.y - totalHeight - 2.0f * zf,
+        renderer.drawDiamond(iso.x, groundCenterY - totalHeight - 2.0f * zf,
                              baseWidth * 0.18f, baseDepth * 0.08f,
                              attenuateToZone(
-                                 Color(0.70f, 0.82f, 0.96f, 0.04f + building.edgeHighlight * 0.05f),
+                                  Color(0.70f, 0.82f, 0.96f, 0.04f + building.edgeHighlight * 0.05f),
                                  zone,
                                  Color(0.02f, 0.03f, 0.05f, 0.08f),
                                  0.22f,
@@ -3193,17 +3296,20 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
     const float baseDepth = std::max(3.0f * zf, p.depth * 28.0f * zf);
     const float totalHeight = std::max(6.0f * zf,
         p.height * placed.heightScale * (p.isTwinTower ? 1.46f : 1.32f) * zf);
+    const float groundCenterOffset = p.isTwinTower ? 2.2f * zf : 1.4f * zf;
+    const float groundCenterY = iso.y + groundCenterOffset;
+    const float shadowDepth = baseDepth * 0.52f;
 
     // Shadow
     const float shadowScale = (p.category == CityAssets::BuildingCategory::Landmark) ? 1.14f : 1.06f;
-    renderer.drawDiamond(iso.x, iso.y + 8.5f * zf, baseWidth * shadowScale,
-                         baseDepth * 0.54f, shadowColor);
+    renderer.drawDiamond(iso.x, groundCenterY + shadowDepth, baseWidth * shadowScale,
+                         shadowDepth, shadowColor);
 
     // Drawing helper
     auto drawMass = [&](float offsetX, float offsetY,
                         float w, float d, float h,
                         float windowScale) -> BlockFaces {
-        const BlockFaces faces = makeBlockFaces(iso.x + offsetX, iso.y + offsetY,
+        const BlockFaces faces = makeBlockFaces(iso.x + offsetX, groundCenterY + offsetY,
                                                 w, d, h);
         drawBlockMass(faces, attenuatedRoof, attenuatedLeft, attenuatedRight);
 
@@ -3259,7 +3365,7 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                  towerH * 0.10f, 0.30f);
 
         // Skybridge
-        const float bridgeY = iso.y - podiumHeight - towerH * 0.46f;
+        const float bridgeY = groundCenterY - podiumHeight - towerH * 0.46f;
         glColor4f(0.84f, 0.90f, 0.98f, 0.50f);
         glBegin(GL_QUADS);
         glVertex2f(iso.x - towerOffset * 0.76f, bridgeY - 3.4f * zf);
@@ -3289,10 +3395,10 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                               0.08f), 1.4f);
 
         // Glow halo at top
-        renderer.drawDiamond(iso.x, iso.y - podiumHeight - towerH * 0.44f,
+        renderer.drawDiamond(iso.x, groundCenterY - podiumHeight - towerH * 0.44f,
                              baseWidth * 0.20f, baseDepth * 0.08f,
                              attenuateToZone(
-                                 Color(0.84f, 0.92f, 0.98f, 0.12f),
+                                  Color(0.84f, 0.92f, 0.98f, 0.12f),
                                  zone,
                                  Color(0.02f, 0.03f, 0.05f, 0.12f),
                                  0.28f,
@@ -3355,10 +3461,10 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
     // Focus glow for landmarks
     if (p.category == CityAssets::BuildingCategory::Landmark ||
         p.category == CityAssets::BuildingCategory::OfficeTower) {
-        renderer.drawDiamond(iso.x, iso.y - totalHeight - 2.0f * zf,
+        renderer.drawDiamond(iso.x, groundCenterY - totalHeight - 2.0f * zf,
                              baseWidth * 0.18f, baseDepth * 0.08f,
                              attenuateToZone(
-                                 Color(0.70f, 0.82f, 0.96f, 0.04f),
+                                  Color(0.70f, 0.82f, 0.96f, 0.04f),
                                  zone,
                                  Color(0.02f, 0.03f, 0.05f, 0.08f),
                                  0.22f,
@@ -3382,6 +3488,69 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
     const float halfW = placed.spanX * 0.5f;
     const float halfD = placed.spanY * 0.5f;
     const Color voidTint(0.01f, 0.02f, 0.04f, 1.0f);
+    auto makeTreePalette = [&](const Color& canopyBase,
+                               const Color& canopyAccent,
+                               const Color& trunkBase,
+                               float shadowAlpha) {
+        TreePalette palette;
+        palette.shadow = attenuateToZone(
+            Color(0.02f, 0.04f, 0.02f, shadowAlpha),
+            zone,
+            Color(0.00f, 0.00f, 0.00f, shadowAlpha),
+            0.00f,
+            0.00f,
+            0.02f);
+        palette.trunkTop = attenuateToZone(
+            scaleColor(mixColor(trunkBase, Color(0.50f, 0.36f, 0.22f, trunkBase.a), 0.14f), 1.06f),
+            zone,
+            voidTint,
+            0.12f,
+            0.22f,
+            0.04f);
+        palette.trunkLeft = attenuateToZone(
+            scaleColor(biasColor(trunkBase, -0.05f, -0.02f, 0.00f), 0.84f),
+            zone,
+            voidTint,
+            0.10f,
+            0.24f,
+            0.04f);
+        palette.trunkRight = attenuateToZone(
+            scaleColor(biasColor(trunkBase, 0.03f, 0.01f, -0.01f), 0.96f),
+            zone,
+            voidTint,
+            0.10f,
+            0.22f,
+            0.04f);
+        palette.canopyTop = attenuateToZone(
+            scaleColor(mixColor(canopyBase, canopyAccent, 0.18f), 1.06f),
+            zone,
+            voidTint,
+            0.14f,
+            0.12f,
+            0.06f);
+        palette.canopyLeft = attenuateToZone(
+            scaleColor(biasColor(canopyBase, -0.04f, -0.02f, 0.00f), 0.82f),
+            zone,
+            voidTint,
+            0.12f,
+            0.16f,
+            0.06f);
+        palette.canopyRight = attenuateToZone(
+            scaleColor(biasColor(canopyBase, 0.03f, 0.02f, -0.01f), 0.94f),
+            zone,
+            voidTint,
+            0.12f,
+            0.14f,
+            0.06f);
+        palette.canopyHighlight = attenuateToZone(
+            withAlpha(scaleColor(mixColor(canopyAccent, Color(0.84f, 0.94f, 0.72f, 1.0f), 0.20f), 1.04f), 0.22f),
+            zone,
+            voidTint,
+            0.18f,
+            0.10f,
+            0.04f);
+        return palette;
+    };
 
     switch (p.category) {
     case CityAssets::EnvironmentCategory::Park: {
@@ -3393,32 +3562,35 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
         drawWorldQuadPatch(placed.worldX - halfW * 0.5f, placed.worldY - halfD * 0.5f,
                            placed.worldX + halfW * 0.5f, placed.worldY + halfD * 0.5f,
                            attenuateToZone(p.secondary, zone, voidTint, 0.10f, 0.18f));
-        // Tree clusters
-        for (int t = 0; t < p.featureCount; ++t) {
-            const float angle = 6.28318f * static_cast<float>(t) / static_cast<float>(std::max(1, p.featureCount));
-            const float tx = placed.worldX + std::cos(angle) * halfW * 0.55f;
-            const float ty = placed.worldY + std::sin(angle) * halfD * 0.45f;
-            const IsoCoord treeIso = RenderUtils::worldToIso(tx, ty);
+        // Dense tree planting with a packed spiral layout.
+        const int treeCount = std::max(8, p.featureCount * 5 + (p.hasCentralFeature ? 4 : 2));
+        constexpr float kGoldenAngle = 2.39996323f;
+        const float minRadius = p.hasCentralFeature ? 0.34f : 0.12f;
+        const float maxRadius = p.hasCentralFeature ? 0.74f : 0.80f;
+        for (int t = 0; t < treeCount; ++t) {
+            const float u = (static_cast<float>(t) + 0.5f) / static_cast<float>(treeCount);
+            float radial = minRadius + (maxRadius - minRadius) * std::sqrt(u);
+            radial = clamp01(radial + (static_cast<float>(t % 3) - 1.0f) * 0.035f);
+            const float angle = kGoldenAngle * static_cast<float>(t) +
+                                (static_cast<float>(t % 4) - 1.5f) * 0.12f;
+            const float tx = placed.worldX + std::cos(angle) * halfW * radial;
+            const float ty = placed.worldY + std::sin(angle) * halfD * (radial * 0.92f + 0.04f);
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.6f + static_cast<float>(t));
-            renderer.drawFilledCircle(treeIso.x, treeIso.y + 4.0f * zf,
-                                      (4.0f + static_cast<float>(t % 2) * 1.4f) * zf,
-                                      attenuateToZone(
-                                          Color(0.18f * pulse, 0.34f * pulse,
-                                                0.16f * pulse, 0.76f),
-                                          zone,
-                                          voidTint,
-                                          0.14f,
-                                          0.14f,
-                                          0.06f));
-            renderer.drawLine(treeIso.x, treeIso.y + 4.0f * zf,
-                              treeIso.x, treeIso.y - 2.0f * zf,
-                              attenuateToZone(
-                                  Color(0.30f, 0.22f, 0.14f, 0.46f),
-                                  zone,
-                                  voidTint,
-                                  0.12f,
-                                  0.20f,
-                                  0.04f), 1.0f);
+            const float sway = std::sin(animationTime * 1.25f + static_cast<float>(t) * 0.72f) * 0.55f * zf;
+            const Color canopyBase = scaleColor(
+                mixColor(p.primary, Color(0.18f, 0.34f, 0.16f, p.primary.a), 0.55f),
+                pulse);
+            const Color canopyAccent = scaleColor(
+                mixColor(p.secondary, Color(0.34f, 0.52f, 0.24f, p.secondary.a), 0.50f),
+                pulse * 1.04f);
+            drawStylizedTree(
+                renderer,
+                tx, ty,
+                zf,
+                0.96f + (1.0f - u) * 0.18f + static_cast<float>(t % 2) * 0.10f,
+                0.88f + static_cast<float>((t + 1) % 3) * 0.10f,
+                sway,
+                makeTreePalette(canopyBase, canopyAccent, Color(0.34f, 0.24f, 0.14f, 0.78f), 0.18f));
         }
         // Central pond/fountain
         if (p.hasCentralFeature) {
@@ -3471,27 +3643,20 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
             const float r = 0.3f + static_cast<float>(t % 3) * 0.2f;
             const float tx = placed.worldX + std::cos(angle) * halfW * r;
             const float ty = placed.worldY + std::sin(angle) * halfD * r;
-            const IsoCoord treeIso = RenderUtils::worldToIso(tx, ty);
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.4f + static_cast<float>(t) * 0.8f);
-            const float rad = (3.6f + static_cast<float>(t % 3) * 1.8f) * zf;
-            renderer.drawFilledCircle(treeIso.x, treeIso.y + 4.0f * zf, rad,
-                                      attenuateToZone(
-                                          Color(p.primary.r * pulse, p.primary.g * pulse,
-                                                p.primary.b * pulse, p.primary.a),
-                                          zone,
-                                          voidTint,
-                                          0.14f,
-                                          0.14f,
-                                          0.06f));
-            renderer.drawLine(treeIso.x, treeIso.y + 4.0f * zf,
-                              treeIso.x, treeIso.y - 2.0f * zf,
-                              attenuateToZone(
-                                  Color(0.30f, 0.22f, 0.14f, 0.40f),
-                                  zone,
-                                  voidTint,
-                                  0.12f,
-                                  0.20f,
-                                  0.04f), 1.0f);
+            const float sway = std::sin(animationTime * 1.18f + static_cast<float>(t) * 0.84f) * 0.48f * zf;
+            const Color canopyBase = scaleColor(p.primary, pulse);
+            const Color canopyAccent = scaleColor(
+                mixColor(p.primary, p.secondary, 0.42f),
+                pulse * 1.02f);
+            drawStylizedTree(
+                renderer,
+                tx, ty,
+                zf,
+                1.06f + static_cast<float>(t % 3) * 0.18f,
+                0.90f + static_cast<float>((t + 2) % 3) * 0.08f,
+                sway,
+                makeTreePalette(canopyBase, canopyAccent, Color(0.32f, 0.23f, 0.14f, 0.74f), 0.16f));
         }
         break;
     }
@@ -3501,27 +3666,20 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
             const float frac = (static_cast<float>(t) + 0.5f) / static_cast<float>(p.featureCount);
             const float tx = placed.worldX - halfW + frac * halfW * 2.0f;
             const float ty = placed.worldY;
-            const IsoCoord treeIso = RenderUtils::worldToIso(tx, ty);
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.5f + static_cast<float>(t));
-            renderer.drawFilledCircle(treeIso.x, treeIso.y + 3.5f * zf,
-                                      (3.2f + static_cast<float>(t % 2) * 0.8f) * zf,
-                                      attenuateToZone(
-                                          Color(p.primary.r * pulse, p.primary.g * pulse,
-                                                p.primary.b * pulse, p.primary.a),
-                                          zone,
-                                          voidTint,
-                                          0.14f,
-                                          0.14f,
-                                          0.06f));
-            renderer.drawLine(treeIso.x, treeIso.y + 3.5f * zf,
-                              treeIso.x, treeIso.y - 2.0f * zf,
-                              attenuateToZone(
-                                  Color(0.30f, 0.22f, 0.14f, 0.42f),
-                                  zone,
-                                  voidTint,
-                                  0.12f,
-                                  0.20f,
-                                  0.04f), 1.0f);
+            const float sway = std::sin(animationTime * 1.22f + static_cast<float>(t) * 0.76f) * 0.36f * zf;
+            const Color canopyBase = scaleColor(p.primary, pulse);
+            const Color canopyAccent = scaleColor(
+                mixColor(p.primary, Color(0.38f, 0.58f, 0.28f, p.primary.a), 0.28f),
+                pulse * 1.01f);
+            drawStylizedTree(
+                renderer,
+                tx, ty,
+                zf,
+                0.90f + static_cast<float>(t % 2) * 0.12f,
+                0.84f + static_cast<float>((t + 1) % 3) * 0.08f,
+                sway,
+                makeTreePalette(canopyBase, canopyAccent, Color(0.32f, 0.24f, 0.15f, 0.74f), 0.14f));
         }
         break;
     }

@@ -62,15 +62,12 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
 
     drawMetricsPanel(currentResult, currentMission, system, environmentInfo,
                      playState, missionProgress);
-    drawLegendPanel(environmentInfo);
+    drawLegendPanel(environmentInfo, system);
     drawRouteOrderPanel(currentResult, currentMission, system, playState,
                         missionProgress);
 
     if (showComparisonTable) {
         drawComparisonTable(compMgr, environmentInfo);
-    }
-    if (showEventLog) {
-        drawEventLogPanel(system);
     }
     if (showNodeDetails) {
         drawNodeDetailsPanel(system);
@@ -150,7 +147,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
         ImGui::TextDisabled("Weather");
         ImGui::TextColored(brandColor(environmentInfo.theme), "%s",
                            environmentInfo.weatherLabel.c_str());
-        if (ImGui::Button("Refresh Weather", ImVec2(-1, 24))) {
+        if (ImGui::Button("Refresh Weather", ImVec2(-1, 22))) {
             actions.randomizeWeather = true;
         }
     }
@@ -170,7 +167,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
     }
 
     ImGui::SeparatorText("Simulation");
-    if (ImGui::Button("Generate New Day", ImVec2(-1, 28))) {
+    if (ImGui::Button("Generate New Day", ImVec2(-1, 24))) {
         actions.generateNewDay = true;
     }
     if (ImGui::IsItemHovered()) {
@@ -193,11 +190,11 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
         }
     }
 
-    if (ImGui::Button("Run Selected", ImVec2(-1, 26))) {
+    if (ImGui::Button("Run Selected", ImVec2(-1, 23))) {
         actions.runSelectedAlgorithm = true;
         actions.algorithmToRun = selectedAlgorithm;
     }
-    if (ImGui::Button("Compare All", ImVec2(-1, 26))) {
+    if (ImGui::Button("Compare All", ImVec2(-1, 23))) {
         actions.compareAll = true;
         showComparisonTable = true;
     }
@@ -207,21 +204,21 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
         (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (playState == AnimationController::PlaybackState::IDLE ||
         playState == AnimationController::PlaybackState::FINISHED) {
-        if (ImGui::Button("Play", ImVec2(halfButtonWidth, 24))) {
+        if (ImGui::Button("Play", ImVec2(halfButtonWidth, 22))) {
             actions.playPause = true;
         }
     } else if (playState == AnimationController::PlaybackState::PLAYING) {
-        if (ImGui::Button("Pause", ImVec2(halfButtonWidth, 24))) {
+        if (ImGui::Button("Pause", ImVec2(halfButtonWidth, 22))) {
             animCtrl.pause();
         }
     } else {
-        if (ImGui::Button("Resume", ImVec2(halfButtonWidth, 24))) {
+        if (ImGui::Button("Resume", ImVec2(halfButtonWidth, 22))) {
             animCtrl.resume();
         }
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Replay", ImVec2(halfButtonWidth, 24))) {
+    if (ImGui::Button("Replay", ImVec2(halfButtonWidth, 22))) {
         actions.replay = true;
     }
 
@@ -232,7 +229,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
     }
 
     ImGui::TextDisabled("Playback Progress");
-    ImGui::ProgressBar(missionProgress, ImVec2(-1, 14));
+    ImGui::ProgressBar(missionProgress, ImVec2(-1, 12));
     ImGui::TextColored(DashboardStyle::playbackTint(playState, hasMission),
                        "%s", DashboardStyle::playbackLabel(playState, hasMission));
 
@@ -465,37 +462,20 @@ void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
     ImGui::End();
 }
 
-void DashboardUI::drawEventLogPanel(const WasteSystem& system) {
-    const DashboardStyle::BottomOverlayLayout layout =
-        DashboardStyle::buildBottomOverlayLayout();
-    ImGui::SetNextWindowPos(layout.eventLogPos, ImGuiCond_Always);
-    ImGui::SetNextWindowSize(layout.eventLogSize, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.93f);
-
-    ImGui::Begin("Activity Log", &showEventLog,
-                 DashboardStyle::pinnedFloatingWindowFlags());
-    ImGui::TextDisabled("Latest operations");
-    ImGui::Separator();
-
-    const auto events = system.getEventLog().getRecentEvents(12);
-    for (const auto* entry : events) {
-        ImGui::TextColored(ImVec4(0.38f, 0.44f, 0.52f, 1.0f),
-                           "%s", entry->timestamp.c_str());
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.72f, 0.76f, 0.80f, 1.0f),
-                           "%s", entry->message.c_str());
-    }
-
-    ImGui::End();
-}
-
-void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo) {
+void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
+                                  const WasteSystem& system) {
     const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.legendPos, ImGuiCond_Always);
-    ImGui::SetNextWindowSize(layout.legendSize, ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(
+        ImVec2(layout.legendSize.x, 0.0f),
+        ImVec2(layout.legendSize.x, FLT_MAX));
     ImGui::SetNextWindowBgAlpha(0.95f);
 
-    ImGui::Begin("Legend", nullptr, DashboardStyle::pinnedSidebarWindowFlags());
+    ImGui::Begin("Legend", nullptr,
+                 DashboardStyle::pinnedSidebarWindowFlags() |
+                 ImGuiWindowFlags_AlwaysAutoResize |
+                 ImGuiWindowFlags_NoScrollbar |
+                 ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::TextDisabled("Urgency and environment");
 
     const Color low = RenderUtils::getUrgencyColor(UrgencyLevel::LOW);
@@ -517,6 +497,18 @@ void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo) {
 
     ImGui::Separator();
     ImGui::TextWrapped("%s", environmentInfo.atmosphereLabel.c_str());
+
+    if (showEventLog) {
+        ImGui::SeparatorText("Activity Log");
+        const auto events = system.getEventLog().getRecentEvents(12);
+        for (const auto* entry : events) {
+            ImGui::TextColored(ImVec4(0.38f, 0.44f, 0.52f, 1.0f),
+                               "%s", entry->timestamp.c_str());
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.72f, 0.76f, 0.80f, 1.0f),
+                               "%s", entry->message.c_str());
+        }
+    }
 
     ImGui::End();
 }
@@ -552,7 +544,25 @@ void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
         activeIndex = static_cast<int>(result.visitOrder.size()) - 1;
     }
 
-    ImGui::TextColored(kSeaPrimary, "%s", result.algorithmName.c_str());
+    const bool isCity = selectedTheme == EnvironmentTheme::City;
+    const ImVec4 brandTint = isCity ? kCityPrimary : kSeaPrimary;
+    const ImVec4 stepActive = isCity
+        ? ImVec4(1.0f, 0.88f, 0.55f, 1.0f)
+        : ImVec4(0.72f, 0.96f, 1.0f, 1.0f);
+    const ImVec4 stepNormal = isCity
+        ? ImVec4(0.82f, 0.64f, 0.30f, 1.0f)
+        : ImVec4(0.46f, 0.80f, 0.88f, 1.0f);
+    const ImVec4 hqTint = isCity
+        ? ImVec4(0.90f, 0.70f, 0.25f, 1.0f)
+        : ImVec4(0.3f, 0.5f, 0.9f, 1.0f);
+    const ImVec4 collectedTint = isCity
+        ? ImVec4(0.60f, 0.75f, 0.50f, 1.0f)
+        : ImVec4(0.54f, 0.76f, 0.66f, 1.0f);
+    const ImVec4 currentTint = isCity
+        ? ImVec4(1.0f, 0.92f, 0.70f, 1.0f)
+        : ImVec4(0.86f, 0.98f, 1.0f, 1.0f);
+
+    ImGui::TextColored(brandTint, "%s", result.algorithmName.c_str());
     ImGui::TextColored(stateTint, "%s",
                        DashboardStyle::playbackLabel(playState, true));
     ImGui::ProgressBar(progress, ImVec2(-1, 8.0f));
@@ -572,20 +582,17 @@ void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
             (playState == AnimationController::PlaybackState::PLAYING ||
              playState == AnimationController::PlaybackState::PAUSED) &&
             i == activeIndex;
-        const ImVec4 stepTint = isCurrent
-            ? ImVec4(0.72f, 0.96f, 1.0f, 1.0f)
-            : ImVec4(0.46f, 0.80f, 0.88f, 1.0f);
+        const ImVec4 stepTint = isCurrent ? stepActive : stepNormal;
         ImGui::TextColored(stepTint, "%02d", i + 1);
         ImGui::SameLine();
 
         if (node.getIsHQ()) {
-            ImGui::TextColored(ImVec4(0.3f, 0.5f, 0.9f, 1.0f),
-                               "%s", node.getName().c_str());
+            ImGui::TextColored(hqTint, "%s", node.getName().c_str());
         } else if (node.isCollected()) {
-            ImGui::TextColored(ImVec4(0.54f, 0.76f, 0.66f, 1.0f),
+            ImGui::TextColored(collectedTint,
                                "%s  [secured]", node.getName().c_str());
         } else if (isCurrent) {
-            ImGui::TextColored(ImVec4(0.86f, 0.98f, 1.0f, 1.0f),
+            ImGui::TextColored(currentTint,
                                "%s  [inbound | %.0f%%]",
                                node.getName().c_str(), node.getWasteLevel());
         } else {
@@ -616,11 +623,11 @@ void DashboardUI::drawExportPanel(UIActions& actions) {
     ImGui::SetNextWindowSize(layout.exportSize, ImGuiCond_Always);
     ImGui::Begin("Export", nullptr, DashboardStyle::pinnedSidebarWindowFlags());
 
-    if (ImGui::Button("Export Summary (TXT)", ImVec2(-1, 24))) {
+    if (ImGui::Button("Export Summary (TXT)", ImVec2(-1, 22))) {
         actions.exportResults = true;
     }
     ImGui::Spacing();
-    if (ImGui::Button("Export Comparison (CSV)", ImVec2(-1, 24))) {
+    if (ImGui::Button("Export Comparison (CSV)", ImVec2(-1, 22))) {
         actions.exportComparison = true;
     }
 

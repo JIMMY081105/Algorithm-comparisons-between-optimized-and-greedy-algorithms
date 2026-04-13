@@ -5,39 +5,45 @@
 namespace DashboardStyle {
 namespace {
 constexpr float kPanelMargin = 8.0f;
-constexpr float kSidebarWidth = 290.0f;
-constexpr float kHeaderHeight = 56.0f;
-constexpr float kExportHeight = 90.0f;
-constexpr float kLegendHeight = 108.0f;
-constexpr float kEventLogWidth = 280.0f;
-constexpr float kEventLogHeight = 180.0f;
+constexpr float kSidebarWidth = 340.0f;
+constexpr float kHeaderWidth = 420.0f;
+constexpr float kLegendWidth = 290.0f;
+constexpr float kHeaderHeight = 74.0f;
+constexpr float kExportHeight = 112.0f;
+constexpr float kLegendHeight = 176.0f;
+constexpr float kEventLogWidth = 290.0f;
+constexpr float kEventLogHeight = 190.0f;
 constexpr float kRouteOrderWidth = 280.0f;
 constexpr float kRouteOrderHeight = 230.0f;
 constexpr float kComparisonHeight = 220.0f;
 constexpr float kComparisonMaxWidth = 620.0f;
+constexpr float kControlsHeightRatio = 0.48f;
+constexpr float kMinMetricsHeight = 92.0f;
 }
 
 SidebarLayout buildSidebarLayout() {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float top = viewport->WorkPos.y + kPanelMargin;
+    const float leftX = viewport->WorkPos.x + kPanelMargin;
+    const float headerX = viewport->WorkPos.x + viewport->WorkSize.x -
+                          kHeaderWidth - kPanelMargin;
     const float rightX = viewport->WorkPos.x + viewport->WorkSize.x -
                          kSidebarWidth - kPanelMargin;
 
-    const float fixedHeights = kHeaderHeight + kExportHeight + kLegendHeight +
-                               (kPanelMargin * 4.0f);
+    const float fixedHeights = kHeaderHeight + kExportHeight + (kPanelMargin * 3.0f);
     const float flexibleHeight = std::max(
         0.0f, viewport->WorkSize.y - (kPanelMargin * 2.0f) - fixedHeights);
 
-    float controlsHeight = flexibleHeight * 0.62f;
+    float controlsHeight = flexibleHeight * kControlsHeightRatio;
     float metricsHeight = flexibleHeight - controlsHeight;
-    if (metricsHeight < 130.0f) {
-        metricsHeight = std::min(130.0f, flexibleHeight);
+    if (metricsHeight < kMinMetricsHeight) {
+        metricsHeight = std::min(kMinMetricsHeight, flexibleHeight);
         controlsHeight = std::max(0.0f, flexibleHeight - metricsHeight);
     }
 
     SidebarLayout layout{};
-    layout.headerPos = ImVec2(rightX, top);
-    layout.headerSize = ImVec2(kSidebarWidth, kHeaderHeight);
+    layout.headerPos = ImVec2(headerX, top);
+    layout.headerSize = ImVec2(kHeaderWidth, kHeaderHeight);
     layout.controlsPos = ImVec2(rightX, top + kHeaderHeight + kPanelMargin);
     layout.controlsSize = ImVec2(kSidebarWidth, controlsHeight);
     layout.exportPos = ImVec2(rightX,
@@ -46,9 +52,8 @@ SidebarLayout buildSidebarLayout() {
     layout.metricsPos = ImVec2(rightX,
                                layout.exportPos.y + layout.exportSize.y + kPanelMargin);
     layout.metricsSize = ImVec2(kSidebarWidth, metricsHeight);
-    layout.legendPos = ImVec2(rightX,
-                              layout.metricsPos.y + layout.metricsSize.y + kPanelMargin);
-    layout.legendSize = ImVec2(kSidebarWidth, kLegendHeight);
+    layout.legendPos = ImVec2(leftX, top);
+    layout.legendSize = ImVec2(kLegendWidth, kLegendHeight);
     return layout;
 }
 
@@ -56,13 +61,10 @@ BottomOverlayLayout buildBottomOverlayLayout() {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float sidebarLeft = viewport->WorkPos.x + viewport->WorkSize.x -
                               kSidebarWidth - kPanelMargin;
-    const ImVec2 eventLogPos(
-        sidebarLeft - kPanelMargin - kEventLogWidth,
-        viewport->WorkPos.y + viewport->WorkSize.y -
-        kEventLogHeight - kPanelMargin);
     const ImVec2 routeOrderPos(
-        eventLogPos.x,
-        eventLogPos.y - kPanelMargin - kRouteOrderHeight);
+        sidebarLeft - kPanelMargin - kRouteOrderWidth,
+        viewport->WorkPos.y + viewport->WorkSize.y -
+        kRouteOrderHeight - kPanelMargin);
 
     const float desiredComparisonLeft =
         routeOrderPos.x - kPanelMargin - kComparisonMaxWidth;
@@ -72,8 +74,6 @@ BottomOverlayLayout buildBottomOverlayLayout() {
         routeOrderPos.x - comparisonLeft - kPanelMargin;
 
     BottomOverlayLayout layout{};
-    layout.eventLogPos = eventLogPos;
-    layout.eventLogSize = ImVec2(kEventLogWidth, kEventLogHeight);
     layout.routeOrderPos = routeOrderPos;
     layout.routeOrderSize = ImVec2(kRouteOrderWidth, kRouteOrderHeight);
     layout.comparisonPos = ImVec2(
@@ -135,14 +135,14 @@ void applyTheme(EnvironmentTheme theme, bool hasMission, bool missionRunning) {
     style.FrameRounding = 7.0f;
     style.GrabRounding = 7.0f;
     style.ScrollbarRounding = 10.0f;
-    style.WindowPadding = ImVec2(14.0f, 12.0f);
-    style.FramePadding = ImVec2(10.0f, 6.0f);
-    style.ItemSpacing = ImVec2(9.0f, 8.0f);
-    style.ItemInnerSpacing = ImVec2(7.0f, 6.0f);
-    style.CellPadding = ImVec2(8.0f, 6.0f);
+    style.WindowPadding = ImVec2(11.0f, 9.0f);
+    style.FramePadding = ImVec2(8.0f, 5.0f);
+    style.ItemSpacing = ImVec2(7.0f, 6.0f);
+    style.ItemInnerSpacing = ImVec2(6.0f, 5.0f);
+    style.CellPadding = ImVec2(6.0f, 5.0f);
     style.WindowBorderSize = 1.0f;
     style.FrameBorderSize = 0.0f;
-    style.ScrollbarSize = 13.0f;
+    style.ScrollbarSize = 11.0f;
 
     const float missionGlow = missionRunning ? 1.0f : (hasMission ? 0.45f : 0.0f);
     ImVec4* colors = style.Colors;

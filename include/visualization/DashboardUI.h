@@ -51,8 +51,8 @@ private:
     void drawComparisonTable(const ComparisonManager& compMgr,
                             const ThemeDashboardInfo& environmentInfo);
     void drawNodeDetailsPanel(const WasteSystem& system);
-    void drawEventLogPanel(const WasteSystem& system);
-    void drawLegendPanel(const ThemeDashboardInfo& environmentInfo);
+    void drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
+                         const WasteSystem& system);
     void drawRouteOrderPanel(const RouteResult& result,
                              const MissionPresentation& currentMission,
                              const WasteSystem& system,
