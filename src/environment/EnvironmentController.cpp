@@ -80,6 +80,14 @@ void EnvironmentController::applyActiveWeights(MapGraph& graph) const {
     rendererFor(activeTheme).applyRouteWeights(graph);
 }
 
+void EnvironmentController::setCitySeason(CitySeason season, MapGraph& graph) {
+    static_cast<CityThemeRenderer&>(*cityTheme).setSeason(season);
+    if (activeTheme == EnvironmentTheme::City) {
+        applyActiveWeights(graph);
+        transitionAlpha = 0.25f;
+    }
+}
+
 void EnvironmentController::randomizeCityTraffic(unsigned int seed, MapGraph& graph) {
     static_cast<CityThemeRenderer&>(*cityTheme).randomizeTrafficConditions(seed);
     if (activeTheme == EnvironmentTheme::City) {

@@ -83,6 +83,7 @@ set(VISUALIZATION_SOURCES
 set(ENVIRONMENT_SOURCES
     src/environment/EnvironmentController.cpp
     src/environment/MissionPresentationUtils.cpp
+    src/environment/SeasonProfile.cpp
 )
 
 set(PERSISTENCE_SOURCES

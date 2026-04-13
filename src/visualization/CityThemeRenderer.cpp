@@ -2,6 +2,7 @@
 #include "visualization/CityAssetLibrary.h"
 
 #include "environment/MissionPresentationUtils.h"
+#include "environment/SeasonProfile.h"
 #include "visualization/IsometricRenderer.h"
 
 #include <glad/glad.h>
@@ -380,6 +381,33 @@ struct TreePalette {
     Color canopyHighlight;
 };
 
+void applySeasonalTreeCanopy(CitySeason season,
+                             bool snowCovered,
+                             Color& canopyBase,
+                             Color& canopyAccent) {
+    switch (season) {
+        case CitySeason::Summer:
+            canopyBase = mixColor(canopyBase, Color(0.84f, 0.58f, 0.70f, canopyBase.a), 0.76f);
+            canopyAccent = mixColor(canopyAccent, Color(0.98f, 0.78f, 0.86f, canopyAccent.a), 0.82f);
+            break;
+        case CitySeason::Autumn:
+            canopyBase = mixColor(canopyBase, Color(0.60f, 0.34f, 0.12f, canopyBase.a), 0.74f);
+            canopyAccent = mixColor(canopyAccent, Color(0.82f, 0.52f, 0.20f, canopyAccent.a), 0.78f);
+            break;
+        case CitySeason::Winter:
+            canopyBase = mixColor(desaturateColor(canopyBase, 0.48f),
+                                  Color(0.70f, 0.74f, 0.78f, canopyBase.a),
+                                  snowCovered ? 0.30f : 0.14f);
+            canopyAccent = mixColor(desaturateColor(canopyAccent, 0.38f),
+                                    Color(0.86f, 0.90f, 0.94f, canopyAccent.a),
+                                    snowCovered ? 0.36f : 0.18f);
+            break;
+        case CitySeason::Spring:
+        default:
+            break;
+    }
+}
+
 void drawStylizedTree(IsometricRenderer& renderer,
                       float worldX, float worldY,
                       float zf,
@@ -437,8 +465,10 @@ void drawStylizedTree(IsometricRenderer& renderer,
 
 CityThemeRenderer::CityThemeRenderer()
     : dashboardInfo{EnvironmentTheme::City, "City", "Operational urban district",
-                    "Stormy", "Storm-driven logistics pressure", 0.0f, 0, true},
+                    CitySeason::Spring, "Spring", "Stormy",
+                    "Storm-driven logistics pressure", 0.0f, 0, true, true},
       layoutSeed(0),
+      season(CitySeason::Spring),
       weather(CityWeather::Stormy),
       trafficClock(0.0f),
       gridColumns(0),
@@ -484,6 +514,7 @@ void CityThemeRenderer::rebuildScene(const MapGraph& graph, unsigned int seed) {
     landscapeFeatures.clear();
     populateFromAssetLibrary(graph, layoutRng);
     generatePeripheralScene(layoutRng);
+    refreshSeasonalRoadState();
     generateAmbientCars(layoutRng);
 
     refreshPairRoutes(graph);
@@ -601,8 +632,9 @@ MissionPresentation CityThemeRenderer::buildMissionPresentation(
 
     const float avgCongestion = dashboardInfo.congestionLevel * 100.0f;
     presentation.narrative =
-        std::string("City mode follows the district street graph through commercial, residential, campus, park, and landmark zones under ") +
-        toDisplayString(weather) + " conditions. Average live congestion load is " +
+        std::string("City mode follows the district street graph through commercial, residential, campus, park, and landmark zones during ") +
+        dashboardInfo.seasonLabel + " under " + dashboardInfo.weatherLabel +
+        " conditions. Average live congestion load is " +
         std::to_string(static_cast<int>(avgCongestion)) + "%.";
     return presentation;
 }
@@ -619,12 +651,34 @@ bool CityThemeRenderer::supportsWeather() const {
     return true;
 }
 
+CitySeason CityThemeRenderer::getSeason() const {
+    return season;
+}
+
+void CityThemeRenderer::setSeason(CitySeason newSeason) {
+    season = newSeason;
+    refreshSeasonalRoadState();
+    std::mt19937 carRng(layoutSeed ^ 0x41C7A93u ^
+                        static_cast<unsigned int>(season) * 131u ^
+                        static_cast<unsigned int>(weather) * 257u);
+    generateAmbientCars(carRng);
+    if (activeGraph != nullptr) {
+        refreshPairRoutes(*activeGraph);
+        refreshDashboardInfo();
+    }
+}
+
 CityWeather CityThemeRenderer::getWeather() const {
     return weather;
 }
 
 void CityThemeRenderer::setWeather(CityWeather newWeather) {
     weather = newWeather;
+    refreshSeasonalRoadState();
+    std::mt19937 carRng(layoutSeed ^ 0x41C7A93u ^
+                        static_cast<unsigned int>(season) * 131u ^
+                        static_cast<unsigned int>(weather) * 257u);
+    generateAmbientCars(carRng);
     if (activeGraph != nullptr) {
         refreshPairRoutes(*activeGraph);
         refreshDashboardInfo();
@@ -634,6 +688,7 @@ void CityThemeRenderer::setWeather(CityWeather newWeather) {
 void CityThemeRenderer::randomizeTrafficConditions(unsigned int seed) {
     std::mt19937 trafficRng(seed ^ 0x6D2F41Bu);
     applyTrafficConditions(trafficRng);
+    refreshSeasonalRoadState();
 
     std::mt19937 carRng(seed ^ 0x41C7A93u);
     generateAmbientCars(carRng);
@@ -646,7 +701,7 @@ void CityThemeRenderer::randomizeTrafficConditions(unsigned int seed) {
 
 void CityThemeRenderer::randomizeWeather(unsigned int seed) {
     std::mt19937 rng(seed ^ 0xB3E947u);
-    setWeather(static_cast<CityWeather>(rng() % 4));
+    setWeather(randomWeatherForSeason(season, rng));
 }
 
 void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
@@ -663,6 +718,8 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
     const float top = static_cast<float>(viewport[1]);
     const float right = left + static_cast<float>(viewport[2]);
     const float bottom = top + static_cast<float>(viewport[3]);
+    const bool snowfall = hasSnowfall();
+    const bool winterStorm = hasWinterStormActive();
 
     Color skyTop(0.22f, 0.30f, 0.40f, 1.0f);
     Color skyBottom(0.11f, 0.14f, 0.18f, 1.0f);
@@ -699,6 +756,22 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
             districtLift = Color(0.34f, 0.40f, 0.48f, 0.11f);
             wetTint = Color(0.18f, 0.26f, 0.36f, 0.16f);
             break;
+    }
+
+    if (season == CitySeason::Winter) {
+        skyTop = mixColor(skyTop, Color(0.54f, 0.60f, 0.70f, 1.0f), snowfall ? 0.34f : 0.16f);
+        skyBottom = mixColor(skyBottom, Color(0.20f, 0.24f, 0.30f, 1.0f), snowfall ? 0.26f : 0.10f);
+        groundBase = mixColor(groundBase, Color(0.72f, 0.76f, 0.80f, groundBase.a),
+                              snowfall ? 0.40f : 0.12f);
+        districtLift = mixColor(districtLift, Color(0.80f, 0.86f, 0.94f, districtLift.a),
+                                snowfall ? 0.26f : 0.10f);
+        wetTint = mixColor(wetTint, Color(0.82f, 0.88f, 0.96f, wetTint.a),
+                           snowfall ? 0.46f : 0.12f);
+        if (winterStorm) {
+            skyTop = mixColor(skyTop, Color(0.02f, 0.03f, 0.06f, 1.0f), 0.24f);
+            skyBottom = mixColor(skyBottom, Color(0.00f, 0.00f, 0.02f, 1.0f), 0.34f);
+            groundBase = mixColor(groundBase, Color(0.12f, 0.14f, 0.18f, groundBase.a), 0.22f);
+        }
     }
 
     skyTop = mixColor(skyTop, Color(0.02f, 0.02f, 0.03f, 1.0f), 0.88f);
@@ -924,21 +997,29 @@ void CityThemeRenderer::drawTransitNetwork(
                               Color(0.68f, 0.76f, 0.92f, 0.12f),
                               roadFocus * 0.70f);
 
-        if (weather == CityWeather::Rainy || weather == CityWeather::Stormy) {
+        if (road.snowBlocked) {
+            curbColor = mixColor(curbColor, Color(0.82f, 0.86f, 0.90f, curbColor.a), 0.72f);
+            roadColor = Color(0.92f, 0.94f, 0.97f, 0.98f);
+            centerLine = withAlpha(Color(0.96f, 0.98f, 1.0f, 1.0f), 0.10f);
+            glow = Color(0.82f, 0.90f, 0.98f, 0.10f);
+        } else if (weather == CityWeather::Rainy || weather == CityWeather::Stormy) {
             roadColor = mixColor(roadColor, Color(0.12f, 0.16f, 0.22f, roadColor.a), 0.24f);
             glow = mixColor(glow, Color(0.60f, 0.74f, 0.94f, glow.a), 0.30f);
         }
 
-        if (road.congestion > 0.58f && layerToggles.showCongestion) {
+        if (!road.snowBlocked && road.congestion > 0.58f && layerToggles.showCongestion) {
             roadColor = mixColor(roadColor, Color(0.84f, 0.36f, 0.16f, 0.98f),
                                  road.congestion * (0.70f + congestionPulse * 0.30f));
         }
-        if (road.incident && layerToggles.showIncidents) {
+        if (!road.snowBlocked && road.incident && layerToggles.showIncidents) {
             roadColor = mixColor(roadColor, Color(0.82f, 0.14f, 0.12f, 1.0f), 0.60f);
         }
         if (road.arterial) {
             roadColor = mixColor(roadColor, Color(0.24f, 0.25f, 0.27f, roadColor.a), 0.24f);
             centerLine = mixColor(centerLine, Color(0.92f, 0.86f, 0.58f, centerLine.a), 0.36f);
+        }
+        if (road.snowBlocked) {
+            centerLine = mixColor(centerLine, Color(0.92f, 0.96f, 1.0f, centerLine.a), 0.72f);
         }
 
         curbColor = attenuateToZone(
@@ -986,7 +1067,7 @@ void CityThemeRenderer::drawTransitNetwork(
     if (layerToggles.showIncidents) {
         for (std::size_t i = 0; i < roads.size(); ++i) {
             const RoadSegment& road = roads[i];
-            if (!road.incident) {
+            if (!road.incident || road.snowBlocked) {
                 continue;
             }
 
@@ -1360,7 +1441,50 @@ void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
     const float spanX = std::max(1.0f, peripheralMaxX - peripheralMinX);
     const float spanY = std::max(1.0f, peripheralMaxY - peripheralMinY);
 
-    if (weather == CityWeather::Rainy || weather == CityWeather::Stormy) {
+    if (hasSnowfall()) {
+        const bool winterStorm = hasWinterStormActive();
+        const int flakeCount = winterStorm ? 220 : 140;
+        for (int i = 0; i < flakeCount; ++i) {
+            const float phase =
+                animationTime * (winterStorm ? 3.1f : 2.2f) +
+                static_cast<float>(i) * 0.97f;
+            const float worldX =
+                peripheralMinX + std::fmod(phase * 1.1f + i * 4.1f, spanX);
+            const float worldY =
+                peripheralMinY + std::fmod(phase * 0.9f + i * 2.8f, spanY);
+            const float drift =
+                std::sin(animationTime * (winterStorm ? 3.7f : 2.4f) +
+                         static_cast<float>(i) * 0.61f) *
+                (winterStorm ? 4.8f : 2.8f);
+            const ZoneVisibility zone = computeZoneVisibility(
+                worldX, worldY,
+                operationalCenterX, operationalCenterY,
+                operationalRadiusX, operationalRadiusY);
+            if (zone.transition <= 0.18f) {
+                continue;
+            }
+
+            const IsoCoord iso = RenderUtils::worldToIso(worldX, worldY);
+            const float flakeRadius = 1.5f + static_cast<float>(i % 4) * 0.55f;
+            const Color flake = attenuateToZone(
+                Color(0.94f, 0.97f, 1.0f,
+                      winterStorm ? 0.36f : 0.28f),
+                zone,
+                Color(0.02f, 0.03f, 0.05f,
+                      winterStorm ? 0.36f : 0.28f),
+                0.28f,
+                0.04f,
+                0.06f);
+            renderer.drawFilledCircle(iso.x + drift, iso.y - 1.0f,
+                                      flakeRadius, flake);
+            renderer.drawLine(iso.x + drift - flakeRadius * (winterStorm ? 1.3f : 0.7f),
+                              iso.y - flakeRadius * (winterStorm ? 4.6f : 2.8f),
+                              iso.x + drift + flakeRadius * 0.2f,
+                              iso.y + flakeRadius * 0.7f,
+                              withAlpha(flake, flake.a * (winterStorm ? 0.76f : 0.42f)),
+                              winterStorm ? 1.2f : 0.9f);
+        }
+    } else if (weather == CityWeather::Rainy || weather == CityWeather::Stormy) {
         const int streakCount = (weather == CityWeather::Stormy) ? 34 : 24;
         for (int i = 0; i < streakCount; ++i) {
             const float phase = animationTime * (weather == CityWeather::Stormy ? 7.2f : 5.2f) +
@@ -1397,7 +1521,9 @@ void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
     const float bottom = top + static_cast<float>(viewport[3]);
     const float midX = (left + right) * 0.5f;
     const float midY = (top + bottom) * 0.5f;
-    const float edgeAlpha = 0.01f + weatherOverlayStrength() * 0.04f;
+    const float edgeAlpha =
+        0.01f + weatherOverlayStrength() * 0.04f +
+        (hasWinterStormActive() ? 0.03f : 0.0f);
 
     glBegin(GL_QUADS);
     glColor4f(0.02f, 0.03f, 0.05f, edgeAlpha);
@@ -1414,6 +1540,17 @@ void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
     glVertex2f(right, bottom);
     glVertex2f(left, bottom);
     glEnd();
+
+    if (hasWinterStormActive()) {
+        glBegin(GL_QUADS);
+        glColor4f(0.01f, 0.02f, 0.04f, 0.08f);
+        glVertex2f(left, top);
+        glVertex2f(right, top);
+        glColor4f(0.01f, 0.02f, 0.04f, 0.14f);
+        glVertex2f(right, bottom);
+        glVertex2f(left, bottom);
+        glEnd();
+    }
 
     glBegin(GL_QUADS);
     glColor4f(0.02f, 0.03f, 0.05f, edgeAlpha * 0.80f);
@@ -1570,6 +1707,7 @@ void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937&
             0.0f,
             0.0f,
             arterial,
+            false,
             VisualTier::Support
         });
         roadAdjacency[from].push_back(roadIndex);
@@ -2301,10 +2439,21 @@ void CityThemeRenderer::generateAmbientCars(std::mt19937& rng) {
         return;
     }
 
+    std::vector<int> availableRoads;
+    availableRoads.reserve(roads.size());
     std::vector<double> weights;
     weights.reserve(roads.size());
-    for (const auto& road : roads) {
+    for (int i = 0; i < static_cast<int>(roads.size()); ++i) {
+        const RoadSegment& road = roads[static_cast<std::size_t>(i)];
+        if (road.snowBlocked) {
+            continue;
+        }
+        availableRoads.push_back(i);
         weights.push_back(0.35 + road.focusWeight * 0.95 + (road.incident ? 0.10 : 0.0));
+    }
+
+    if (availableRoads.empty()) {
+        return;
     }
 
     std::discrete_distribution<int> roadDistribution(weights.begin(), weights.end());
@@ -2312,7 +2461,8 @@ void CityThemeRenderer::generateAmbientCars(std::mt19937& rng) {
     std::uniform_real_distribution<float> speedDistribution(0.05f, 0.18f);
 
     for (int i = 0; i < 22; ++i) {
-        const int roadIndex = roadDistribution(rng);
+        const int roadIndex =
+            availableRoads[static_cast<std::size_t>(roadDistribution(rng))];
         ambientCars.push_back(AmbientCar{
             roadIndex,
             offsetDistribution(rng),
@@ -2355,6 +2505,51 @@ void CityThemeRenderer::applyTrafficConditions(std::mt19937& rng) {
         road.incident = incidentDistribution(rng) && congestion > 0.35f;
         road.signalDelay =
             (from.hasTrafficLight || to.hasTrafficLight) ? 0.18f + congestion * 0.25f : 0.0f;
+    }
+}
+
+void CityThemeRenderer::refreshSeasonalRoadState() {
+    for (RoadSegment& road : roads) {
+        road.snowBlocked = false;
+    }
+
+    if (!hasSnowfall() || roads.empty() || intersections.empty()) {
+        return;
+    }
+
+    std::vector<int> candidates;
+    candidates.reserve(roads.size());
+    for (int i = 0; i < static_cast<int>(roads.size()); ++i) {
+        const RoadSegment& road = roads[static_cast<std::size_t>(i)];
+        if (road.arterial || road.visualTier == VisualTier::Focus) {
+            continue;
+        }
+        candidates.push_back(i);
+    }
+
+    if (candidates.empty()) {
+        return;
+    }
+
+    std::mt19937 rng(layoutSeed ^ 0x8F4C39u ^
+                     static_cast<unsigned int>(season) * 173u ^
+                     static_cast<unsigned int>(weather) * 313u);
+    std::shuffle(candidates.begin(), candidates.end(), rng);
+
+    const int targetBlockedRoads =
+        std::max(2, std::min(6, static_cast<int>(roads.size() / 14)));
+    int blockedRoads = 0;
+    for (const int roadIndex : candidates) {
+        roads[static_cast<std::size_t>(roadIndex)].snowBlocked = true;
+        if (!isRoadNetworkConnected()) {
+            roads[static_cast<std::size_t>(roadIndex)].snowBlocked = false;
+            continue;
+        }
+
+        ++blockedRoads;
+        if (blockedRoads >= targetBlockedRoads) {
+            break;
+        }
     }
 }
 
@@ -2478,6 +2673,9 @@ std::vector<int> CityThemeRenderer::shortestPath(int startIntersection,
 
         for (const int roadIndex : roadAdjacency[current]) {
             const RoadSegment& road = roads[roadIndex];
+            if (road.snowBlocked) {
+                continue;
+            }
             const int next = (road.from == current) ? road.to : road.from;
             const float nextDistance = currentDistance + roadCost(road);
             if (nextDistance < distance[next]) {
@@ -2500,7 +2698,50 @@ std::vector<int> CityThemeRenderer::shortestPath(int startIntersection,
     return path;
 }
 
+bool CityThemeRenderer::isRoadNetworkConnected() const {
+    if (intersections.empty()) {
+        return true;
+    }
+
+    std::vector<bool> visited(intersections.size(), false);
+    std::queue<int> pending;
+    pending.push(0);
+    visited[0] = true;
+
+    while (!pending.empty()) {
+        const int current = pending.front();
+        pending.pop();
+
+        for (const int roadIndex : roadAdjacency[current]) {
+            const RoadSegment& road = roads[static_cast<std::size_t>(roadIndex)];
+            if (road.snowBlocked) {
+                continue;
+            }
+
+            const int next = (road.from == current) ? road.to : road.from;
+            if (!visited[static_cast<std::size_t>(next)]) {
+                visited[static_cast<std::size_t>(next)] = true;
+                pending.push(next);
+            }
+        }
+    }
+
+    return std::all_of(visited.begin(), visited.end(),
+                       [](bool reached) { return reached; });
+}
+
+bool CityThemeRenderer::hasSnowfall() const {
+    return isSnowWeather(season, weather);
+}
+
+bool CityThemeRenderer::hasWinterStormActive() const {
+    return isWinterStorm(season, weather);
+}
+
 float CityThemeRenderer::roadCost(const RoadSegment& road) const {
+    if (road.snowBlocked) {
+        return 1000000.0f;
+    }
     return road.baseLength * weatherDistanceMultiplier() +
            road.baseLength * road.congestion * kCongestionPenaltyScale +
            (road.incident ? road.baseLength * kIncidentPenaltyScale : 0.0f) +
@@ -2508,6 +2749,9 @@ float CityThemeRenderer::roadCost(const RoadSegment& road) const {
 }
 
 float CityThemeRenderer::roadTravelSpeedFactor(const RoadSegment& road) const {
+    if (road.snowBlocked) {
+        return 0.15f;
+    }
     if (road.incident || road.congestion >= 0.82f) {
         return 0.25f;
     }
@@ -2518,6 +2762,16 @@ float CityThemeRenderer::roadTravelSpeedFactor(const RoadSegment& road) const {
 }
 
 float CityThemeRenderer::weatherDistanceMultiplier() const {
+    if (season == CitySeason::Winter) {
+        switch (weather) {
+            case CityWeather::Sunny: return 1.04f;
+            case CityWeather::Cloudy: return 1.10f;
+            case CityWeather::Rainy: return 1.22f;
+            case CityWeather::Stormy: return 1.36f;
+            default: return 1.0f;
+        }
+    }
+
     switch (weather) {
         case CityWeather::Sunny: return 1.00f;
         case CityWeather::Cloudy: return 1.05f;
@@ -2528,6 +2782,10 @@ float CityThemeRenderer::weatherDistanceMultiplier() const {
 }
 
 float CityThemeRenderer::weatherOverlayStrength() const {
+    if (hasSnowfall()) {
+        return hasWinterStormActive() ? 0.24f : 0.18f;
+    }
+
     switch (weather) {
         case CityWeather::Cloudy: return 0.08f;
         case CityWeather::Rainy: return 0.14f;
@@ -2603,18 +2861,36 @@ void CityThemeRenderer::refreshDashboardInfo() {
 
     dashboardInfo.theme = EnvironmentTheme::City;
     dashboardInfo.themeLabel = "City";
-    dashboardInfo.weatherLabel = toDisplayString(weather);
-    dashboardInfo.subtitle = "District-planned urban map";
-    dashboardInfo.atmosphereLabel =
-        (weather == CityWeather::Sunny) ? "Satellite-lit mixed districts and boulevard flow"
-        : (weather == CityWeather::Cloudy) ? "Soft-density urban fabric under muted circulation"
-        : (weather == CityWeather::Rainy) ? "Wet-surface district logistics through parks and campus blocks"
-        : "Storm-loaded boulevard routing across dense landmark districts";
+    dashboardInfo.season = season;
+    dashboardInfo.seasonLabel = toDisplayString(season);
+    dashboardInfo.weatherLabel = toSeasonalWeatherString(season, weather);
+    dashboardInfo.subtitle =
+        std::string(toDisplayString(season)) + " district-planned urban map";
+
+    if (season == CitySeason::Summer) {
+        dashboardInfo.atmosphereLabel =
+            "Sakura-tinted park districts under warm boulevard circulation";
+    } else if (season == CitySeason::Autumn) {
+        dashboardInfo.atmosphereLabel =
+            "Amber park canopies and cooler cross-district routing pressure";
+    } else if (season == CitySeason::Winter && hasSnowfall()) {
+        dashboardInfo.atmosphereLabel =
+            hasWinterStormActive()
+                ? "Darkened winter grid with snow-blocked lanes and rerouted traffic"
+                : "Snowfall across the district grid with partial lane closures";
+    } else {
+        dashboardInfo.atmosphereLabel =
+            (weather == CityWeather::Sunny) ? "Satellite-lit mixed districts and boulevard flow"
+            : (weather == CityWeather::Cloudy) ? "Soft-density urban fabric under muted circulation"
+            : (weather == CityWeather::Rainy) ? "Wet-surface district logistics through parks and campus blocks"
+            : "Storm-loaded boulevard routing across dense landmark districts";
+    }
     dashboardInfo.congestionLevel = roads.empty()
         ? 0.0f
         : congestionSum / static_cast<float>(roads.size());
     dashboardInfo.incidentCount = incidentCount;
     dashboardInfo.supportsWeather = true;
+    dashboardInfo.supportsSeasons = true;
 }
 
 void CityThemeRenderer::drawRoutePath(IsometricRenderer& renderer,
@@ -2807,15 +3083,18 @@ void CityThemeRenderer::drawLandscapeFeature(IsometricRenderer& renderer,
             }};
             for (const PlaybackPoint& offset : offsets) {
                 const float sway = std::sin(animationTime * 1.3f + offset.x * 7.0f) * 0.45f * zf;
+                Color canopyBase(0.22f * pulse, 0.40f * pulse, 0.18f * pulse, 0.78f);
+                Color canopyAccent(0.38f * pulse, 0.58f * pulse, 0.24f * pulse, 0.22f);
+                applySeasonalTreeCanopy(season, hasSnowfall(), canopyBase, canopyAccent);
                 const TreePalette palette{
                     Color(0.02f, 0.04f, 0.02f, 0.16f),
                     Color(0.36f, 0.28f, 0.18f, 0.70f),
                     Color(0.26f, 0.20f, 0.12f, 0.72f),
                     Color(0.34f, 0.24f, 0.14f, 0.72f),
-                    Color(0.22f * pulse, 0.40f * pulse, 0.18f * pulse, 0.78f),
-                    Color(0.16f * pulse, 0.30f * pulse, 0.14f * pulse, 0.78f),
-                    Color(0.18f * pulse, 0.35f * pulse, 0.15f * pulse, 0.78f),
-                    Color(0.38f * pulse, 0.58f * pulse, 0.24f * pulse, 0.22f)
+                    canopyBase,
+                    scaleColor(biasColor(canopyBase, -0.06f, -0.04f, 0.00f), 0.84f),
+                    scaleColor(biasColor(canopyBase, -0.04f, -0.02f, -0.01f), 0.92f),
+                    canopyAccent
                 };
                 drawStylizedTree(renderer,
                                  feature.x + offset.x, feature.y + offset.y,
@@ -2958,6 +3237,24 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
     const float groundCenterY = iso.y + groundCenterOffset;
     const float shadowDepth = baseDepth * 0.52f;
     const float shadowScale = (building.visualTier == VisualTier::Focus) ? 1.12f : 1.04f;
+    if (season == CitySeason::Winter) {
+        const float snowBlend = hasSnowfall() ? 0.82f : 0.52f;
+        const Color snowGround = attenuateToZone(
+            mixColor(Color(0.20f, 0.22f, 0.25f, 0.30f),
+                     Color(0.92f, 0.94f, 0.98f, 0.84f),
+                     snowBlend),
+            zone,
+            voidTint,
+            0.32f,
+            0.04f,
+            0.10f);
+        renderer.drawDiamond(iso.x, groundCenterY + shadowDepth * 0.22f,
+                             baseWidth * 1.16f, baseDepth * 0.88f,
+                             snowGround);
+        renderer.drawDiamond(iso.x, groundCenterY + shadowDepth * 0.12f,
+                             baseWidth * 0.86f, baseDepth * 0.64f,
+                             withAlpha(scaleColor(snowGround, 1.04f), snowGround.a * 0.55f));
+    }
     renderer.drawDiamond(iso.x, groundCenterY + shadowDepth, baseWidth * shadowScale,
                          shadowDepth, shadowColor);
 
@@ -3300,6 +3597,25 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
     const float groundCenterY = iso.y + groundCenterOffset;
     const float shadowDepth = baseDepth * 0.52f;
 
+    if (season == CitySeason::Winter) {
+        const float snowBlend = hasSnowfall() ? 0.82f : 0.52f;
+        const Color snowGround = attenuateToZone(
+            mixColor(Color(0.20f, 0.22f, 0.25f, 0.30f),
+                     Color(0.92f, 0.94f, 0.98f, 0.84f),
+                     snowBlend),
+            zone,
+            voidTint,
+            0.32f,
+            0.04f,
+            0.10f);
+        renderer.drawDiamond(iso.x, groundCenterY + shadowDepth * 0.22f,
+                             baseWidth * 1.16f, baseDepth * 0.88f,
+                             snowGround);
+        renderer.drawDiamond(iso.x, groundCenterY + shadowDepth * 0.12f,
+                             baseWidth * 0.86f, baseDepth * 0.64f,
+                             withAlpha(scaleColor(snowGround, 1.04f), snowGround.a * 0.55f));
+    }
+
     // Shadow
     const float shadowScale = (p.category == CityAssets::BuildingCategory::Landmark) ? 1.14f : 1.06f;
     renderer.drawDiamond(iso.x, groundCenterY + shadowDepth, baseWidth * shadowScale,
@@ -3554,35 +3870,49 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
 
     switch (p.category) {
     case CityAssets::EnvironmentCategory::Park: {
+        Color parkPrimary = p.primary;
+        Color parkSecondary = p.secondary;
+        if (season == CitySeason::Winter) {
+            parkPrimary = mixColor(
+                parkPrimary,
+                Color(0.74f, 0.78f, 0.82f, parkPrimary.a),
+                hasSnowfall() ? 0.42f : 0.18f);
+            parkSecondary = mixColor(
+                parkSecondary,
+                Color(0.88f, 0.92f, 0.96f, parkSecondary.a),
+                hasSnowfall() ? 0.38f : 0.16f);
+        }
         // Green ground patch
         drawWorldQuadPatch(placed.worldX - halfW, placed.worldY - halfD,
                            placed.worldX + halfW, placed.worldY + halfD,
-                           attenuateToZone(p.primary, zone, voidTint, 0.08f, 0.18f));
+                           attenuateToZone(parkPrimary, zone, voidTint, 0.08f, 0.18f));
         // Inner accent
         drawWorldQuadPatch(placed.worldX - halfW * 0.5f, placed.worldY - halfD * 0.5f,
                            placed.worldX + halfW * 0.5f, placed.worldY + halfD * 0.5f,
-                           attenuateToZone(p.secondary, zone, voidTint, 0.10f, 0.18f));
+                           attenuateToZone(parkSecondary, zone, voidTint, 0.10f, 0.18f));
         // Dense tree planting with a packed spiral layout.
-        const int treeCount = std::max(8, p.featureCount * 5 + (p.hasCentralFeature ? 4 : 2));
+        const int treeCount =
+            std::max(72, p.featureCount * 18 + (p.hasCentralFeature ? 24 : 14));
         constexpr float kGoldenAngle = 2.39996323f;
-        const float minRadius = p.hasCentralFeature ? 0.34f : 0.12f;
-        const float maxRadius = p.hasCentralFeature ? 0.74f : 0.80f;
+        const float minRadius = p.hasCentralFeature ? 0.18f : 0.04f;
+        const float maxRadius = p.hasCentralFeature ? 0.96f : 0.98f;
         for (int t = 0; t < treeCount; ++t) {
             const float u = (static_cast<float>(t) + 0.5f) / static_cast<float>(treeCount);
-            float radial = minRadius + (maxRadius - minRadius) * std::sqrt(u);
-            radial = clamp01(radial + (static_cast<float>(t % 3) - 1.0f) * 0.035f);
+            float radial = minRadius + (maxRadius - minRadius) * std::pow(u, 0.78f);
+            radial = clamp01(radial + (static_cast<float>(t % 5) - 2.0f) * 0.018f);
             const float angle = kGoldenAngle * static_cast<float>(t) +
-                                (static_cast<float>(t % 4) - 1.5f) * 0.12f;
+                                (static_cast<float>(t % 7) - 3.0f) * 0.07f;
             const float tx = placed.worldX + std::cos(angle) * halfW * radial;
             const float ty = placed.worldY + std::sin(angle) * halfD * (radial * 0.92f + 0.04f);
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.6f + static_cast<float>(t));
             const float sway = std::sin(animationTime * 1.25f + static_cast<float>(t) * 0.72f) * 0.55f * zf;
-            const Color canopyBase = scaleColor(
-                mixColor(p.primary, Color(0.18f, 0.34f, 0.16f, p.primary.a), 0.55f),
+            Color canopyBase = scaleColor(
+                mixColor(parkPrimary, Color(0.18f, 0.34f, 0.16f, parkPrimary.a), 0.55f),
                 pulse);
-            const Color canopyAccent = scaleColor(
-                mixColor(p.secondary, Color(0.34f, 0.52f, 0.24f, p.secondary.a), 0.50f),
+            Color canopyAccent = scaleColor(
+                mixColor(parkSecondary, Color(0.34f, 0.52f, 0.24f, parkSecondary.a), 0.50f),
                 pulse * 1.04f);
+            applySeasonalTreeCanopy(season, hasSnowfall(), canopyBase, canopyAccent);
             drawStylizedTree(
                 renderer,
                 tx, ty,
@@ -3638,17 +3968,21 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
     }
 
     case CityAssets::EnvironmentCategory::TreeCluster: {
-        for (int t = 0; t < p.featureCount; ++t) {
-            const float angle = 6.28318f * static_cast<float>(t) / static_cast<float>(std::max(1, p.featureCount));
-            const float r = 0.3f + static_cast<float>(t % 3) * 0.2f;
+        const int treeCount = std::max(28, p.featureCount * 7 + 8);
+        constexpr float kGoldenAngle = 2.39996323f;
+        for (int t = 0; t < treeCount; ++t) {
+            const float u = (static_cast<float>(t) + 0.5f) / static_cast<float>(treeCount);
+            const float angle = kGoldenAngle * static_cast<float>(t);
+            const float r = 0.10f + 0.84f * std::pow(u, 0.82f);
             const float tx = placed.worldX + std::cos(angle) * halfW * r;
-            const float ty = placed.worldY + std::sin(angle) * halfD * r;
+            const float ty = placed.worldY + std::sin(angle) * halfD * (r * 0.92f + 0.04f);
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.4f + static_cast<float>(t) * 0.8f);
             const float sway = std::sin(animationTime * 1.18f + static_cast<float>(t) * 0.84f) * 0.48f * zf;
-            const Color canopyBase = scaleColor(p.primary, pulse);
-            const Color canopyAccent = scaleColor(
+            Color canopyBase = scaleColor(p.primary, pulse);
+            Color canopyAccent = scaleColor(
                 mixColor(p.primary, p.secondary, 0.42f),
                 pulse * 1.02f);
+            applySeasonalTreeCanopy(season, hasSnowfall(), canopyBase, canopyAccent);
             drawStylizedTree(
                 renderer,
                 tx, ty,
@@ -3662,16 +3996,18 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
     }
 
     case CityAssets::EnvironmentCategory::RoadsideTrees: {
-        for (int t = 0; t < p.featureCount; ++t) {
-            const float frac = (static_cast<float>(t) + 0.5f) / static_cast<float>(p.featureCount);
+        const int treeCount = std::max(10, p.featureCount * 3);
+        for (int t = 0; t < treeCount; ++t) {
+            const float frac = (static_cast<float>(t) + 0.5f) / static_cast<float>(treeCount);
             const float tx = placed.worldX - halfW + frac * halfW * 2.0f;
             const float ty = placed.worldY;
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.5f + static_cast<float>(t));
             const float sway = std::sin(animationTime * 1.22f + static_cast<float>(t) * 0.76f) * 0.36f * zf;
-            const Color canopyBase = scaleColor(p.primary, pulse);
-            const Color canopyAccent = scaleColor(
+            Color canopyBase = scaleColor(p.primary, pulse);
+            Color canopyAccent = scaleColor(
                 mixColor(p.primary, Color(0.38f, 0.58f, 0.28f, p.primary.a), 0.28f),
                 pulse * 1.01f);
+            applySeasonalTreeCanopy(season, hasSnowfall(), canopyBase, canopyAccent);
             drawStylizedTree(
                 renderer,
                 tx, ty,

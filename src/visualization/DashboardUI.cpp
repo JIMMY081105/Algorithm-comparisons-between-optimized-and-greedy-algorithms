@@ -31,6 +31,7 @@ const char* themeTooltip(EnvironmentTheme theme) {
 DashboardUI::DashboardUI()
     : selectedAlgorithm(0),
       selectedTheme(EnvironmentTheme::City),
+      selectedSeason(CitySeason::Spring),
       showComparisonTable(false),
       showEventLog(true),
       showNodeDetails(false) {}
@@ -53,9 +54,11 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
 
     UIActions actions;
     actions.selectedTheme = activeTheme;
+    actions.selectedSeason = environmentInfo.season;
     actions.layerToggles = layerToggles;
 
     selectedTheme = activeTheme;
+    selectedSeason = environmentInfo.season;
 
     drawHeaderPanel(system, environmentInfo, playState, hasMission);
     drawControlPanel(system, animCtrl, environmentInfo, actions);
@@ -101,12 +104,20 @@ void DashboardUI::drawHeaderPanel(const WasteSystem& system,
     ImGui::SetWindowFontScale(1.0f);
     ImGui::TextColored(ImVec4(0.64f, 0.78f, 0.84f, 1.0f),
                        "%s Operations", environmentInfo.themeLabel.c_str());
-    ImGui::TextColored(kTextSoft,
-                       "Day %d  |  Seed %u  |  %s",
-                       system.getDayNumber(), system.getCurrentSeed(),
-                       environmentInfo.supportsWeather
-                           ? environmentInfo.weatherLabel.c_str()
-                           : "Standard Conditions");
+    if (environmentInfo.supportsWeather && environmentInfo.supportsSeasons) {
+        ImGui::TextColored(kTextSoft,
+                           "Day %d  |  Seed %u  |  %s  |  %s",
+                           system.getDayNumber(), system.getCurrentSeed(),
+                           environmentInfo.seasonLabel.c_str(),
+                           environmentInfo.weatherLabel.c_str());
+    } else {
+        ImGui::TextColored(kTextSoft,
+                           "Day %d  |  Seed %u  |  %s",
+                           system.getDayNumber(), system.getCurrentSeed(),
+                           environmentInfo.supportsWeather
+                               ? environmentInfo.weatherLabel.c_str()
+                               : "Standard Conditions");
+    }
 
     ImGui::End();
 }
@@ -144,6 +155,19 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
     }
 
     if (environmentInfo.supportsWeather) {
+        if (environmentInfo.supportsSeasons && selectedTheme == EnvironmentTheme::City) {
+            ImGui::TextDisabled("Season");
+            static const char* seasonLabels[] = {"Spring", "Summer", "Autumn", "Winter"};
+            int seasonIndex = static_cast<int>(selectedSeason);
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::Combo("##season", &seasonIndex, seasonLabels,
+                             IM_ARRAYSIZE(seasonLabels))) {
+                selectedSeason = static_cast<CitySeason>(seasonIndex);
+                actions.changeSeason = true;
+                actions.selectedSeason = selectedSeason;
+            }
+        }
+
         ImGui::TextDisabled("Weather");
         ImGui::TextColored(brandColor(environmentInfo.theme), "%s",
                            environmentInfo.weatherLabel.c_str());
@@ -321,6 +345,10 @@ void DashboardUI::drawMetricsPanel(const RouteResult& currentResult,
         ImGui::SeparatorText("Environment");
         ImGui::TextColored(brandColor(environmentInfo.theme), "%s",
                            environmentInfo.atmosphereLabel.c_str());
+        if (environmentInfo.supportsSeasons) {
+            ImGui::TextColored(kTextSoft, "Season: %s",
+                               environmentInfo.seasonLabel.c_str());
+        }
         ImGui::TextColored(kTextSoft, "Weather: %s", environmentInfo.weatherLabel.c_str());
         ImGui::TextColored(kTextSoft, "Congestion: %.0f%%",
                            environmentInfo.congestionLevel * 100.0f);

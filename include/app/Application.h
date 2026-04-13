@@ -46,6 +46,7 @@ private:
     void handleZoomInput();
     void handleCollectedNode(int collectedNodeId);
     void handleThemeChange(EnvironmentTheme theme);
+    void handleCitySeasonChange(CitySeason season);
     void refreshCityWeather();
     void generateNewDay();
     void runSelectedAlgorithm(int algorithmIndex);

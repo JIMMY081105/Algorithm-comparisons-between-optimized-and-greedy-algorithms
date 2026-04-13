@@ -28,6 +28,7 @@ public:
     void rebuildScenes(const MapGraph& graph);
     bool setActiveTheme(EnvironmentTheme theme, MapGraph& graph);
     void applyActiveWeights(MapGraph& graph) const;
+    void setCitySeason(CitySeason season, MapGraph& graph);
     void randomizeCityTraffic(unsigned int seed, MapGraph& graph);
     void randomizeCityWeather(unsigned int seed, MapGraph& graph);
     void update(float deltaTime);

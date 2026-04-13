@@ -1,4 +1,5 @@
 #include "app/Application.h"
+#include "environment/SeasonProfile.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -358,6 +359,13 @@ void Application::handleThemeChange(EnvironmentTheme theme) {
         std::string("Environment switched to ") + toDisplayString(theme));
 }
 
+void Application::handleCitySeasonChange(CitySeason season) {
+    environmentController.setCitySeason(season, wasteSystem.getGraph());
+    resetMissionSession();
+    wasteSystem.getEventLog().addEvent(
+        std::string("City season set to ") + toDisplayString(season));
+}
+
 void Application::refreshCityWeather() {
     if (environmentController.getActiveTheme() != EnvironmentTheme::City) {
         return;
@@ -486,6 +494,10 @@ void Application::handleUIActions(const DashboardUI::UIActions& actions) {
 
     if (actions.changeTheme) {
         handleThemeChange(actions.selectedTheme);
+    }
+
+    if (actions.changeSeason) {
+        handleCitySeasonChange(actions.selectedSeason);
     }
 
     if (actions.randomizeWeather) {

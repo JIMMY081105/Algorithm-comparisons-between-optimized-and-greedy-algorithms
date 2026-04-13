@@ -481,7 +481,8 @@ float getClearingAmount(const MapGraph& graph, const Truck& truck,
 
 SeaThemeRenderer::SeaThemeRenderer()
     : dashboardInfo{EnvironmentTheme::Sea, "Sea", "Harbour command",
-                    "N/A", "Open-water transit and port logistics", 0.0f, 0, false},
+                    CitySeason::Spring, "N/A", "N/A",
+                    "Open-water transit and port logistics", 0.0f, 0, false, false},
       sceneSeed(0),
       currentGarbageSinkProgress(0.0f),
       boatCargoFillRatio(0.0f),

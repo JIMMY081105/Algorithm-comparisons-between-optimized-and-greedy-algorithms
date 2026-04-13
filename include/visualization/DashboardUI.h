@@ -20,17 +20,20 @@ public:
         bool exportResults = false;
         bool exportComparison = false;
         bool changeTheme = false;
+        bool changeSeason = false;
         bool randomizeWeather = false;
         bool layerTogglesChanged = false;
         int algorithmToRun = -1;
         bool playPause = false;
         EnvironmentTheme selectedTheme = EnvironmentTheme::Sea;
+        CitySeason selectedSeason = CitySeason::Spring;
         SceneLayerToggles layerToggles;
     };
 
 private:
     int selectedAlgorithm;
     EnvironmentTheme selectedTheme;
+    CitySeason selectedSeason;
     bool showComparisonTable;
     bool showEventLog;
     bool showNodeDetails;

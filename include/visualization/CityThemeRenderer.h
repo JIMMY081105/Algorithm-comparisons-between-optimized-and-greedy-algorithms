@@ -22,6 +22,8 @@ public:
     ThemeDashboardInfo getDashboardInfo() const override;
     void setLayerToggles(const SceneLayerToggles& toggles) override;
     bool supportsWeather() const override;
+    CitySeason getSeason() const;
+    void setSeason(CitySeason season);
     CityWeather getWeather() const override;
     void setWeather(CityWeather weather) override;
     void randomizeTrafficConditions(unsigned int seed);
@@ -123,6 +125,7 @@ private:
         float signalDelay = 0.0f;
         float focusWeight = 0.0f;
         bool arterial = false;
+        bool snowBlocked = false;
         VisualTier visualTier = VisualTier::Support;
     };
 
@@ -222,6 +225,7 @@ private:
     ThemeDashboardInfo dashboardInfo;
     SceneLayerToggles layerToggles;
     unsigned int layoutSeed;
+    CitySeason season;
     CityWeather weather;
     float trafficClock;
     int gridColumns;
@@ -291,9 +295,13 @@ private:
     void generatePeripheralScene(std::mt19937& rng);
     void generateAmbientCars(std::mt19937& rng);
     void applyTrafficConditions(std::mt19937& rng);
+    void refreshSeasonalRoadState();
     void refreshPairRoutes(const MapGraph& graph);
     std::vector<int> shortestPath(int startIntersection, int endIntersection) const;
 
+    bool isRoadNetworkConnected() const;
+    bool hasSnowfall() const;
+    bool hasWinterStormActive() const;
     float roadCost(const RoadSegment& road) const;
     float roadTravelSpeedFactor(const RoadSegment& road) const;
     float weatherDistanceMultiplier() const;

@@ -15,6 +15,13 @@ enum class CityWeather {
     Stormy = 3
 };
 
+enum class CitySeason {
+    Spring = 0,
+    Summer = 1,
+    Autumn = 2,
+    Winter = 3
+};
+
 struct SceneLayerToggles {
     bool showTraffic = true;
     bool showCongestion = true;
@@ -27,11 +34,14 @@ struct ThemeDashboardInfo {
     EnvironmentTheme theme = EnvironmentTheme::Sea;
     std::string themeLabel = "Sea";
     std::string subtitle = "Harbour operations";
+    CitySeason season = CitySeason::Spring;
+    std::string seasonLabel = "N/A";
     std::string weatherLabel = "N/A";
     std::string atmosphereLabel = "Steady marine conditions";
     float congestionLevel = 0.0f;
     int incidentCount = 0;
     bool supportsWeather = false;
+    bool supportsSeasons = false;
 };
 
 inline const char* toDisplayString(EnvironmentTheme theme) {
