@@ -125,7 +125,7 @@ ImVec4 playbackTint(AnimationController::PlaybackState playState,
 }
 
 void applyTheme(bool hasMission, bool missionRunning) {
-    applyTheme(EnvironmentTheme::Sea, hasMission, missionRunning);
+    applyTheme(EnvironmentTheme::City, hasMission, missionRunning);
 }
 
 void applyTheme(EnvironmentTheme theme, bool hasMission, bool missionRunning) {

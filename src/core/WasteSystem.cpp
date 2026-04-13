@@ -14,12 +14,12 @@ struct MapNodeDefinition {
     bool isHeadquarters;
 };
 
-constexpr float kDefaultCollectionThreshold = 30.0f;
+constexpr float kDefaultCollectionThreshold = 5.0f;
 constexpr float kDistanceScaleKmPerGridUnit = 1.5f;
 constexpr float kMinimumDailyWasteLevel = 5.0f;
 constexpr float kMaximumDailyWasteLevel = 100.0f;
 
-constexpr std::array<MapNodeDefinition, 10> kIndianOceanLocations{{
+constexpr std::array<MapNodeDefinition, 21> kIndianOceanLocations{{
     {0, "Command Anchorage",   11.50f, 11.25f,   0.0f, true},
     {1, "Lakshadweep Current",  3.20f,  1.80f, 500.0f, false},
     {2, "Andaman Passage",     20.80f,  3.10f, 300.0f, false},
@@ -30,6 +30,17 @@ constexpr std::array<MapNodeDefinition, 10> kIndianOceanLocations{{
     {7, "Bengal Gate",         12.20f,  0.90f, 350.0f, false},
     {8, "Sunda Channel",       26.80f,  8.30f, 380.0f, false},
     {9, "Monsoon Trench",       0.30f, 22.60f, 550.0f, false},
+    {10, "Java Gyre",          24.10f, 20.20f, 320.0f, false},
+    {11, "Sumatra Shelf",      18.60f, 17.40f, 360.0f, false},
+    {12, "Chagos Current",      7.80f,  6.40f, 340.0f, false},
+    {13, "Mascarene Wake",      4.40f, 14.90f, 310.0f, false},
+    {14, "Timor Stream",       25.10f, 12.60f, 330.0f, false},
+    {15, "Equator Sweep",      14.70f,  6.20f, 280.0f, false},
+    {16, "Reunion Spiral",      9.10f, 21.30f, 390.0f, false},
+    {17, "Arafura Link",       27.20f,  4.90f, 420.0f, false},
+    {18, "Bay Breaker",        17.90f, 10.60f, 300.0f, false},
+    {19, "Southern Drift",     13.80f, 23.60f, 440.0f, false},
+    {20, "Coral Arc",          28.40f, 17.10f, 360.0f, false},
 }};
 
 unsigned int makeTimeSeed() {

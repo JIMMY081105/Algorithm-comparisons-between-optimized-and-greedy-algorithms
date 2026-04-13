@@ -5,7 +5,7 @@
 #include <algorithm>
 
 namespace {
-constexpr float kBaseTravelUnitsPerSecond = 6.5f;
+constexpr float kBaseTravelUnitsPerSecond = 13.0f;
 constexpr float kDistanceEpsilon = 0.0001f;
 
 float segmentSpeedFactorFor(const PlaybackPath& path, std::size_t segmentIndex) {

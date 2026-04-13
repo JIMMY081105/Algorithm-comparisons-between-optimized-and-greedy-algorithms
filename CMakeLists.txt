@@ -117,6 +117,30 @@ target_link_libraries(SmartWasteClearance PRIVATE
     imgui
 )
 
+if(MINGW)
+    get_filename_component(MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    set(MINGW_RUNTIME_DLLS
+        "${MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
+        "${MINGW_BIN_DIR}/libstdc++-6.dll"
+        "${MINGW_BIN_DIR}/libwinpthread-1.dll"
+        "${MINGW_BIN_DIR}/glfw3.dll"
+    )
+
+    function(copy_mingw_runtime_dlls target_name)
+        foreach(runtime_dll IN LISTS MINGW_RUNTIME_DLLS)
+            if(EXISTS "${runtime_dll}")
+                add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${runtime_dll}"
+                    "$<TARGET_FILE_DIR:${target_name}>"
+                )
+            endif()
+        endforeach()
+    endfunction()
+
+    copy_mingw_runtime_dlls(SmartWasteClearance)
+endif()
+
 # On Windows, suppress the console window for Release builds
 if(WIN32)
     set_target_properties(SmartWasteClearance PROPERTIES
@@ -156,6 +180,10 @@ target_link_libraries(EnvironmentCoreTests PRIVATE
     OpenGL::GL
     glad
 )
+
+if(MINGW)
+    copy_mingw_runtime_dlls(EnvironmentCoreTests)
+endif()
 
 add_test(NAME EnvironmentCoreTests COMMAND EnvironmentCoreTests)
 

@@ -40,7 +40,7 @@ unsigned int stableVisualSeed(const MapGraph& graph) {
 EnvironmentController::EnvironmentController()
     : seaTheme(std::make_unique<SeaThemeRenderer>()),
       cityTheme(std::make_unique<CityThemeRenderer>()),
-      activeTheme(EnvironmentTheme::Sea),
+      activeTheme(EnvironmentTheme::City),
       transitionAlpha(0.0f) {}
 
 EnvironmentController::~EnvironmentController() = default;

@@ -26,9 +26,26 @@ constexpr unsigned int kNorthEdge = 1u;
 constexpr unsigned int kEastEdge = 2u;
 constexpr unsigned int kSouthEdge = 4u;
 constexpr unsigned int kWestEdge = 8u;
+float gZoneMinX = -1.0f;
+float gZoneMaxX = 1.0f;
+float gZoneMinY = -1.0f;
+float gZoneMaxY = 1.0f;
+float gZoneFalloffX = 4.0f;
+float gZoneFalloffY = 4.0f;
 
 float clamp01(float value) {
     return std::max(0.0f, std::min(1.0f, value));
+}
+
+float remap01(float value, float start, float end) {
+    if (std::abs(end - start) <= 0.0001f) {
+        return (value >= end) ? 1.0f : 0.0f;
+    }
+    return clamp01((value - start) / (end - start));
+}
+
+float smoothRange(float start, float end, float value) {
+    return RenderUtils::smoothstep(remap01(value, start, end));
 }
 
 float currentZoomFactor() {
@@ -62,6 +79,14 @@ Color biasColor(const Color& color, float redShift, float greenShift, float blue
                  color.a);
 }
 
+Color desaturateColor(const Color& color, float amount) {
+    const float grey =
+        color.r * 0.299f +
+        color.g * 0.587f +
+        color.b * 0.114f;
+    return mixColor(color, Color(grey, grey, grey, color.a), amount);
+}
+
 float pointDistance(float ax, float ay, float bx, float by) {
     const float dx = bx - ax;
     const float dy = by - ay;
@@ -77,6 +102,95 @@ float ellipseInfluence(float x, float y,
     const float dy = (y - centerY) / safeRadiusY;
     const float distance = std::sqrt(dx * dx + dy * dy);
     return 1.0f - RenderUtils::smoothstep(clamp01(distance));
+}
+
+float ellipseDistance(float x, float y,
+                      float centerX, float centerY,
+                      float radiusX, float radiusY) {
+    const float safeRadiusX = std::max(radiusX, 0.001f);
+    const float safeRadiusY = std::max(radiusY, 0.001f);
+    const float dx = (x - centerX) / safeRadiusX;
+    const float dy = (y - centerY) / safeRadiusY;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+void updateZoneBounds(float minX, float maxX, float minY, float maxY) {
+    const float spanX = std::max(1.0f, maxX - minX);
+    const float spanY = std::max(1.0f, maxY - minY);
+    const float padX = std::max(0.35f, spanX * 0.04f);
+    const float padY = std::max(0.30f, spanY * 0.04f);
+
+    gZoneMinX = minX - padX;
+    gZoneMaxX = maxX + padX;
+    gZoneMinY = minY - padY;
+    gZoneMaxY = maxY + padY;
+    gZoneFalloffX = std::max(2.8f, spanX * 0.40f);
+    gZoneFalloffY = std::max(2.4f, spanY * 0.40f);
+}
+
+struct ZoneVisibility {
+    float focus = 0.0f;
+    float transition = 0.0f;
+    float brightness = 0.0f;
+    float detail = 0.0f;
+    float roadVisibility = 0.0f;
+    float routeVisibility = 0.0f;
+    float voidness = 0.0f;
+};
+
+ZoneVisibility computeZoneVisibility(float x, float y,
+                                     float centerX, float centerY,
+                                     float radiusX, float radiusY) {
+    (void)centerX;
+    (void)centerY;
+    (void)radiusX;
+    (void)radiusY;
+
+    const float dx = (x < gZoneMinX) ? (gZoneMinX - x)
+                   : (x > gZoneMaxX) ? (x - gZoneMaxX)
+                                     : 0.0f;
+    const float dy = (y < gZoneMinY) ? (gZoneMinY - y)
+                   : (y > gZoneMaxY) ? (y - gZoneMaxY)
+                                     : 0.0f;
+
+    if (dx <= 0.0001f && dy <= 0.0001f) {
+        return ZoneVisibility{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f};
+    }
+
+    const float outside = std::sqrt(
+        (dx / std::max(gZoneFalloffX, 0.001f)) * (dx / std::max(gZoneFalloffX, 0.001f)) +
+        (dy / std::max(gZoneFalloffY, 0.001f)) * (dy / std::max(gZoneFalloffY, 0.001f)));
+    const float focus = 1.0f - smoothRange(0.0f, 0.38f, outside);
+    const float transition = 1.0f - smoothRange(0.0f, 1.0f, outside);
+    const float brightness = clamp01(transition * 0.86f + focus * 0.14f);
+    const float detail = clamp01(0.02f + transition * 0.78f + focus * 0.20f);
+    const float roadVisibility = clamp01(std::max(0.20f, 0.26f + transition * 0.74f));
+    const float routeVisibility = clamp01(std::max(0.62f, 0.66f + transition * 0.34f));
+
+    return ZoneVisibility{
+        focus,
+        transition,
+        brightness,
+        detail,
+        roadVisibility,
+        routeVisibility,
+        1.0f - transition
+    };
+}
+
+Color attenuateToZone(const Color& color,
+                      const ZoneVisibility& zone,
+                      const Color& voidTint,
+                      float minBrightness,
+                      float desaturationStrength,
+                      float minAlpha = 0.0f) {
+    Color toned = desaturateColor(
+        color,
+        clamp01((1.0f - zone.focus) * desaturationStrength + zone.voidness * 0.22f));
+    toned = scaleColor(toned, std::max(minBrightness, zone.brightness));
+    toned = mixColor(withAlpha(voidTint, toned.a), toned, zone.transition);
+    toned.a = clamp01(std::max(minAlpha, toned.a * (0.06f + 0.94f * zone.transition)));
+    return toned;
 }
 
 void appendDistinctPoint(std::vector<PlaybackPoint>& points, const PlaybackPoint& point) {
@@ -140,6 +254,32 @@ void drawGradientEllipse(float cx, float cy,
         const float py = cy + std::sin(angle) * radiusY;
         glColor4f(edgeColor.r, edgeColor.g, edgeColor.b, edgeColor.a);
         glVertex2f(px, py);
+    }
+    glEnd();
+}
+
+void drawGradientRingEllipse(float cx, float cy,
+                             float innerRadiusX, float innerRadiusY,
+                             float outerRadiusX, float outerRadiusY,
+                             const Color& innerColor,
+                             const Color& outerColor,
+                             int segments = 72) {
+    if (innerRadiusX <= 0.0f || innerRadiusY <= 0.0f ||
+        outerRadiusX <= innerRadiusX || outerRadiusY <= innerRadiusY) {
+        return;
+    }
+
+    glBegin(GL_TRIANGLE_STRIP);
+    for (int i = 0; i <= segments; ++i) {
+        const float angle = kTwoPi * static_cast<float>(i) / static_cast<float>(segments);
+        const float cosAngle = std::cos(angle);
+        const float sinAngle = std::sin(angle);
+
+        glColor4f(innerColor.r, innerColor.g, innerColor.b, innerColor.a);
+        glVertex2f(cx + cosAngle * innerRadiusX, cy + sinAngle * innerRadiusY);
+
+        glColor4f(outerColor.r, outerColor.g, outerColor.b, outerColor.a);
+        glVertex2f(cx + cosAngle * outerRadiusX, cy + sinAngle * outerRadiusY);
     }
     glEnd();
 }
@@ -489,6 +629,10 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
             break;
     }
 
+    skyTop = mixColor(skyTop, Color(0.02f, 0.02f, 0.03f, 1.0f), 0.88f);
+    skyBottom = mixColor(skyBottom, Color(0.00f, 0.00f, 0.00f, 1.0f), 0.96f);
+    groundBase = mixColor(groundBase, Color(0.01f, 0.01f, 0.01f, groundBase.a), 0.72f);
+
     glBegin(GL_QUADS);
     glColor4f(skyTop.r, skyTop.g, skyTop.b, skyTop.a);
     glVertex2f(left, top);
@@ -498,6 +642,7 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
     glVertex2f(left, bottom);
     glEnd();
 
+    groundBase = mixColor(groundBase, Color(0.03f, 0.04f, 0.07f, groundBase.a), 0.44f);
     drawWorldQuadPatch(peripheralMinX, peripheralMinY,
                        peripheralMaxX, peripheralMaxY,
                        groundBase);
@@ -515,11 +660,67 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
                         districtLift,
                         withAlpha(districtLift, 0.0f));
 
+    drawGradientEllipse(opIso.x, opIso.y + glowRadiusY * 0.20f,
+                        glowRadiusX * 1.78f, glowRadiusY * 1.46f,
+                        withAlpha(scaleColor(districtLift, 1.06f), 0.03f),
+                        withAlpha(districtLift, 0.0f));
+
+    auto blockHasMeaningfulContent = [&](const BlockZone& block) {
+        if (block.district == DistrictType::Park ||
+            block.district == DistrictType::Campus ||
+            block.district == DistrictType::Landmark ||
+            block.landmarkCluster ||
+            block.civicAnchor ||
+            block.parkAnchor) {
+            return true;
+        }
+
+        const float marginX = (block.maxX - block.minX) * 0.05f;
+        const float marginY = (block.maxY - block.minY) * 0.05f;
+        const auto contains = [&](float worldX, float worldY) {
+            return worldX >= block.minX - marginX &&
+                   worldX <= block.maxX + marginX &&
+                   worldY >= block.minY - marginY &&
+                   worldY <= block.maxY + marginY;
+        };
+
+        for (const auto& placed : presetBuildings) {
+            if (contains(placed.worldX, placed.worldY)) {
+                return true;
+            }
+        }
+        for (const auto& env : presetEnvironments) {
+            if (contains(env.worldX, env.worldY)) {
+                return true;
+            }
+        }
+        for (const auto& vehicle : presetVehicles) {
+            if (contains(vehicle.worldX, vehicle.worldY)) {
+                return true;
+            }
+        }
+        for (const auto& prop : presetRoadProps) {
+            if (contains(prop.worldX, prop.worldY)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     for (const BlockZone& block : blocks) {
         const float spanX = block.maxX - block.minX;
         const float spanY = block.maxY - block.minY;
         const float insetX = spanX * 0.05f;
         const float insetY = spanY * 0.06f;
+        const ZoneVisibility zone = computeZoneVisibility(
+            block.centerX, block.centerY,
+            operationalCenterX, operationalCenterY,
+            operationalRadiusX, operationalRadiusY);
+        const bool meaningful = blockHasMeaningfulContent(block);
+
+        if (zone.transition <= 0.03f && !meaningful) {
+            continue;
+        }
 
         Color patch(0.18f, 0.18f, 0.17f, 0.96f);
         Color curb(0.11f, 0.11f, 0.12f, 0.92f);
@@ -558,6 +759,22 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
                          (weather == CityWeather::Rainy || weather == CityWeather::Stormy)
                              ? 0.26f : 0.0f);
 
+        if (!meaningful &&
+            block.district != DistrictType::Park &&
+            block.district != DistrictType::Campus) {
+            patch = mixColor(patch, Color(0.03f, 0.05f, 0.08f, patch.a), 0.84f);
+            curb = mixColor(curb, Color(0.01f, 0.02f, 0.04f, curb.a), 0.82f);
+        }
+
+        patch = attenuateToZone(
+            patch, zone, Color(0.01f, 0.02f, 0.04f, patch.a),
+            meaningful ? 0.08f : 0.01f,
+            meaningful ? 0.28f : 0.52f);
+        curb = attenuateToZone(
+            curb, zone, Color(0.00f, 0.01f, 0.03f, curb.a),
+            meaningful ? 0.06f : 0.00f,
+            0.42f);
+
         drawWorldQuadPatch(block.minX + insetX * 0.36f, block.minY + insetY * 0.36f,
                            block.maxX - insetX * 0.36f, block.maxY - insetY * 0.36f,
                            curb);
@@ -565,12 +782,18 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
                            block.maxX - insetX, block.maxY - insetY,
                            patch);
 
-        if (block.visualTier == VisualTier::Focus || block.district == DistrictType::Landmark) {
+        if (meaningful &&
+            (block.visualTier == VisualTier::Focus || block.district == DistrictType::Landmark)) {
             drawWorldQuadPatch(block.centerX - spanX * 0.16f,
                                block.centerY - spanY * 0.16f,
                                block.centerX + spanX * 0.16f,
                                block.centerY + spanY * 0.16f,
-                               Color(0.32f, 0.36f, 0.42f, 0.12f));
+                               attenuateToZone(
+                                   Color(0.32f, 0.36f, 0.42f, 0.12f),
+                                   zone,
+                                   Color(0.01f, 0.02f, 0.04f, 0.12f),
+                                   0.06f,
+                                   0.18f));
         }
 
         if (block.district == DistrictType::Park || block.district == DistrictType::Campus) {
@@ -578,7 +801,12 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
                                block.centerY - spanY * 0.10f,
                                block.centerX + spanX * 0.10f,
                                block.centerY + spanY * 0.10f,
-                               Color(0.22f, 0.34f, 0.18f, 0.12f));
+                               attenuateToZone(
+                                   Color(0.22f, 0.34f, 0.18f, 0.12f),
+                                   zone,
+                                   Color(0.01f, 0.02f, 0.04f, 0.12f),
+                                   0.04f,
+                                   0.24f));
         }
     }
 }
@@ -598,6 +826,15 @@ void CityThemeRenderer::drawTransitNetwork(
         const Intersection& to = intersections[road.to];
         const IsoCoord isoFrom = RenderUtils::worldToIso(from.x, from.y);
         const IsoCoord isoTo = RenderUtils::worldToIso(to.x, to.y);
+        const float midWorldX = (from.x + to.x) * 0.5f;
+        const float midWorldY = (from.y + to.y) * 0.5f;
+        const ZoneVisibility zone = computeZoneVisibility(
+            midWorldX, midWorldY,
+            operationalCenterX, operationalCenterY,
+            operationalRadiusX, operationalRadiusY);
+        if (zone.transition <= 0.04f) {
+            continue;
+        }
         const float roadFocus = road.focusWeight;
         const float congestionPulse =
             0.60f + 0.40f * std::sin(animationTime * 3.0f + static_cast<float>(i));
@@ -632,6 +869,19 @@ void CityThemeRenderer::drawTransitNetwork(
             centerLine = mixColor(centerLine, Color(0.92f, 0.86f, 0.58f, centerLine.a), 0.36f);
         }
 
+        curbColor = attenuateToZone(
+            curbColor, zone, Color(0.00f, 0.01f, 0.03f, curbColor.a),
+            0.04f, 0.42f);
+        roadColor = attenuateToZone(
+            roadColor, zone, Color(0.01f, 0.02f, 0.05f, roadColor.a),
+            0.08f, 0.30f);
+        centerLine = attenuateToZone(
+            centerLine, zone, Color(0.00f, 0.00f, 0.00f, centerLine.a),
+            0.14f, 0.34f, 0.01f);
+        glow = attenuateToZone(
+            glow, zone, Color(0.00f, 0.00f, 0.00f, glow.a),
+            0.16f, 0.24f);
+
         const float curbWidth = 8.8f + roadFocus * 3.4f + (road.arterial ? 2.0f : 0.0f);
         const float asphaltWidth = 6.6f + roadFocus * 2.8f + (road.arterial ? 1.4f : 0.0f);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y, curbColor, curbWidth);
@@ -648,8 +898,13 @@ void CityThemeRenderer::drawTransitNetwork(
         const float midY = (isoFrom.y + isoTo.y) * 0.5f;
         renderer.drawDiamond(midX, midY, 1.8f + roadFocus * 1.8f,
                              0.8f + roadFocus * 0.7f,
-                             withAlpha(Color(0.88f, 0.84f, 0.62f, 1.0f),
-                                       0.05f + roadFocus * 0.08f));
+                             attenuateToZone(
+                                 withAlpha(Color(0.88f, 0.84f, 0.62f, 1.0f),
+                                           0.05f + roadFocus * 0.08f),
+                                 zone,
+                                 Color(0.00f, 0.00f, 0.00f, 0.08f),
+                                 0.12f,
+                                 0.24f));
     }
 
     for (const auto& placed : presetBuildings) {
@@ -665,20 +920,43 @@ void CityThemeRenderer::drawTransitNetwork(
 
             const Intersection& from = intersections[road.from];
             const Intersection& to = intersections[road.to];
+            const ZoneVisibility zone = computeZoneVisibility(
+                (from.x + to.x) * 0.5f, (from.y + to.y) * 0.5f,
+                operationalCenterX, operationalCenterY,
+                operationalRadiusX, operationalRadiusY);
+            if (zone.transition <= 0.10f) {
+                continue;
+            }
             const IsoCoord isoFrom = RenderUtils::worldToIso(from.x, from.y);
             const IsoCoord isoTo = RenderUtils::worldToIso(to.x, to.y);
             const float midX = (isoFrom.x + isoTo.x) * 0.5f;
             const float midY = (isoFrom.y + isoTo.y) * 0.5f;
             renderer.drawLine(midX - 4.0f, midY - 3.0f, midX + 4.0f, midY + 3.0f,
-                              Color(1.0f, 0.24f, 0.18f, 0.78f), 1.6f);
+                              attenuateToZone(
+                                  Color(1.0f, 0.24f, 0.18f, 0.78f),
+                                  zone,
+                                  Color(0.06f, 0.02f, 0.02f, 0.78f),
+                                  0.24f,
+                                  0.10f),
+                              1.6f);
             renderer.drawLine(midX - 4.0f, midY + 3.0f, midX + 4.0f, midY - 3.0f,
-                              Color(1.0f, 0.24f, 0.18f, 0.78f), 1.6f);
+                              attenuateToZone(
+                                  Color(1.0f, 0.24f, 0.18f, 0.78f),
+                                  zone,
+                                  Color(0.06f, 0.02f, 0.02f, 0.78f),
+                                  0.24f,
+                                  0.10f),
+                              1.6f);
         }
     }
 
     if (layerToggles.showTrafficLights) {
         for (const auto& intersection : intersections) {
-            if (intersection.hasTrafficLight) {
+            const ZoneVisibility zone = computeZoneVisibility(
+                intersection.x, intersection.y,
+                operationalCenterX, operationalCenterY,
+                operationalRadiusX, operationalRadiusY);
+            if (intersection.hasTrafficLight && zone.transition > 0.10f) {
                 drawTrafficLight(renderer, intersection, animationTime + trafficClock);
             }
         }
@@ -697,10 +975,22 @@ void CityThemeRenderer::drawTransitNetwork(
 
                 const WasteNode& node = graph.getNode(nodeIndex);
                 const Intersection& anchor = intersections[nodeAnchors[nodeIndex]];
+                const ZoneVisibility zone = computeZoneVisibility(
+                    (node.getWorldX() + anchor.x) * 0.5f,
+                    (node.getWorldY() + anchor.y) * 0.5f,
+                    operationalCenterX, operationalCenterY,
+                    operationalRadiusX, operationalRadiusY);
                 const IsoCoord nodeIso = RenderUtils::worldToIso(node.getWorldX(), node.getWorldY());
                 const IsoCoord anchorIso = RenderUtils::worldToIso(anchor.x, anchor.y);
                 renderer.drawLine(nodeIso.x, nodeIso.y, anchorIso.x, anchorIso.y,
-                                  Color(0.34f, 0.70f, 0.90f, 0.18f), 1.0f);
+                                  attenuateToZone(
+                                      Color(0.34f, 0.70f, 0.90f, 0.18f),
+                                      zone,
+                                      Color(0.00f, 0.00f, 0.00f, 0.18f),
+                                      0.28f,
+                                      0.18f,
+                                      0.06f),
+                                  1.0f);
             }
         }
     }
@@ -718,15 +1008,36 @@ void CityThemeRenderer::drawTransitNetwork(
             const float localOffset = clamp01(car.offset);
             const float worldX = RenderUtils::lerp(from.x, to.x, localOffset);
             const float worldY = RenderUtils::lerp(from.y, to.y, localOffset);
+            const ZoneVisibility zone = computeZoneVisibility(
+                worldX, worldY,
+                operationalCenterX, operationalCenterY,
+                operationalRadiusX, operationalRadiusY);
+            if (zone.transition <= 0.14f) {
+                continue;
+            }
             const IsoCoord iso = RenderUtils::worldToIso(worldX, worldY);
             const Color carColor = car.crashed
                 ? Color(0.88f, 0.22f, 0.18f, 0.85f)
                 : mixColor(Color(0.80f, 0.84f, 0.88f, 0.78f),
                            Color(0.96f, 0.96f, 0.98f, 0.86f),
                            road.focusWeight * 0.60f);
-            renderer.drawDiamond(iso.x, iso.y, 3.0f, 1.4f, carColor);
+            renderer.drawDiamond(iso.x, iso.y, 3.0f, 1.4f,
+                                 attenuateToZone(
+                                     carColor,
+                                     zone,
+                                     Color(0.01f, 0.02f, 0.04f, carColor.a),
+                                     0.22f,
+                                     0.18f,
+                                     0.08f));
             renderer.drawDiamondOutline(iso.x, iso.y, 3.0f, 1.4f,
-                                        Color(0.08f, 0.09f, 0.10f, 0.55f), 1.0f);
+                                        attenuateToZone(
+                                            Color(0.08f, 0.09f, 0.10f, 0.55f),
+                                            zone,
+                                            Color(0.00f, 0.00f, 0.00f, 0.55f),
+                                            0.20f,
+                                            0.12f,
+                                            0.04f),
+                                        1.0f);
         }
     }
 }
@@ -736,6 +1047,10 @@ void CityThemeRenderer::drawWasteNode(IsometricRenderer& renderer,
                                       float animationTime) {
     const IsoCoord iso = RenderUtils::worldToIso(node.getWorldX(), node.getWorldY());
     const float focus = computeOperationalFocus(node.getWorldX(), node.getWorldY());
+    const ZoneVisibility zone = computeZoneVisibility(
+        node.getWorldX(), node.getWorldY(),
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
     const Color urgency = RenderUtils::getUrgencyColor(node.getUrgency());
     const float pulse = 0.65f + 0.35f * std::sin(animationTime * 3.2f + node.getId());
     const Color padColor = node.isCollected()
@@ -746,16 +1061,41 @@ void CityThemeRenderer::drawWasteNode(IsometricRenderer& renderer,
     const Color blockColor = node.isCollected()
         ? Color(0.38f, 0.42f, 0.46f, 0.84f)
         : mixColor(Color(0.24f, 0.28f, 0.34f, 0.95f), urgency, 0.28f);
+    const Color attenuatedPad = attenuateToZone(
+        padColor, zone, Color(0.01f, 0.02f, 0.04f, padColor.a),
+        0.22f, 0.16f, 0.08f);
+    const Color attenuatedBlock = attenuateToZone(
+        blockColor, zone, Color(0.01f, 0.02f, 0.04f, blockColor.a),
+        0.26f, 0.12f, 0.10f);
+    const Color attenuatedUrgency = attenuateToZone(
+        Color(urgency.r, urgency.g, urgency.b,
+              node.isCollected() ? 0.18f : 0.22f + pulse * 0.16f),
+        zone,
+        Color(0.02f, 0.02f, 0.04f, 0.20f),
+        0.36f,
+        0.08f,
+        0.10f);
+    const Color attenuatedRing = attenuateToZone(
+        Color(urgency.r, urgency.g, urgency.b,
+              node.isCollected() ? 0.18f : 0.22f + pulse * 0.12f),
+        zone,
+        Color(0.02f, 0.02f, 0.04f, 0.18f),
+        0.34f,
+        0.08f,
+        0.08f);
 
-    renderer.drawDiamond(iso.x, iso.y + 9.0f, 11.0f, 5.5f, padColor);
+    renderer.drawDiamond(iso.x, iso.y + 9.0f, 11.0f, 5.5f, attenuatedPad);
     renderer.drawIsometricBlock(iso.x, iso.y + 4.0f, 12.0f, 8.0f, 10.0f,
-                                blockColor, Color(0.12f, 0.14f, 0.17f, 0.92f));
-    renderer.drawDiamond(iso.x, iso.y - 7.0f, 5.0f, 2.4f,
-                         Color(urgency.r, urgency.g, urgency.b,
-                               node.isCollected() ? 0.18f : 0.22f + pulse * 0.16f));
-    renderer.drawRing(iso.x, iso.y - 12.0f, 3.4f,
-                      Color(urgency.r, urgency.g, urgency.b,
-                            node.isCollected() ? 0.18f : 0.22f + pulse * 0.12f),
+                                attenuatedBlock,
+                                attenuateToZone(
+                                    Color(0.12f, 0.14f, 0.17f, 0.92f),
+                                    zone,
+                                    Color(0.01f, 0.02f, 0.04f, 0.92f),
+                                    0.22f,
+                                    0.16f,
+                                    0.08f));
+    renderer.drawDiamond(iso.x, iso.y - 7.0f, 5.0f, 2.4f, attenuatedUrgency);
+    renderer.drawRing(iso.x, iso.y - 12.0f, 3.4f, attenuatedRing,
                       1.2f);
 }
 
@@ -763,16 +1103,50 @@ void CityThemeRenderer::drawHQNode(IsometricRenderer& renderer,
                                    const WasteNode& node,
                                    float animationTime) {
     const IsoCoord iso = RenderUtils::worldToIso(node.getWorldX(), node.getWorldY());
+    const ZoneVisibility zone = computeZoneVisibility(
+        node.getWorldX(), node.getWorldY(),
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
     const float pulse = 0.5f + 0.5f * std::sin(animationTime * 2.2f);
     renderer.drawDiamond(iso.x, iso.y + 14.0f, 17.0f, 8.5f,
-                         Color(0.16f, 0.18f, 0.22f, 0.94f));
+                         attenuateToZone(
+                             Color(0.16f, 0.18f, 0.22f, 0.94f),
+                             zone,
+                             Color(0.01f, 0.02f, 0.04f, 0.94f),
+                             0.30f,
+                             0.12f,
+                             0.10f));
     renderer.drawIsometricBlock(iso.x, iso.y + 4.0f, 18.0f, 12.0f, 16.0f,
-                                Color(0.28f, 0.38f, 0.52f, 0.98f),
-                                Color(0.14f, 0.18f, 0.24f, 0.98f));
+                                attenuateToZone(
+                                    Color(0.28f, 0.38f, 0.52f, 0.98f),
+                                    zone,
+                                    Color(0.02f, 0.03f, 0.05f, 0.98f),
+                                    0.34f,
+                                    0.08f,
+                                    0.12f),
+                                attenuateToZone(
+                                    Color(0.14f, 0.18f, 0.24f, 0.98f),
+                                    zone,
+                                    Color(0.01f, 0.02f, 0.04f, 0.98f),
+                                    0.28f,
+                                    0.10f,
+                                    0.12f));
     renderer.drawDiamond(iso.x, iso.y - 16.0f, 8.0f, 3.6f,
-                         Color(0.74f, 0.86f, 0.96f, 0.20f + pulse * 0.12f));
+                         attenuateToZone(
+                             Color(0.74f, 0.86f, 0.96f, 0.20f + pulse * 0.12f),
+                             zone,
+                             Color(0.02f, 0.03f, 0.05f, 0.24f),
+                             0.46f,
+                             0.06f,
+                             0.10f));
     renderer.drawRing(iso.x, iso.y - 16.0f, 5.2f,
-                      Color(0.88f, 0.94f, 0.98f, 0.18f + pulse * 0.08f), 1.4f);
+                      attenuateToZone(
+                          Color(0.88f, 0.94f, 0.98f, 0.18f + pulse * 0.08f),
+                          zone,
+                          Color(0.02f, 0.03f, 0.05f, 0.20f),
+                          0.42f,
+                          0.06f,
+                          0.08f), 1.4f);
 }
 
 void CityThemeRenderer::drawTruck(IsometricRenderer& renderer,
@@ -782,6 +1156,10 @@ void CityThemeRenderer::drawTruck(IsometricRenderer& renderer,
                                   float animationTime) {
     const MissionPresentation* liveMission = ensureMission(mission);
     const IsoCoord iso = RenderUtils::worldToIso(truck.getPosX(), truck.getPosY());
+    const ZoneVisibility zone = computeZoneVisibility(
+        truck.getPosX(), truck.getPosY(),
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
 
     float dirX = 1.0f;
     float dirY = 0.0f;
@@ -809,14 +1187,38 @@ void CityThemeRenderer::drawTruck(IsometricRenderer& renderer,
 
     const float bob = std::sin(animationTime * 5.0f) * 0.6f;
     renderer.drawRing(iso.x, iso.y + bob, 7.0f,
-                      Color(0.22f, 0.90f, 1.0f, 0.20f), 1.5f);
+                      attenuateToZone(
+                          Color(0.22f, 0.90f, 1.0f, 0.20f),
+                          zone,
+                          Color(0.02f, 0.03f, 0.05f, 0.20f),
+                          0.48f,
+                          0.04f,
+                          0.10f), 1.5f);
     renderer.drawDiamond(iso.x, iso.y + bob, 5.0f, 2.4f,
-                         Color(0.96f, 0.74f, 0.18f, 0.96f));
+                         attenuateToZone(
+                             Color(0.96f, 0.74f, 0.18f, 0.96f),
+                             zone,
+                             Color(0.04f, 0.03f, 0.02f, 0.96f),
+                             0.62f,
+                             0.04f,
+                             0.16f));
     renderer.drawDiamondOutline(iso.x, iso.y + bob, 5.0f, 2.4f,
-                                Color(0.10f, 0.12f, 0.14f, 0.76f), 1.2f);
+                                attenuateToZone(
+                                    Color(0.10f, 0.12f, 0.14f, 0.76f),
+                                    zone,
+                                    Color(0.00f, 0.00f, 0.00f, 0.76f),
+                                    0.28f,
+                                    0.08f,
+                                    0.08f), 1.2f);
     renderer.drawLine(iso.x, iso.y + bob,
                       iso.x + dirX * 10.0f, iso.y - dirY * 5.0f + bob,
-                      Color(0.98f, 0.92f, 0.64f, 0.52f), 1.4f);
+                      attenuateToZone(
+                          Color(0.98f, 0.92f, 0.64f, 0.52f),
+                          zone,
+                          Color(0.04f, 0.03f, 0.02f, 0.52f),
+                          0.58f,
+                          0.04f,
+                          0.12f), 1.4f);
 }
 
 void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
@@ -825,14 +1227,40 @@ void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
     const float pulse = 0.5f + 0.5f * std::sin(animationTime * 1.4f);
 
     for (const AmbientStreet& street : ambientStreets) {
+        const ZoneVisibility zone = computeZoneVisibility(
+            (street.startX + street.endX) * 0.5f,
+            (street.startY + street.endY) * 0.5f,
+            operationalCenterX, operationalCenterY,
+            operationalRadiusX, operationalRadiusY);
+        if (zone.transition <= 0.08f) {
+            continue;
+        }
         const IsoCoord isoFrom = RenderUtils::worldToIso(street.startX, street.startY);
         const IsoCoord isoTo = RenderUtils::worldToIso(street.endX, street.endY);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.04f, 0.05f, 0.06f, 0.40f), street.width + 1.6f);
+                          attenuateToZone(
+                              Color(0.04f, 0.05f, 0.06f, 0.40f),
+                              zone,
+                              Color(0.00f, 0.01f, 0.03f, 0.40f),
+                              0.04f,
+                              0.40f),
+                          street.width + 1.6f);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.10f, 0.11f, 0.13f, 0.30f), street.width);
+                          attenuateToZone(
+                              Color(0.10f, 0.11f, 0.13f, 0.30f),
+                              zone,
+                              Color(0.00f, 0.01f, 0.03f, 0.30f),
+                              0.08f,
+                              0.34f),
+                          street.width);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.58f, 0.64f, 0.76f, street.glow * (0.45f + pulse * 0.25f)),
+                          attenuateToZone(
+                              Color(0.58f, 0.64f, 0.76f, street.glow * (0.45f + pulse * 0.25f)),
+                              zone,
+                              Color(0.01f, 0.02f, 0.04f, street.glow),
+                              0.18f,
+                              0.18f,
+                              0.04f),
                           1.2f);
     }
 
@@ -856,6 +1284,7 @@ void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
 void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
                                                const MapGraph&,
                                                float animationTime) {
+    (void)renderer;
     const float spanX = std::max(1.0f, peripheralMaxX - peripheralMinX);
     const float spanY = std::max(1.0f, peripheralMaxY - peripheralMinY);
 
@@ -866,10 +1295,24 @@ void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
                                 static_cast<float>(i) * 1.31f;
             const float worldX = peripheralMinX + std::fmod(phase * 1.4f + i * 3.7f, spanX);
             const float worldY = peripheralMinY + std::fmod(phase * 0.9f + i * 2.4f, spanY);
+            const ZoneVisibility zone = computeZoneVisibility(
+                worldX, worldY,
+                operationalCenterX, operationalCenterY,
+                operationalRadiusX, operationalRadiusY);
+            if (zone.transition <= 0.18f) {
+                continue;
+            }
             const IsoCoord iso = RenderUtils::worldToIso(worldX, worldY);
             renderer.drawLine(iso.x, iso.y - 10.0f, iso.x - 3.0f, iso.y + 6.0f,
-                              Color(0.82f, 0.88f, 0.98f,
-                                    weather == CityWeather::Stormy ? 0.24f : 0.18f),
+                              attenuateToZone(
+                                  Color(0.82f, 0.88f, 0.98f,
+                                        weather == CityWeather::Stormy ? 0.24f : 0.18f),
+                                  zone,
+                                  Color(0.02f, 0.03f, 0.05f,
+                                        weather == CityWeather::Stormy ? 0.24f : 0.18f),
+                                  0.18f,
+                                  0.12f,
+                                  0.04f),
                               1.0f);
         }
     }
@@ -882,7 +1325,7 @@ void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
     const float bottom = top + static_cast<float>(viewport[3]);
     const float midX = (left + right) * 0.5f;
     const float midY = (top + bottom) * 0.5f;
-    const float edgeAlpha = 0.10f + weatherOverlayStrength();
+    const float edgeAlpha = 0.01f + weatherOverlayStrength() * 0.04f;
 
     glBegin(GL_QUADS);
     glColor4f(0.02f, 0.03f, 0.05f, edgeAlpha);
@@ -919,17 +1362,37 @@ void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
     glVertex2f(midX, bottom);
     glEnd();
 
-    const IsoCoord opIso = RenderUtils::worldToIso(operationalCenterX, operationalCenterY);
-    const float halfW = RenderUtils::getProjection().tileWidth * 0.5f;
-    const float halfH = RenderUtils::getProjection().tileHeight * 0.5f;
-    const float vignetteRadiusX =
-        (operationalRadiusX + operationalRadiusY) * halfW * 1.60f;
-    const float vignetteRadiusY =
-        (operationalRadiusX + operationalRadiusY) * halfH * 1.12f;
-    drawGradientEllipse(opIso.x, opIso.y + vignetteRadiusY * 0.10f,
-                        vignetteRadiusX, vignetteRadiusY,
-                        Color(0.02f, 0.03f, 0.05f, 0.0f),
-                        Color(0.02f, 0.03f, 0.05f, 0.14f + weatherOverlayStrength()));
+    const float zoneCenterX = (gZoneMinX + gZoneMaxX) * 0.5f;
+    const float zoneCenterY = (gZoneMinY + gZoneMaxY) * 0.5f;
+    const IsoCoord zoneIso = RenderUtils::worldToIso(zoneCenterX, zoneCenterY);
+    const std::array<IsoCoord, 4> zoneCorners{{
+        RenderUtils::worldToIso(gZoneMinX, gZoneMinY),
+        RenderUtils::worldToIso(gZoneMaxX, gZoneMinY),
+        RenderUtils::worldToIso(gZoneMaxX, gZoneMaxY),
+        RenderUtils::worldToIso(gZoneMinX, gZoneMaxY)
+    }};
+
+    float clearRadiusX = 0.0f;
+    float clearRadiusY = 0.0f;
+    for (const IsoCoord& corner : zoneCorners) {
+        clearRadiusX = std::max(clearRadiusX, std::abs(corner.x - zoneIso.x));
+        clearRadiusY = std::max(clearRadiusY, std::abs(corner.y - zoneIso.y));
+    }
+    clearRadiusX += 22.0f;
+    clearRadiusY += 14.0f;
+
+    drawGradientRingEllipse(zoneIso.x, zoneIso.y,
+                            clearRadiusX, clearRadiusY,
+                            clearRadiusX * 1.26f, clearRadiusY * 1.22f,
+                            Color(0.00f, 0.00f, 0.00f, 0.0f),
+                            Color(0.00f, 0.00f, 0.00f,
+                                  0.18f + weatherOverlayStrength() * 0.16f));
+    drawGradientRingEllipse(zoneIso.x, zoneIso.y,
+                            clearRadiusX * 1.12f, clearRadiusY * 1.10f,
+                            clearRadiusX * 1.88f, clearRadiusY * 1.66f,
+                            Color(0.00f, 0.00f, 0.00f, 0.0f),
+                            Color(0.00f, 0.00f, 0.00f,
+                                  0.72f + weatherOverlayStrength() * 0.18f));
 }
 
 void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937& rng) {
@@ -1115,6 +1578,7 @@ void CityThemeRenderer::updateSceneFocus(const MapGraph& graph) {
     peripheralMaxX = sceneMaxX + kPeripheralBandX;
     peripheralMinY = sceneMinY - kPeripheralBandY;
     peripheralMaxY = sceneMaxY + kPeripheralBandY;
+    updateZoneBounds(sceneMinX, sceneMaxX, sceneMinY, sceneMaxY);
 
     for (auto& road : roads) {
         const Intersection& from = intersections[road.from];
@@ -2109,35 +2573,90 @@ void CityThemeRenderer::drawRoutePath(IsometricRenderer& renderer,
         }
 
         const PlaybackPoint& startPoint = path.points[i - 1];
+        const ZoneVisibility zone = computeZoneVisibility(
+            (startPoint.x + endX) * 0.5f,
+            (startPoint.y + endY) * 0.5f,
+            operationalCenterX, operationalCenterY,
+            operationalRadiusX, operationalRadiusY);
         const float focus = computeOperationalFocus((startPoint.x + endX) * 0.5f,
                                                     (startPoint.y + endY) * 0.5f);
         const IsoCoord isoFrom = RenderUtils::worldToIso(startPoint.x, startPoint.y);
         const IsoCoord isoTo = RenderUtils::worldToIso(endX, endY);
-        if (focus > 0.26f) {
+        if (focus > 0.20f) {
             renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                              Color(0.90f, 0.78f, 0.44f, 0.06f + focus * 0.08f),
+                              attenuateToZone(
+                                  Color(0.90f, 0.78f, 0.44f,
+                                        0.10f + zone.routeVisibility * 0.10f),
+                                  zone,
+                                  Color(0.08f, 0.05f, 0.02f, 0.14f),
+                                  0.44f,
+                                  0.04f,
+                                  0.10f),
                               10.0f + focus * 3.0f);
         }
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.06f, 0.08f, 0.10f, 0.40f + pulse * 0.08f), 9.2f);
+                          attenuateToZone(
+                              Color(0.06f, 0.08f, 0.10f, 0.22f + zone.routeVisibility * 0.18f),
+                              zone,
+                              Color(0.01f, 0.02f, 0.04f, 0.28f),
+                              0.26f,
+                              0.10f,
+                              0.10f), 9.2f);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.24f, 0.84f, 0.96f, 0.32f + pulse * 0.10f), 3.8f);
+                          attenuateToZone(
+                              Color(0.24f, 0.84f, 0.96f,
+                                    0.26f + zone.routeVisibility * 0.18f + pulse * 0.06f),
+                              zone,
+                              Color(0.02f, 0.03f, 0.05f, 0.30f),
+                              0.58f,
+                              0.04f,
+                              0.20f), 3.8f);
         renderer.drawLine(isoFrom.x, isoFrom.y, isoTo.x, isoTo.y,
-                          Color(0.94f, 0.98f, 1.0f, 0.18f + pulse * 0.08f), 1.2f);
+                          attenuateToZone(
+                              Color(0.94f, 0.98f, 1.0f,
+                                    0.12f + zone.routeVisibility * 0.12f + pulse * 0.04f),
+                              zone,
+                              Color(0.02f, 0.03f, 0.05f, 0.16f),
+                              0.66f,
+                              0.02f,
+                              0.12f), 1.2f);
     }
 
     for (const auto& stop : path.stops) {
+        const ZoneVisibility zone = computeZoneVisibility(
+            path.points[stop.pointIndex].x, path.points[stop.pointIndex].y,
+            operationalCenterX, operationalCenterY,
+            operationalRadiusX, operationalRadiusY);
         const float focus = computeOperationalFocus(path.points[stop.pointIndex].x,
                                                     path.points[stop.pointIndex].y);
         const IsoCoord iso = RenderUtils::worldToIso(path.points[stop.pointIndex].x,
                                                      path.points[stop.pointIndex].y);
         if (focus > 0.28f) {
             renderer.drawDiamond(iso.x, iso.y, 6.0f, 2.6f,
-                                 Color(0.92f, 0.80f, 0.46f, 0.08f + focus * 0.08f));
+                                 attenuateToZone(
+                                     Color(0.92f, 0.80f, 0.46f, 0.08f + focus * 0.08f),
+                                     zone,
+                                     Color(0.08f, 0.05f, 0.02f, 0.12f),
+                                     0.42f,
+                                     0.04f,
+                                     0.08f));
         }
-        renderer.drawDiamond(iso.x, iso.y, 4.5f, 2.0f, Color(0.70f, 0.94f, 1.0f, 0.18f));
+        renderer.drawDiamond(iso.x, iso.y, 4.5f, 2.0f,
+                             attenuateToZone(
+                                 Color(0.70f, 0.94f, 1.0f, 0.18f),
+                                 zone,
+                                 Color(0.02f, 0.03f, 0.05f, 0.18f),
+                                 0.54f,
+                                 0.04f,
+                                 0.10f));
         renderer.drawDiamondOutline(iso.x, iso.y, 3.0f, 1.4f,
-                                    Color(0.94f, 0.98f, 1.0f, 0.24f), 1.0f);
+                                    attenuateToZone(
+                                        Color(0.94f, 0.98f, 1.0f, 0.24f),
+                                        zone,
+                                        Color(0.02f, 0.03f, 0.05f, 0.24f),
+                                        0.64f,
+                                        0.02f,
+                                        0.12f), 1.0f);
     }
 }
 
@@ -2233,6 +2752,13 @@ void CityThemeRenderer::drawLandscapeFeature(IsometricRenderer& renderer,
 void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                                         const BuildingLot& building) const {
     const IsoCoord iso = RenderUtils::worldToIso(building.x, building.y);
+    const ZoneVisibility zone = computeZoneVisibility(
+        building.x, building.y,
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
+    if (zone.transition <= 0.08f) {
+        return;
+    }
     const float zf = currentZoomFactor();
 
     Color material(0.42f, 0.46f, 0.52f, 0.98f);
@@ -2292,6 +2818,38 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
         (0.06f + building.windowDensity * 0.12f) *
             (building.visualTier == VisualTier::Peripheral ? 0.72f : 1.0f));
 
+    const Color voidTint(0.01f, 0.02f, 0.04f, 1.0f);
+    const Color attenuatedRoof = attenuateToZone(
+        roof, zone, voidTint,
+        building.landmark ? 0.22f : 0.08f,
+        building.landmark ? 0.12f : 0.32f,
+        0.08f);
+    const Color attenuatedLeft = attenuateToZone(
+        leftSide, zone, voidTint,
+        building.landmark ? 0.18f : 0.06f,
+        0.38f,
+        0.08f);
+    const Color attenuatedRight = attenuateToZone(
+        rightSide, zone, voidTint,
+        building.landmark ? 0.20f : 0.08f,
+        0.34f,
+        0.08f);
+    const Color attenuatedOutline = attenuateToZone(
+        outline, zone, Color(0.00f, 0.00f, 0.00f, 1.0f),
+        0.20f,
+        0.26f,
+        0.03f);
+    const Color attenuatedWindow = attenuateToZone(
+        windowColor, zone, voidTint,
+        0.24f,
+        0.16f,
+        0.01f);
+    const Color shadowColor = attenuateToZone(
+        Color(0.02f, 0.02f, 0.03f, 0.24f), zone, Color(0.00f, 0.00f, 0.00f, 0.24f),
+        0.00f,
+        0.00f,
+        0.02f);
+
     const float baseWidth = std::max(4.0f * zf, building.width * 38.0f * zf);
     const float baseDepth = std::max(3.0f * zf, building.depth * 28.0f * zf);
     const float totalHeight = std::max(
@@ -2299,28 +2857,28 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
         building.height * (building.form == BuildingForm::TwinTower ? 1.46f : 1.32f) * zf);
     const float shadowScale = (building.visualTier == VisualTier::Focus) ? 1.12f : 1.04f;
     renderer.drawDiamond(iso.x, iso.y + 8.5f * zf, baseWidth * shadowScale,
-                         baseDepth * 0.54f, Color(0.02f, 0.02f, 0.03f, 0.24f));
+                         baseDepth * 0.54f, shadowColor);
 
     auto drawMass = [&](float offsetX, float offsetY,
                         float width, float depth, float height,
                         float windowScale) -> BlockFaces {
         const BlockFaces faces = makeBlockFaces(iso.x + offsetX, iso.y + offsetY,
                                                 width, depth, height);
-        drawBlockMass(faces, roof, leftSide, rightSide);
+        drawBlockMass(faces, attenuatedRoof, attenuatedLeft, attenuatedRight);
 
         const int bands = std::max(1, static_cast<int>(std::round(
             height / (5.4f * zf) * building.windowDensity * windowScale)));
         drawFaceBands(faces.left, bands,
-                      0.10f, withAlpha(windowColor, windowColor.a * building.occupancy * 0.82f),
+                      0.10f, withAlpha(attenuatedWindow, attenuatedWindow.a * building.occupancy * 0.82f),
                       0.8f * zf + 0.35f);
         drawFaceBands(faces.right, bands + (building.family == BuildingFamily::Commercial ? 1 : 0),
-                      0.12f, withAlpha(windowColor, windowColor.a * building.occupancy),
+                      0.12f, withAlpha(attenuatedWindow, attenuatedWindow.a * building.occupancy),
                       0.8f * zf + 0.35f);
-        drawOutlineLoop(faces.top, outline, std::max(0.8f, 0.85f * zf));
+        drawOutlineLoop(faces.top, attenuatedOutline, std::max(0.8f, 0.85f * zf));
         renderer.drawLine(faces.top[1].x, faces.top[1].y, faces.right[2].x, faces.right[2].y,
-                          outline, std::max(0.8f, 0.9f * zf));
+                          attenuatedOutline, std::max(0.8f, 0.9f * zf));
         renderer.drawLine(faces.top[3].x, faces.top[3].y, faces.left[2].x, faces.left[2].y,
-                          outline, std::max(0.8f, 0.9f * zf));
+                          attenuatedOutline, std::max(0.8f, 0.9f * zf));
         return faces;
     };
 
@@ -2351,7 +2909,13 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                 renderer.drawDiamond(faces.top[0].x,
                                      faces.top[0].y + depth * 0.48f,
                                      width * 0.12f, depth * 0.06f,
-                                     Color(0.94f, 0.74f, 0.40f, 0.10f));
+                                     attenuateToZone(
+                                         Color(0.94f, 0.74f, 0.40f, 0.10f),
+                                         zone,
+                                         Color(0.02f, 0.02f, 0.04f, 0.10f),
+                                         0.30f,
+                                         0.08f,
+                                         0.04f));
                 break;
             case RoofProfile::Crown:
                 drawMass(0.0f, offsetY,
@@ -2359,7 +2923,13 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                          std::max(2.0f * zf, height * 0.12f), windowScale * 0.40f);
                 renderer.drawLine(faces.top[0].x, faces.top[0].y,
                                   faces.top[0].x, faces.top[0].y - 7.0f * zf,
-                                  Color(0.82f, 0.88f, 0.96f, 0.18f), 1.0f);
+                                  attenuateToZone(
+                                      Color(0.82f, 0.88f, 0.96f, 0.18f),
+                                      zone,
+                                      Color(0.02f, 0.03f, 0.05f, 0.18f),
+                                      0.34f,
+                                      0.08f,
+                                      0.05f), 1.0f);
                 break;
             case RoofProfile::Spire:
                 drawMass(0.0f, offsetY,
@@ -2367,7 +2937,13 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
                          std::max(1.8f * zf, height * 0.10f), windowScale * 0.40f);
                 renderer.drawLine(faces.top[0].x, faces.top[0].y - 1.0f * zf,
                                   faces.top[0].x, faces.top[0].y - 12.0f * zf,
-                                  Color(0.90f, 0.96f, 1.0f, 0.28f), 1.2f);
+                                  attenuateToZone(
+                                      Color(0.90f, 0.96f, 1.0f, 0.28f),
+                                      zone,
+                                      Color(0.02f, 0.03f, 0.05f, 0.28f),
+                                      0.38f,
+                                      0.06f,
+                                      0.06f), 1.2f);
                 break;
         }
     };
@@ -2465,13 +3041,31 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
 
             renderer.drawLine(leftTower.top[0].x, leftTower.top[0].y - 1.0f * zf,
                               leftTower.top[0].x, leftTower.top[0].y - 14.0f * zf,
-                              Color(0.94f, 0.98f, 1.0f, 0.30f), 1.2f);
+                              attenuateToZone(
+                                  Color(0.94f, 0.98f, 1.0f, 0.30f),
+                                  zone,
+                                  Color(0.02f, 0.03f, 0.05f, 0.30f),
+                                  0.40f,
+                                  0.06f,
+                                  0.08f), 1.2f);
             renderer.drawLine(rightTower.top[0].x, rightTower.top[0].y - 1.0f * zf,
                               rightTower.top[0].x, rightTower.top[0].y - 13.0f * zf,
-                              Color(0.94f, 0.98f, 1.0f, 0.30f), 1.2f);
+                              attenuateToZone(
+                                  Color(0.94f, 0.98f, 1.0f, 0.30f),
+                                  zone,
+                                  Color(0.02f, 0.03f, 0.05f, 0.30f),
+                                  0.40f,
+                                  0.06f,
+                                  0.08f), 1.2f);
             renderer.drawDiamond(iso.x, iso.y - podiumHeight - towerH * 0.44f,
                                  baseWidth * 0.18f, baseDepth * 0.06f,
-                                 Color(0.82f, 0.90f, 0.98f, 0.10f));
+                                 attenuateToZone(
+                                     Color(0.82f, 0.90f, 0.98f, 0.10f),
+                                     zone,
+                                     Color(0.02f, 0.03f, 0.05f, 0.10f),
+                                     0.28f,
+                                     0.08f,
+                                     0.04f));
             break;
         }
 
@@ -2514,7 +3108,13 @@ void CityThemeRenderer::drawBuildingLot(IsometricRenderer& renderer,
     if (building.visualTier == VisualTier::Focus) {
         renderer.drawDiamond(iso.x, iso.y - totalHeight - 2.0f * zf,
                              baseWidth * 0.18f, baseDepth * 0.08f,
-                             Color(0.70f, 0.82f, 0.96f, 0.04f + building.edgeHighlight * 0.05f));
+                             attenuateToZone(
+                                 Color(0.70f, 0.82f, 0.96f, 0.04f + building.edgeHighlight * 0.05f),
+                                 zone,
+                                 Color(0.02f, 0.03f, 0.05f, 0.08f),
+                                 0.22f,
+                                 0.06f,
+                                 0.03f));
     }
 }
 
@@ -2526,6 +3126,13 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                                             const PlacedPresetBuilding& placed) const {
     const CityAssets::BuildingPreset& p = *placed.preset;
     const IsoCoord iso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
+    const ZoneVisibility zone = computeZoneVisibility(
+        placed.worldX, placed.worldY,
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
+    if (zone.transition <= 0.10f) {
+        return;
+    }
     const float zf = currentZoomFactor();
 
     // Compute authored dual-tone colors from preset
@@ -2550,6 +3157,38 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                  p.windowWarmth),
         0.06f + p.windowDensity * 0.12f);
 
+    const Color voidTint(0.01f, 0.02f, 0.04f, 1.0f);
+    const Color attenuatedRoof = attenuateToZone(
+        roof, zone, voidTint,
+        p.category == CityAssets::BuildingCategory::Landmark ? 0.22f : 0.08f,
+        p.category == CityAssets::BuildingCategory::Landmark ? 0.12f : 0.30f,
+        0.08f);
+    const Color attenuatedLeft = attenuateToZone(
+        leftSide, zone, voidTint,
+        p.category == CityAssets::BuildingCategory::Landmark ? 0.18f : 0.06f,
+        0.36f,
+        0.08f);
+    const Color attenuatedRight = attenuateToZone(
+        rightSide, zone, voidTint,
+        p.category == CityAssets::BuildingCategory::Landmark ? 0.20f : 0.08f,
+        0.32f,
+        0.08f);
+    const Color attenuatedOutline = attenuateToZone(
+        outline, zone, Color(0.00f, 0.00f, 0.00f, 1.0f),
+        0.20f,
+        0.24f,
+        0.03f);
+    const Color attenuatedWindow = attenuateToZone(
+        windowColor, zone, voidTint,
+        0.24f,
+        0.14f,
+        0.01f);
+    const Color shadowColor = attenuateToZone(
+        Color(0.02f, 0.02f, 0.03f, 0.24f), zone, Color(0.00f, 0.00f, 0.00f, 0.24f),
+        0.00f,
+        0.00f,
+        0.02f);
+
     const float baseWidth = std::max(4.0f * zf, p.width * 38.0f * zf);
     const float baseDepth = std::max(3.0f * zf, p.depth * 28.0f * zf);
     const float totalHeight = std::max(6.0f * zf,
@@ -2558,7 +3197,7 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
     // Shadow
     const float shadowScale = (p.category == CityAssets::BuildingCategory::Landmark) ? 1.14f : 1.06f;
     renderer.drawDiamond(iso.x, iso.y + 8.5f * zf, baseWidth * shadowScale,
-                         baseDepth * 0.54f, Color(0.02f, 0.02f, 0.03f, 0.24f));
+                         baseDepth * 0.54f, shadowColor);
 
     // Drawing helper
     auto drawMass = [&](float offsetX, float offsetY,
@@ -2566,22 +3205,22 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                         float windowScale) -> BlockFaces {
         const BlockFaces faces = makeBlockFaces(iso.x + offsetX, iso.y + offsetY,
                                                 w, d, h);
-        drawBlockMass(faces, roof, leftSide, rightSide);
+        drawBlockMass(faces, attenuatedRoof, attenuatedLeft, attenuatedRight);
 
         const int bands = std::max(1, static_cast<int>(std::round(
             h / (5.4f * zf) * p.windowDensity * windowScale)));
         drawFaceBands(faces.left, bands, 0.10f,
-                      withAlpha(windowColor, windowColor.a * 0.82f),
+                      withAlpha(attenuatedWindow, attenuatedWindow.a * 0.82f),
                       0.8f * zf + 0.35f);
         drawFaceBands(faces.right, bands, 0.12f,
-                      windowColor, 0.8f * zf + 0.35f);
-        drawOutlineLoop(faces.top, outline, std::max(0.8f, 0.85f * zf));
+                      attenuatedWindow, 0.8f * zf + 0.35f);
+        drawOutlineLoop(faces.top, attenuatedOutline, std::max(0.8f, 0.85f * zf));
         renderer.drawLine(faces.top[1].x, faces.top[1].y,
                           faces.right[2].x, faces.right[2].y,
-                          outline, std::max(0.8f, 0.9f * zf));
+                          attenuatedOutline, std::max(0.8f, 0.9f * zf));
         renderer.drawLine(faces.top[3].x, faces.top[3].y,
                           faces.left[2].x, faces.left[2].y,
-                          outline, std::max(0.8f, 0.9f * zf));
+                          attenuatedOutline, std::max(0.8f, 0.9f * zf));
         return faces;
     };
 
@@ -2632,15 +3271,33 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
         // Spires
         renderer.drawLine(leftTower.top[0].x, leftTower.top[0].y - 1.0f * zf,
                           leftTower.top[0].x, leftTower.top[0].y - 18.0f * zf,
-                          Color(0.94f, 0.98f, 1.0f, 0.34f), 1.4f);
+                          attenuateToZone(
+                              Color(0.94f, 0.98f, 1.0f, 0.34f),
+                              zone,
+                              Color(0.02f, 0.03f, 0.05f, 0.34f),
+                              0.40f,
+                              0.06f,
+                              0.08f), 1.4f);
         renderer.drawLine(rightTower.top[0].x, rightTower.top[0].y - 1.0f * zf,
                           rightTower.top[0].x, rightTower.top[0].y - 17.0f * zf,
-                          Color(0.94f, 0.98f, 1.0f, 0.34f), 1.4f);
+                          attenuateToZone(
+                              Color(0.94f, 0.98f, 1.0f, 0.34f),
+                              zone,
+                              Color(0.02f, 0.03f, 0.05f, 0.34f),
+                              0.40f,
+                              0.06f,
+                              0.08f), 1.4f);
 
         // Glow halo at top
         renderer.drawDiamond(iso.x, iso.y - podiumHeight - towerH * 0.44f,
                              baseWidth * 0.20f, baseDepth * 0.08f,
-                             Color(0.84f, 0.92f, 0.98f, 0.12f));
+                             attenuateToZone(
+                                 Color(0.84f, 0.92f, 0.98f, 0.12f),
+                                 zone,
+                                 Color(0.02f, 0.03f, 0.05f, 0.12f),
+                                 0.28f,
+                                 0.08f,
+                                 0.04f));
     } else {
         // === STANDARD BUILDING FORM ===
         // Podium base
@@ -2670,7 +3327,13 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                          std::max(2.0f * zf, mainHeight * 0.12f), 0.40f);
                 renderer.drawLine(mainFaces.top[0].x, mainFaces.top[0].y,
                                   mainFaces.top[0].x, mainFaces.top[0].y - 7.0f * zf,
-                                  Color(0.82f, 0.88f, 0.96f, 0.20f), 1.0f);
+                                  attenuateToZone(
+                                      Color(0.82f, 0.88f, 0.96f, 0.20f),
+                                      zone,
+                                      Color(0.02f, 0.03f, 0.05f, 0.20f),
+                                      0.34f,
+                                      0.08f,
+                                      0.05f), 1.0f);
                 break;
             case CityAssets::RoofStyle::Spire:
                 drawMass(0.0f, -podiumHeight - mainHeight,
@@ -2678,7 +3341,13 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                          std::max(1.8f * zf, mainHeight * 0.10f), 0.40f);
                 renderer.drawLine(mainFaces.top[0].x, mainFaces.top[0].y - 1.0f * zf,
                                   mainFaces.top[0].x, mainFaces.top[0].y - 14.0f * zf,
-                                  Color(0.90f, 0.96f, 1.0f, 0.30f), 1.2f);
+                                  attenuateToZone(
+                                      Color(0.90f, 0.96f, 1.0f, 0.30f),
+                                      zone,
+                                      Color(0.02f, 0.03f, 0.05f, 0.30f),
+                                      0.38f,
+                                      0.06f,
+                                      0.06f), 1.2f);
                 break;
         }
     }
@@ -2688,7 +3357,13 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
         p.category == CityAssets::BuildingCategory::OfficeTower) {
         renderer.drawDiamond(iso.x, iso.y - totalHeight - 2.0f * zf,
                              baseWidth * 0.18f, baseDepth * 0.08f,
-                             Color(0.70f, 0.82f, 0.96f, 0.04f));
+                             attenuateToZone(
+                                 Color(0.70f, 0.82f, 0.96f, 0.04f),
+                                 zone,
+                                 Color(0.02f, 0.03f, 0.05f, 0.08f),
+                                 0.22f,
+                                 0.06f,
+                                 0.03f));
     }
 }
 
@@ -2696,20 +3371,28 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
                                                const PlacedEnvironment& placed,
                                                float animationTime) const {
     const CityAssets::EnvironmentPreset& p = *placed.preset;
+    const ZoneVisibility zone = computeZoneVisibility(
+        placed.worldX, placed.worldY,
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
+    if (zone.transition <= 0.08f) {
+        return;
+    }
     const float zf = currentZoomFactor();
     const float halfW = placed.spanX * 0.5f;
     const float halfD = placed.spanY * 0.5f;
+    const Color voidTint(0.01f, 0.02f, 0.04f, 1.0f);
 
     switch (p.category) {
     case CityAssets::EnvironmentCategory::Park: {
         // Green ground patch
         drawWorldQuadPatch(placed.worldX - halfW, placed.worldY - halfD,
                            placed.worldX + halfW, placed.worldY + halfD,
-                           p.primary);
+                           attenuateToZone(p.primary, zone, voidTint, 0.08f, 0.18f));
         // Inner accent
         drawWorldQuadPatch(placed.worldX - halfW * 0.5f, placed.worldY - halfD * 0.5f,
                            placed.worldX + halfW * 0.5f, placed.worldY + halfD * 0.5f,
-                           p.secondary);
+                           attenuateToZone(p.secondary, zone, voidTint, 0.10f, 0.18f));
         // Tree clusters
         for (int t = 0; t < p.featureCount; ++t) {
             const float angle = 6.28318f * static_cast<float>(t) / static_cast<float>(std::max(1, p.featureCount));
@@ -2719,11 +3402,23 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.6f + static_cast<float>(t));
             renderer.drawFilledCircle(treeIso.x, treeIso.y + 4.0f * zf,
                                       (4.0f + static_cast<float>(t % 2) * 1.4f) * zf,
-                                      Color(0.18f * pulse, 0.34f * pulse,
-                                            0.16f * pulse, 0.76f));
+                                      attenuateToZone(
+                                          Color(0.18f * pulse, 0.34f * pulse,
+                                                0.16f * pulse, 0.76f),
+                                          zone,
+                                          voidTint,
+                                          0.14f,
+                                          0.14f,
+                                          0.06f));
             renderer.drawLine(treeIso.x, treeIso.y + 4.0f * zf,
                               treeIso.x, treeIso.y - 2.0f * zf,
-                              Color(0.30f, 0.22f, 0.14f, 0.46f), 1.0f);
+                              attenuateToZone(
+                                  Color(0.30f, 0.22f, 0.14f, 0.46f),
+                                  zone,
+                                  voidTint,
+                                  0.12f,
+                                  0.20f,
+                                  0.04f), 1.0f);
         }
         // Central pond/fountain
         if (p.hasCentralFeature) {
@@ -2732,7 +3427,8 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
                 Color(0.08f, 0.34f, 0.48f, 0.58f),
                 Color(0.12f, 0.48f, 0.62f, 0.62f),
                 0.5f + 0.5f * std::sin(animationTime * 0.9f));
-            renderer.drawDiamond(cIso.x, cIso.y, halfW * 16.0f * zf, halfD * 8.0f * zf, water);
+            renderer.drawDiamond(cIso.x, cIso.y, halfW * 16.0f * zf, halfD * 8.0f * zf,
+                                 attenuateToZone(water, zone, voidTint, 0.18f, 0.08f, 0.06f));
         }
         break;
     }
@@ -2740,7 +3436,7 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
     case CityAssets::EnvironmentCategory::Plaza: {
         drawWorldQuadPatch(placed.worldX - halfW, placed.worldY - halfD,
                            placed.worldX + halfW, placed.worldY + halfD,
-                           p.primary);
+                           attenuateToZone(p.primary, zone, voidTint, 0.08f, 0.24f));
         if (p.hasBorder) {
             const IsoCoord corners[] = {
                 RenderUtils::worldToIso(placed.worldX - halfW, placed.worldY - halfD),
@@ -2752,13 +3448,19 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
                 const int next = (e + 1) % 4;
                 renderer.drawLine(corners[e].x, corners[e].y,
                                   corners[next].x, corners[next].y,
-                                  Color(0.72f, 0.74f, 0.78f, 0.22f), 1.0f);
+                                  attenuateToZone(
+                                      Color(0.72f, 0.74f, 0.78f, 0.22f),
+                                      zone,
+                                      voidTint,
+                                      0.16f,
+                                      0.20f,
+                                      0.04f), 1.0f);
             }
         }
         if (p.hasCentralFeature) {
             const IsoCoord cIso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
             renderer.drawDiamond(cIso.x, cIso.y, halfW * 10.0f * zf, halfD * 5.0f * zf,
-                                 p.secondary);
+                                 attenuateToZone(p.secondary, zone, voidTint, 0.12f, 0.18f, 0.04f));
         }
         break;
     }
@@ -2773,11 +3475,23 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.4f + static_cast<float>(t) * 0.8f);
             const float rad = (3.6f + static_cast<float>(t % 3) * 1.8f) * zf;
             renderer.drawFilledCircle(treeIso.x, treeIso.y + 4.0f * zf, rad,
-                                      Color(p.primary.r * pulse, p.primary.g * pulse,
-                                            p.primary.b * pulse, p.primary.a));
+                                      attenuateToZone(
+                                          Color(p.primary.r * pulse, p.primary.g * pulse,
+                                                p.primary.b * pulse, p.primary.a),
+                                          zone,
+                                          voidTint,
+                                          0.14f,
+                                          0.14f,
+                                          0.06f));
             renderer.drawLine(treeIso.x, treeIso.y + 4.0f * zf,
                               treeIso.x, treeIso.y - 2.0f * zf,
-                              Color(0.30f, 0.22f, 0.14f, 0.40f), 1.0f);
+                              attenuateToZone(
+                                  Color(0.30f, 0.22f, 0.14f, 0.40f),
+                                  zone,
+                                  voidTint,
+                                  0.12f,
+                                  0.20f,
+                                  0.04f), 1.0f);
         }
         break;
     }
@@ -2791,11 +3505,23 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
             const float pulse = 0.94f + 0.06f * std::sin(animationTime * 1.5f + static_cast<float>(t));
             renderer.drawFilledCircle(treeIso.x, treeIso.y + 3.5f * zf,
                                       (3.2f + static_cast<float>(t % 2) * 0.8f) * zf,
-                                      Color(p.primary.r * pulse, p.primary.g * pulse,
-                                            p.primary.b * pulse, p.primary.a));
+                                      attenuateToZone(
+                                          Color(p.primary.r * pulse, p.primary.g * pulse,
+                                                p.primary.b * pulse, p.primary.a),
+                                          zone,
+                                          voidTint,
+                                          0.14f,
+                                          0.14f,
+                                          0.06f));
             renderer.drawLine(treeIso.x, treeIso.y + 3.5f * zf,
                               treeIso.x, treeIso.y - 2.0f * zf,
-                              Color(0.30f, 0.22f, 0.14f, 0.42f), 1.0f);
+                              attenuateToZone(
+                                  Color(0.30f, 0.22f, 0.14f, 0.42f),
+                                  zone,
+                                  voidTint,
+                                  0.12f,
+                                  0.20f,
+                                  0.04f), 1.0f);
         }
         break;
     }
@@ -2805,16 +3531,35 @@ void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
 void CityThemeRenderer::drawPresetVehicle(IsometricRenderer& renderer,
                                            const PlacedVehicle& placed) const {
     const CityAssets::VehiclePreset& v = *placed.preset;
+    const ZoneVisibility zone = computeZoneVisibility(
+        placed.worldX, placed.worldY,
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
+    if (zone.transition <= 0.12f) {
+        return;
+    }
     const IsoCoord iso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
-    renderer.drawDiamond(iso.x, iso.y, v.length, v.width, v.body);
-    renderer.drawDiamondOutline(iso.x, iso.y, v.length, v.width, v.outline, 1.0f);
+    renderer.drawDiamond(iso.x, iso.y, v.length, v.width,
+                         attenuateToZone(
+                             v.body, zone, Color(0.01f, 0.02f, 0.04f, v.body.a),
+                             0.24f, 0.16f, 0.08f));
+    renderer.drawDiamondOutline(iso.x, iso.y, v.length, v.width,
+                                attenuateToZone(
+                                    v.outline, zone, Color(0.00f, 0.00f, 0.00f, v.outline.a),
+                                    0.18f, 0.08f, 0.04f), 1.0f);
 
     // Windshield highlight for sedans and vans
     if (v.category == CityAssets::VehicleCategory::Sedan ||
         v.category == CityAssets::VehicleCategory::Van) {
         renderer.drawDiamond(iso.x, iso.y - v.width * 0.15f,
                              v.length * 0.35f, v.width * 0.45f,
-                             Color(0.58f, 0.68f, 0.82f, 0.28f));
+                             attenuateToZone(
+                                 Color(0.58f, 0.68f, 0.82f, 0.28f),
+                                 zone,
+                                 Color(0.02f, 0.03f, 0.05f, 0.28f),
+                                 0.24f,
+                                 0.08f,
+                                 0.06f));
     }
 }
 
@@ -2822,6 +3567,13 @@ void CityThemeRenderer::drawPresetRoadProp(IsometricRenderer& renderer,
                                             const PlacedRoadProp& placed,
                                             float animationTime) const {
     const CityAssets::RoadPropPreset& rp = *placed.preset;
+    const ZoneVisibility zone = computeZoneVisibility(
+        placed.worldX, placed.worldY,
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
+    if (zone.transition <= 0.12f) {
+        return;
+    }
     const IsoCoord iso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
     const float zf = currentZoomFactor();
 
@@ -2829,34 +3581,64 @@ void CityThemeRenderer::drawPresetRoadProp(IsometricRenderer& renderer,
     case CityAssets::RoadPropCategory::TrafficLight: {
         // Pole
         renderer.drawLine(iso.x, iso.y + 6.0f, iso.x, iso.y - rp.height * 0.6f * zf,
-                          rp.poleColor, 1.2f);
+                          attenuateToZone(
+                              rp.poleColor, zone, Color(0.01f, 0.02f, 0.04f, rp.poleColor.a),
+                              0.16f, 0.18f, 0.05f), 1.2f);
         // Housing
         renderer.drawDiamond(iso.x, iso.y - rp.height * 0.7f * zf,
                              2.8f, 1.6f,
-                             Color(0.08f, 0.08f, 0.10f, 0.94f));
+                             attenuateToZone(
+                                 Color(0.08f, 0.08f, 0.10f, 0.94f),
+                                 zone,
+                                 Color(0.00f, 0.00f, 0.00f, 0.94f),
+                                 0.12f,
+                                 0.12f,
+                                 0.06f));
         // Signal lights
         const float phase = std::fmod(animationTime + placed.worldX * 0.7f, 6.0f);
         const bool green = phase < 2.8f;
         renderer.drawFilledCircle(iso.x - 0.9f, iso.y - rp.height * 0.7f * zf, 0.9f,
-                                  green ? Color(0.26f, 0.26f, 0.28f, 0.62f) : rp.signalRed);
+                                  attenuateToZone(
+                                      green ? Color(0.26f, 0.26f, 0.28f, 0.62f) : rp.signalRed,
+                                      zone,
+                                      Color(0.02f, 0.02f, 0.04f, 0.62f),
+                                      0.18f,
+                                      0.08f,
+                                      0.06f));
         renderer.drawFilledCircle(iso.x + 0.9f, iso.y - rp.height * 0.7f * zf, 0.9f,
-                                  green ? rp.lightColor : Color(0.26f, 0.26f, 0.28f, 0.62f));
+                                  attenuateToZone(
+                                      green ? rp.lightColor : Color(0.26f, 0.26f, 0.28f, 0.62f),
+                                      zone,
+                                      Color(0.02f, 0.02f, 0.04f, 0.62f),
+                                      0.20f,
+                                      0.08f,
+                                      0.06f));
         break;
     }
 
     case CityAssets::RoadPropCategory::Streetlight: {
         renderer.drawLine(iso.x, iso.y + 4.0f, iso.x, iso.y - rp.height * 0.6f * zf,
-                          rp.poleColor, 1.0f);
+                          attenuateToZone(
+                              rp.poleColor, zone, Color(0.01f, 0.02f, 0.04f, rp.poleColor.a),
+                              0.16f, 0.18f, 0.05f), 1.0f);
         // Lamp glow
         const float pulse = 0.7f + 0.3f * std::sin(animationTime * 1.2f + placed.worldX);
         renderer.drawFilledCircle(iso.x, iso.y - rp.height * 0.6f * zf, 2.0f * zf,
-                                  withAlpha(rp.lightColor, rp.lightColor.a * pulse));
+                                  attenuateToZone(
+                                      withAlpha(rp.lightColor, rp.lightColor.a * pulse),
+                                      zone,
+                                      Color(0.02f, 0.03f, 0.05f, rp.lightColor.a),
+                                      0.26f,
+                                      0.08f,
+                                      0.06f));
         break;
     }
 
     case CityAssets::RoadPropCategory::Divider: {
         renderer.drawDiamond(iso.x, iso.y, rp.width * zf, rp.height * 0.3f * zf,
-                             rp.poleColor);
+                             attenuateToZone(
+                                 rp.poleColor, zone, Color(0.01f, 0.02f, 0.04f, rp.poleColor.a),
+                                 0.14f, 0.18f, 0.05f));
         break;
     }
 
@@ -2866,7 +3648,10 @@ void CityThemeRenderer::drawPresetRoadProp(IsometricRenderer& renderer,
             const float t = (static_cast<float>(s) + 0.5f) / static_cast<float>(stripes);
             const float offsetY = RenderUtils::lerp(-rp.width * 0.4f, rp.width * 0.4f, t);
             const IsoCoord sIso = RenderUtils::worldToIso(placed.worldX, placed.worldY + offsetY);
-            renderer.drawDiamond(sIso.x, sIso.y, 4.0f * zf, 0.8f * zf, rp.poleColor);
+            renderer.drawDiamond(sIso.x, sIso.y, 4.0f * zf, 0.8f * zf,
+                                 attenuateToZone(
+                                     rp.poleColor, zone, Color(0.01f, 0.02f, 0.04f, rp.poleColor.a),
+                                     0.16f, 0.18f, 0.05f));
         }
         break;
     }
@@ -2877,17 +3662,45 @@ void CityThemeRenderer::drawTrafficLight(IsometricRenderer& renderer,
                                          const Intersection& intersection,
                                          float animationTime) const {
     const IsoCoord iso = RenderUtils::worldToIso(intersection.x, intersection.y);
+    const ZoneVisibility zone = computeZoneVisibility(
+        intersection.x, intersection.y,
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
     const bool green = isTrafficLightGreen(intersection, animationTime);
     renderer.drawLine(iso.x - 4.0f, iso.y + 6.0f, iso.x - 4.0f, iso.y - 8.0f,
-                      Color(0.18f, 0.18f, 0.20f, 0.82f), 1.2f);
+                      attenuateToZone(
+                          Color(0.18f, 0.18f, 0.20f, 0.82f),
+                          zone,
+                          Color(0.00f, 0.00f, 0.00f, 0.82f),
+                          0.16f,
+                          0.12f,
+                          0.06f), 1.2f);
     renderer.drawDiamond(iso.x - 4.0f, iso.y - 10.0f, 2.6f, 1.4f,
-                         Color(0.08f, 0.08f, 0.10f, 0.94f));
+                         attenuateToZone(
+                             Color(0.08f, 0.08f, 0.10f, 0.94f),
+                             zone,
+                             Color(0.00f, 0.00f, 0.00f, 0.94f),
+                             0.10f,
+                             0.10f,
+                             0.06f));
     renderer.drawFilledCircle(iso.x - 4.8f, iso.y - 10.0f, 0.9f,
-                              green ? Color(0.26f, 0.26f, 0.28f, 0.62f)
-                                    : Color(0.92f, 0.20f, 0.16f, 0.88f));
+                              attenuateToZone(
+                                  green ? Color(0.26f, 0.26f, 0.28f, 0.62f)
+                                        : Color(0.92f, 0.20f, 0.16f, 0.88f),
+                                  zone,
+                                  Color(0.02f, 0.02f, 0.04f, 0.62f),
+                                  0.18f,
+                                  0.08f,
+                                  0.06f));
     renderer.drawFilledCircle(iso.x - 3.2f, iso.y - 10.0f, 0.9f,
-                              green ? Color(0.28f, 0.96f, 0.44f, 0.92f)
-                                    : Color(0.34f, 0.34f, 0.36f, 0.62f));
+                              attenuateToZone(
+                                  green ? Color(0.28f, 0.96f, 0.44f, 0.92f)
+                                        : Color(0.34f, 0.34f, 0.36f, 0.62f),
+                                  zone,
+                                  Color(0.02f, 0.02f, 0.04f, 0.62f),
+                                  0.20f,
+                                  0.08f,
+                                  0.06f));
 }
 
 void CityThemeRenderer::cleanup() {

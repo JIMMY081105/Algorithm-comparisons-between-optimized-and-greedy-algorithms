@@ -30,7 +30,7 @@ const char* themeTooltip(EnvironmentTheme theme) {
 
 DashboardUI::DashboardUI()
     : selectedAlgorithm(0),
-      selectedTheme(EnvironmentTheme::Sea),
+      selectedTheme(EnvironmentTheme::City),
       showComparisonTable(false),
       showEventLog(true),
       showNodeDetails(false) {}
@@ -179,7 +179,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
 
     float threshold = system.getCollectionThreshold();
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::SliderFloat("##threshold", &threshold, 10.0f, 80.0f,
+    if (ImGui::SliderFloat("##threshold", &threshold, 5.0f, 80.0f,
                            "Threshold: %.0f%%")) {
         system.setCollectionThreshold(threshold);
     }

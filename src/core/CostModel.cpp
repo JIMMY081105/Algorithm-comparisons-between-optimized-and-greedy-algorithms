@@ -5,7 +5,7 @@
 CostModel::CostModel()
     : fuelCostPerKm(1.20f),
       driverWagePerHour(15.00f),
-      truckSpeedKmh(30.0f) {}
+      truckSpeedKmh(60.0f) {}
 
 void CostModel::setFuelCostPerKm(float cost) { fuelCostPerKm = cost; }
 void CostModel::setDriverWagePerHour(float wage) { driverWagePerHour = wage; }
