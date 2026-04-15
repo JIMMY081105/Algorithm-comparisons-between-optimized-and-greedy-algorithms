@@ -434,10 +434,13 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr,
 }
 
 void DashboardUI::drawNodeDetailsPanel(const WasteSystem& system) {
-    ImGui::SetNextWindowPos(ImVec2(970, 10), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(290, 400), ImGuiCond_FirstUseEver);
+    const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
+    ImGui::SetNextWindowPos(layout.nodeDetailsPos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(layout.nodeDetailsSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.95f);
 
-    ImGui::Begin("Node Details", &showNodeDetails);
+    ImGui::Begin("Node Details", &showNodeDetails,
+                 DashboardStyle::pinnedSidebarWindowFlags());
 
     const MapGraph& graph = system.getGraph();
     if (ImGui::BeginTable("NodeTable", 4,
@@ -523,6 +526,8 @@ void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
     ImGui::ColorButton("##done", ImVec4(collected.r, collected.g, collected.b, 1.0f));
     ImGui::SameLine(); ImGui::Text("Completed");
 
+    drawTrafficLegend();
+
     ImGui::Separator();
     ImGui::TextWrapped("%s", environmentInfo.atmosphereLabel.c_str());
 
@@ -539,6 +544,47 @@ void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
     }
 
     ImGui::End();
+}
+
+void DashboardUI::drawTrafficLegend() {
+    ImGui::Separator();
+    ImGui::TextDisabled("Road conditions");
+
+    const ImU32 slowColor   = IM_COL32(220, 120, 40, 235);
+    const ImU32 jamColor    = IM_COL32(210, 40, 35, 240);
+    const ImU32 snowColor   = IM_COL32(240, 245, 250, 240);
+    const ImU32 borderColor = IM_COL32(40, 50, 60, 200);
+
+    const float barHeight = 10.0f;
+    const float barWidth  = ImGui::GetContentRegionAvail().x;
+    const ImVec2 origin   = ImGui::GetCursorScreenPos();
+    const float segment   = barWidth / 3.0f;
+
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilledMultiColor(
+        ImVec2(origin.x, origin.y),
+        ImVec2(origin.x + segment, origin.y + barHeight),
+        slowColor, slowColor, slowColor, slowColor);
+    draw->AddRectFilledMultiColor(
+        ImVec2(origin.x + segment, origin.y),
+        ImVec2(origin.x + segment * 2.0f, origin.y + barHeight),
+        jamColor, jamColor, jamColor, jamColor);
+    draw->AddRectFilledMultiColor(
+        ImVec2(origin.x + segment * 2.0f, origin.y),
+        ImVec2(origin.x + barWidth, origin.y + barHeight),
+        snowColor, snowColor, snowColor, snowColor);
+    draw->AddRect(
+        ImVec2(origin.x, origin.y),
+        ImVec2(origin.x + barWidth, origin.y + barHeight),
+        borderColor, 0.0f, 0, 1.0f);
+
+    ImGui::Dummy(ImVec2(barWidth, barHeight));
+
+    ImGui::TextColored(ImVec4(0.86f, 0.48f, 0.18f, 1.0f), "Slow");
+    ImGui::SameLine(segment + 4.0f);
+    ImGui::TextColored(ImVec4(0.90f, 0.24f, 0.20f, 1.0f), "Jam");
+    ImGui::SameLine(segment * 2.0f + 4.0f);
+    ImGui::TextColored(ImVec4(0.92f, 0.95f, 0.98f, 1.0f), "Snow block");
 }
 
 void DashboardUI::drawRouteOrderPanel(const RouteResult& result,

@@ -18,6 +18,8 @@ struct SidebarLayout {
     ImVec2 metricsSize;
     ImVec2 legendPos;
     ImVec2 legendSize;
+    ImVec2 nodeDetailsPos;
+    ImVec2 nodeDetailsSize;
 };
 
 struct BottomOverlayLayout {

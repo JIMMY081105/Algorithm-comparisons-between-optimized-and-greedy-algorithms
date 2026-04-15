@@ -56,6 +56,7 @@ private:
     void drawNodeDetailsPanel(const WasteSystem& system);
     void drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
                          const WasteSystem& system);
+    void drawTrafficLegend();
     void drawRouteOrderPanel(const RouteResult& result,
                              const MissionPresentation& currentMission,
                              const WasteSystem& system,

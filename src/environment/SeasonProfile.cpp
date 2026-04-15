@@ -50,6 +50,17 @@ CityWeather randomWeatherForSeason(CitySeason season, std::mt19937& rng) {
     return static_cast<CityWeather>(distribution(rng));
 }
 
+CityWeather nextDistinctWeatherForSeason(CitySeason season,
+                                         CityWeather current,
+                                         std::mt19937& rng) {
+    constexpr int kWeatherCount = 4;
+    const int currentIndex = static_cast<int>(current);
+    std::uniform_int_distribution<int> offsetDistribution(1, kWeatherCount - 1);
+    const int nextIndex = (currentIndex + offsetDistribution(rng)) % kWeatherCount;
+    (void)season;
+    return static_cast<CityWeather>(nextIndex);
+}
+
 bool isSnowWeather(CitySeason season, CityWeather weather) {
     return season == CitySeason::Winter &&
            (weather == CityWeather::Rainy || weather == CityWeather::Stormy);

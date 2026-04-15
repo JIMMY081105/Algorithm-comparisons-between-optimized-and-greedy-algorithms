@@ -19,6 +19,7 @@ constexpr float kComparisonHeight = 220.0f;
 constexpr float kComparisonMaxWidth = 620.0f;
 constexpr float kControlsHeightRatio = 0.48f;
 constexpr float kMinMetricsHeight = 92.0f;
+constexpr float kNodeDetailsWidth = 300.0f;
 }
 
 SidebarLayout buildSidebarLayout() {
@@ -54,6 +55,10 @@ SidebarLayout buildSidebarLayout() {
     layout.metricsSize = ImVec2(kSidebarWidth, metricsHeight);
     layout.legendPos = ImVec2(leftX, top);
     layout.legendSize = ImVec2(kLegendWidth, kLegendHeight);
+    layout.nodeDetailsPos = ImVec2(
+        layout.controlsPos.x - kPanelMargin - kNodeDetailsWidth,
+        layout.controlsPos.y);
+    layout.nodeDetailsSize = ImVec2(kNodeDetailsWidth, layout.controlsSize.y);
     return layout;
 }
 

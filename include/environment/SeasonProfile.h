@@ -9,6 +9,9 @@ const char* toDisplayString(CitySeason season);
 const char* toSeasonalWeatherString(CitySeason season, CityWeather weather);
 
 CityWeather randomWeatherForSeason(CitySeason season, std::mt19937& rng);
+CityWeather nextDistinctWeatherForSeason(CitySeason season,
+                                         CityWeather current,
+                                         std::mt19937& rng);
 
 bool isSnowWeather(CitySeason season, CityWeather weather);
 bool isWinterStorm(CitySeason season, CityWeather weather);

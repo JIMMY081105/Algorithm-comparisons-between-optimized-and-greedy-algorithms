@@ -701,7 +701,7 @@ void CityThemeRenderer::randomizeTrafficConditions(unsigned int seed) {
 
 void CityThemeRenderer::randomizeWeather(unsigned int seed) {
     std::mt19937 rng(seed ^ 0xB3E947u);
-    setWeather(randomWeatherForSeason(season, rng));
+    setWeather(nextDistinctWeatherForSeason(season, weather, rng));
 }
 
 void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
@@ -759,24 +759,27 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
     }
 
     if (season == CitySeason::Winter) {
+        const float floorSnowMix = winterStorm ? 0.92f : (snowfall ? 0.66f : 0.12f);
+        const float liftMix      = winterStorm ? 0.70f : (snowfall ? 0.44f : 0.10f);
+        const float wetMix       = winterStorm ? 0.80f : (snowfall ? 0.56f : 0.12f);
         skyTop = mixColor(skyTop, Color(0.54f, 0.60f, 0.70f, 1.0f), snowfall ? 0.34f : 0.16f);
         skyBottom = mixColor(skyBottom, Color(0.20f, 0.24f, 0.30f, 1.0f), snowfall ? 0.26f : 0.10f);
-        groundBase = mixColor(groundBase, Color(0.72f, 0.76f, 0.80f, groundBase.a),
-                              snowfall ? 0.40f : 0.12f);
-        districtLift = mixColor(districtLift, Color(0.80f, 0.86f, 0.94f, districtLift.a),
-                                snowfall ? 0.26f : 0.10f);
-        wetTint = mixColor(wetTint, Color(0.82f, 0.88f, 0.96f, wetTint.a),
-                           snowfall ? 0.46f : 0.12f);
+        groundBase = mixColor(groundBase, Color(0.94f, 0.96f, 0.99f, groundBase.a),
+                              floorSnowMix);
+        districtLift = mixColor(districtLift, Color(0.92f, 0.95f, 0.99f, districtLift.a),
+                                liftMix);
+        wetTint = mixColor(wetTint, Color(0.92f, 0.95f, 0.99f, wetTint.a),
+                           wetMix);
         if (winterStorm) {
             skyTop = mixColor(skyTop, Color(0.02f, 0.03f, 0.06f, 1.0f), 0.24f);
             skyBottom = mixColor(skyBottom, Color(0.00f, 0.00f, 0.02f, 1.0f), 0.34f);
-            groundBase = mixColor(groundBase, Color(0.12f, 0.14f, 0.18f, groundBase.a), 0.22f);
         }
     }
 
     skyTop = mixColor(skyTop, Color(0.02f, 0.02f, 0.03f, 1.0f), 0.88f);
     skyBottom = mixColor(skyBottom, Color(0.00f, 0.00f, 0.00f, 1.0f), 0.96f);
-    groundBase = mixColor(groundBase, Color(0.01f, 0.01f, 0.01f, groundBase.a), 0.72f);
+    const float groundDarken = snowfall ? (winterStorm ? 0.04f : 0.18f) : 0.72f;
+    groundBase = mixColor(groundBase, Color(0.01f, 0.01f, 0.01f, groundBase.a), groundDarken);
 
     glBegin(GL_QUADS);
     glColor4f(skyTop.r, skyTop.g, skyTop.b, skyTop.a);
@@ -787,7 +790,9 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
     glVertex2f(left, bottom);
     glEnd();
 
-    groundBase = mixColor(groundBase, Color(0.03f, 0.04f, 0.07f, groundBase.a), 0.44f);
+    const float peripheralDarken = snowfall ? (winterStorm ? 0.02f : 0.12f) : 0.44f;
+    groundBase = mixColor(groundBase, Color(0.03f, 0.04f, 0.07f, groundBase.a),
+                          peripheralDarken);
     drawWorldQuadPatch(peripheralMinX, peripheralMinY,
                        peripheralMaxX, peripheralMaxY,
                        groundBase);
@@ -903,6 +908,16 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
         patch = mixColor(patch, wetTint,
                          (weather == CityWeather::Rainy || weather == CityWeather::Stormy)
                              ? 0.26f : 0.0f);
+
+        if (snowfall) {
+            const Color snowTint(0.94f, 0.96f, 0.99f, patch.a);
+            const float patchSnowMix = winterStorm ? 0.88f : 0.60f;
+            const float curbSnowMix  = winterStorm ? 0.70f : 0.45f;
+            patch = mixColor(patch, snowTint, patchSnowMix);
+            curb = mixColor(curb,
+                            Color(0.82f, 0.86f, 0.92f, curb.a),
+                            curbSnowMix);
+        }
 
         if (!meaningful &&
             block.district != DistrictType::Park &&
