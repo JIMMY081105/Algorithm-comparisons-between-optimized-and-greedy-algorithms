@@ -5,10 +5,20 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ========================================
-# Find GLFW
+# GLFW — fetched automatically from GitHub
 # ========================================
-# If using vcpkg, pass -DCMAKE_TOOLCHAIN_FILE=[vcpkg]/scripts/buildsystems/vcpkg.cmake
-find_package(glfw3 3.3 REQUIRED)
+include(FetchContent)
+set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    glfw
+    GIT_REPOSITORY https://github.com/glfw/glfw.git
+    GIT_TAG        3.3.9
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(glfw)
 
 # ========================================
 # Find OpenGL
@@ -124,7 +134,6 @@ if(MINGW)
         "${MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
         "${MINGW_BIN_DIR}/libstdc++-6.dll"
         "${MINGW_BIN_DIR}/libwinpthread-1.dll"
-        "${MINGW_BIN_DIR}/glfw3.dll"
     )
 
     function(copy_mingw_runtime_dlls target_name)

@@ -1,11 +1,9 @@
 # Build output
 build/
 
-# External dependencies (downloaded by setup script)
-external/
-
-# Runtime output files
-output/
+# Runtime output files (keep folder, ignore generated files)
+output/*
+!output/.gitkeep
 
 # ImGui config (generated at runtime)
 imgui.ini

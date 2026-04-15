@@ -54,15 +54,20 @@ src/
 
 ## Build Requirements
 
-- C++17 compiler
+- C++17 compiler (MinGW-w64, MSVC, GCC, or Clang)
 - CMake 3.16 or newer
-- GLFW 3.3
-- OpenGL
-- Dear ImGui and GLAD in the `external/` directory
+- Git (used by CMake to fetch GLFW the first time you configure)
+- OpenGL drivers (already installed on any modern system)
 
-## Build
+Everything else ships with the repository:
 
-Windows example:
+- Dear ImGui sources and backends in [external/imgui/](external/imgui/)
+- GLAD OpenGL loader in [external/glad/](external/glad/)
+- GLFW is **downloaded and built automatically** the first time CMake configures — no vcpkg, no system install needed.
+
+## Build & Run — one-time setup
+
+After cloning the repository, open a terminal in the project folder and run:
 
 ```powershell
 mkdir build
@@ -71,14 +76,33 @@ cmake ..
 cmake --build . --config Release
 ```
 
-If you manage GLFW through `vcpkg`, pass the vcpkg toolchain file when configuring CMake.
+The first `cmake ..` takes a little longer because it downloads GLFW 3.3.9 from GitHub and builds it as part of the project. All following builds are incremental.
 
-## Running the Application
-
-After building:
+Then launch the app from the build directory:
 
 ```powershell
 .\SmartWasteClearance.exe
+```
+
+Or, on MinGW/Makefile generators, the executable is directly in `build/`:
+
+```bash
+./SmartWasteClearance
+```
+
+### Choosing a CMake generator
+
+If CMake picks an unexpected generator, you can be explicit:
+
+```powershell
+# MinGW (MSYS2)
+cmake .. -G "MinGW Makefiles"
+
+# Visual Studio 2022
+cmake .. -G "Visual Studio 17 2022"
+
+# Linux / macOS
+cmake .. -G "Unix Makefiles"
 ```
 
 ## Using the Simulation
