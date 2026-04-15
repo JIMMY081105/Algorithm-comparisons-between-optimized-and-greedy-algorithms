@@ -1,4 +1,4 @@
-# Ocean Cleanup System
+# Cleanup System
 
 **EcoRoute Solutions** is a C++ coursework project that simulates route planning for marine waste collection across a fixed Indian Ocean cleanup sector. The application combines an isometric visual map, animated route playback, algorithm comparison, and exportable summary reports.
 
