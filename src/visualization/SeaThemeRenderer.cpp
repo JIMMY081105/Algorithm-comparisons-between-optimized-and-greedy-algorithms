@@ -2,12 +2,24 @@
 #include "environment/MissionPresentationUtils.h"
 #include "visualization/IsometricRenderer.h"
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <array>
 #include <algorithm>
 #include <cmath>
 #include <string>
+
+#ifdef min
+#undef min
+#endif
+
+#ifdef max
+#undef max
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
