@@ -26,8 +26,8 @@ namespace {
 
 constexpr float kCityPaddingX = 2.0f;
 constexpr float kCityPaddingY = 1.8f;
-constexpr float kPeripheralBandX = 5.8f;
-constexpr float kPeripheralBandY = 4.8f;
+constexpr float kPeripheralBandX = 9.0f;
+constexpr float kPeripheralBandY = 7.5f;
 constexpr float kCongestionPenaltyScale = 0.75f;
 constexpr float kIncidentPenaltyScale = 1.75f;
 constexpr float kTwoPi = 6.28318530718f;
@@ -337,51 +337,108 @@ void drawBlockMass(const BlockFaces& faces,
 
 void drawMountainShape(float cx, float cy,
                        float halfW, float halfD, float peakHeight,
-                       const Color& baseLeft, const Color& baseRight,
-                       const Color& peakCol) {
-    const float peakX = cx;
-    const float peakY = cy - peakHeight;
-    const float northY = cy - halfD;
-    const float southY = cy + halfD;
-    const float westX = cx - halfW;
-    const float eastX = cx + halfW;
+                       const Color& tier0Col, const Color& tier1Col,
+                       const Color& tier2Col, const Color& tier3Col,
+                       float snowAmt, const Color& snowCol) {
+    // Clash of Clans style: 4 stacked tiers creating a layered, terraced mountain
+    // Each tier is a diamond pyramid (4 triangular faces) at increasing height
+    struct TierDef {
+        float wScale;     // fraction of base halfW
+        float dScale;     // fraction of base halfD
+        float baseFrac;   // height fraction where tier base sits
+        float peakFrac;   // height fraction where tier peak sits
+    };
 
-    const Color backL = scaleColor(baseLeft, 0.70f);
-    const Color backR = scaleColor(baseRight, 0.76f);
+    const TierDef tiers[4] = {
+        {1.00f, 1.00f, 0.00f, 0.32f},   // foothill base — wide, low
+        {0.70f, 0.70f, 0.18f, 0.58f},   // lower rocky slope
+        {0.44f, 0.44f, 0.40f, 0.82f},   // upper rocky face
+        {0.22f, 0.22f, 0.65f, 1.00f},   // summit peak
+    };
 
-    glBegin(GL_TRIANGLES);
-    // Back-left face (North -> West -> Peak)
-    glColor4f(backL.r, backL.g, backL.b, backL.a);
-    glVertex2f(cx, northY);
-    glColor4f(backL.r, backL.g, backL.b, backL.a);
-    glVertex2f(westX, cy);
-    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
-    glVertex2f(peakX, peakY);
+    const Color tierCols[4] = {tier0Col, tier1Col, tier2Col, tier3Col};
 
-    // Back-right face (North -> East -> Peak)
-    glColor4f(backR.r, backR.g, backR.b, backR.a);
-    glVertex2f(cx, northY);
-    glColor4f(backR.r, backR.g, backR.b, backR.a);
-    glVertex2f(eastX, cy);
-    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
-    glVertex2f(peakX, peakY);
+    for (int t = 0; t < 4; ++t) {
+        const float tw = halfW * tiers[t].wScale;
+        const float td = halfD * tiers[t].dScale;
+        const float tierBaseY = cy - peakHeight * tiers[t].baseFrac;
+        const float tierPeakY = cy - peakHeight * tiers[t].peakFrac;
 
-    // Front-left face (West -> South -> Peak)
-    glColor4f(baseLeft.r, baseLeft.g, baseLeft.b, baseLeft.a);
-    glVertex2f(westX, cy);
-    glColor4f(baseLeft.r, baseLeft.g, baseLeft.b, baseLeft.a);
-    glVertex2f(cx, southY);
-    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
-    glVertex2f(peakX, peakY);
+        Color faceCol = tierCols[t];
 
-    // Front-right face (East -> South -> Peak)
-    glColor4f(baseRight.r, baseRight.g, baseRight.b, baseRight.a);
-    glVertex2f(eastX, cy);
-    glColor4f(baseRight.r, baseRight.g, baseRight.b, baseRight.a);
-    glVertex2f(cx, southY);
-    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
-    glVertex2f(peakX, peakY);
-    glEnd();
+        // Snow coverage increases with altitude
+        if (snowAmt > 0.0f) {
+            float blend = 0.0f;
+            if (t == 3)      blend = snowAmt * 0.88f;
+            else if (t == 2) blend = snowAmt * 0.38f;
+            else if (t == 1) blend = snowAmt * 0.10f;
+            if (blend > 0.0f) faceCol = mixColor(faceCol, snowCol, blend);
+        }
+
+        // 3D face shading: right = sunlit, left = shadow, back = darkest
+        const Color rightFace = scaleColor(faceCol, 1.14f);
+        const Color leftFace  = scaleColor(faceCol, 0.76f);
+        const Color backLeft  = scaleColor(faceCol, 0.56f);
+        const Color backRight = scaleColor(faceCol, 0.64f);
+        const Color tipCol    = (t == 3 && snowAmt > 0.3f)
+            ? mixColor(scaleColor(faceCol, 1.30f), snowCol, snowAmt * 0.7f)
+            : scaleColor(faceCol, 1.28f);
+
+        // Diamond corner points
+        const float northY = tierBaseY - td;
+        const float southY = tierBaseY + td;
+        const float westX  = cx - tw;
+        const float eastX  = cx + tw;
+
+        glBegin(GL_TRIANGLES);
+        // Back-left face (North -> West -> Peak)
+        glColor4f(backLeft.r, backLeft.g, backLeft.b, backLeft.a);
+        glVertex2f(cx, northY);
+        glColor4f(backLeft.r, backLeft.g, backLeft.b, backLeft.a);
+        glVertex2f(westX, tierBaseY);
+        glColor4f(tipCol.r, tipCol.g, tipCol.b, tipCol.a);
+        glVertex2f(cx, tierPeakY);
+
+        // Back-right face (North -> East -> Peak)
+        glColor4f(backRight.r, backRight.g, backRight.b, backRight.a);
+        glVertex2f(cx, northY);
+        glColor4f(backRight.r, backRight.g, backRight.b, backRight.a);
+        glVertex2f(eastX, tierBaseY);
+        glColor4f(tipCol.r, tipCol.g, tipCol.b, tipCol.a);
+        glVertex2f(cx, tierPeakY);
+
+        // Front-left face (West -> South -> Peak)
+        glColor4f(leftFace.r, leftFace.g, leftFace.b, leftFace.a);
+        glVertex2f(westX, tierBaseY);
+        glColor4f(leftFace.r, leftFace.g, leftFace.b, leftFace.a);
+        glVertex2f(cx, southY);
+        glColor4f(tipCol.r, tipCol.g, tipCol.b, tipCol.a);
+        glVertex2f(cx, tierPeakY);
+
+        // Front-right face (East -> South -> Peak)
+        glColor4f(rightFace.r, rightFace.g, rightFace.b, rightFace.a);
+        glVertex2f(eastX, tierBaseY);
+        glColor4f(rightFace.r, rightFace.g, rightFace.b, rightFace.a);
+        glVertex2f(cx, southY);
+        glColor4f(tipCol.r, tipCol.g, tipCol.b, tipCol.a);
+        glVertex2f(cx, tierPeakY);
+        glEnd();
+
+        // Edge outlines for crisp 3D definition (front ridges only)
+        Color edgeCol = scaleColor(faceCol, 0.48f);
+        edgeCol.a = 0.45f;
+        glLineWidth(1.0f);
+        glColor4f(edgeCol.r, edgeCol.g, edgeCol.b, edgeCol.a);
+        glBegin(GL_LINE_STRIP);
+        glVertex2f(westX, tierBaseY);
+        glVertex2f(cx, tierPeakY);
+        glVertex2f(eastX, tierBaseY);
+        glEnd();
+        glBegin(GL_LINES);
+        glVertex2f(cx, southY);
+        glVertex2f(cx, tierPeakY);
+        glEnd();
+    }
 }
 
 void drawFaceBands(const std::array<IsoCoord, 4>& face,
@@ -2394,64 +2451,108 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
         mountains.push_back(MountainPeak{wx, wy, bw, bd, hs, cv});
     };
 
-    // North ridge — main backdrop mountain range (tallest)
-    const float northBaseY = sceneMinY - 2.0f;
-    const int northCount = 14;
-    for (int i = 0; i < northCount; ++i) {
-        const float t = (static_cast<float>(i) + 0.5f) /
-                        static_cast<float>(northCount);
-        float x = peripheralMinX + t * (peripheralMaxX - peripheralMinX);
-        x += (unit(rng) - 0.5f) * 1.2f;
-        const float y = northBaseY - unit(rng) * 2.8f;
-        float heightScale = 0.6f + unit(rng) * 0.5f;
-        const float centerBoost = 1.0f - std::abs(t - 0.5f) * 1.6f;
-        heightScale += std::max(0.0f, centerBoost) * 0.4f;
-        const float baseW = 1.4f + unit(rng) * 1.0f;
-        const float baseD = 1.0f + unit(rng) * 0.8f;
-        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
+    // Extended placement area — mountains spread far beyond the city
+    const float mtnMinX = peripheralMinX - 14.0f;
+    const float mtnMaxX = peripheralMaxX + 14.0f;
+    const float mtnSpanX = mtnMaxX - mtnMinX;
+    const float mtnMinY = peripheralMinY - 12.0f;
+    const float mtnMaxY = peripheralMaxY + 12.0f;
+    const float mtnSpanY = mtnMaxY - mtnMinY;
+
+    // === NORTH RIDGE — 3 rows, tallest backdrop range ===
+    for (int row = 0; row < 3; ++row) {
+        const float rowF = static_cast<float>(row);
+        const float baseY = sceneMinY - 2.0f - rowF * 3.8f;
+        const int count = 18 + row * 5;
+        const float hBoost = 0.16f * rowF;
+        for (int i = 0; i < count; ++i) {
+            const float t = (static_cast<float>(i) + 0.5f) /
+                            static_cast<float>(count);
+            float x = mtnMinX + t * mtnSpanX;
+            x += (unit(rng) - 0.5f) * 1.8f;
+            const float y = baseY - unit(rng) * 3.4f;
+            float hs = 0.55f + unit(rng) * 0.55f + hBoost;
+            const float cb = 1.0f - std::abs(t - 0.5f) * 1.4f;
+            hs += std::max(0.0f, cb) * 0.5f;
+            const float bw = 1.6f + unit(rng) * 1.5f + rowF * 0.3f;
+            const float bd = 1.1f + unit(rng) * 1.0f + rowF * 0.2f;
+            addMountain(x, y, bw, bd, hs, colorDist(rng));
+        }
     }
 
-    // South hills — lower foreground ridges
-    const float southBaseY = sceneMaxY + 2.0f;
-    const int southCount = 10;
-    for (int i = 0; i < southCount; ++i) {
-        const float t = (static_cast<float>(i) + 0.5f) /
-                        static_cast<float>(southCount);
-        float x = peripheralMinX + t * (peripheralMaxX - peripheralMinX);
-        x += (unit(rng) - 0.5f) * 1.0f;
-        const float y = southBaseY + unit(rng) * 2.4f;
-        const float heightScale = 0.3f + unit(rng) * 0.35f;
-        const float baseW = 1.2f + unit(rng) * 0.8f;
-        const float baseD = 0.8f + unit(rng) * 0.6f;
-        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
+    // === SOUTH HILLS — 2 rows, lower foreground ridges ===
+    for (int row = 0; row < 2; ++row) {
+        const float rowF = static_cast<float>(row);
+        const float baseY = sceneMaxY + 2.0f + rowF * 3.2f;
+        const int count = 14 + row * 4;
+        for (int i = 0; i < count; ++i) {
+            const float t = (static_cast<float>(i) + 0.5f) /
+                            static_cast<float>(count);
+            float x = mtnMinX + t * mtnSpanX;
+            x += (unit(rng) - 0.5f) * 1.5f;
+            const float y = baseY + unit(rng) * 3.0f;
+            const float hs = 0.35f + unit(rng) * 0.42f + rowF * 0.12f;
+            const float bw = 1.4f + unit(rng) * 1.3f + rowF * 0.3f;
+            const float bd = 0.9f + unit(rng) * 0.9f + rowF * 0.2f;
+            addMountain(x, y, bw, bd, hs, colorDist(rng));
+        }
     }
 
-    // West ridge
-    const int westCount = 7;
-    for (int i = 0; i < westCount; ++i) {
-        const float t = (static_cast<float>(i) + 0.5f) /
-                        static_cast<float>(westCount);
-        float y = peripheralMinY + t * (peripheralMaxY - peripheralMinY);
-        y += (unit(rng) - 0.5f) * 0.8f;
-        const float x = sceneMinX - 2.0f - unit(rng) * 2.5f;
-        const float heightScale = 0.4f + unit(rng) * 0.4f;
-        const float baseW = 1.2f + unit(rng) * 0.9f;
-        const float baseD = 0.9f + unit(rng) * 0.7f;
-        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
+    // === WEST RIDGE — 2 rows ===
+    for (int row = 0; row < 2; ++row) {
+        const float rowF = static_cast<float>(row);
+        const int count = 12 + row * 4;
+        for (int i = 0; i < count; ++i) {
+            const float t = (static_cast<float>(i) + 0.5f) /
+                            static_cast<float>(count);
+            float y = mtnMinY + t * mtnSpanY;
+            y += (unit(rng) - 0.5f) * 1.2f;
+            const float x = sceneMinX - 2.5f - unit(rng) * 3.8f - rowF * 3.2f;
+            const float hs = 0.45f + unit(rng) * 0.48f + rowF * 0.1f;
+            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.3f;
+            const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.2f;
+            addMountain(x, y, bw, bd, hs, colorDist(rng));
+        }
     }
 
-    // East ridge
-    const int eastCount = 7;
-    for (int i = 0; i < eastCount; ++i) {
-        const float t = (static_cast<float>(i) + 0.5f) /
-                        static_cast<float>(eastCount);
-        float y = peripheralMinY + t * (peripheralMaxY - peripheralMinY);
-        y += (unit(rng) - 0.5f) * 0.8f;
-        const float x = sceneMaxX + 2.0f + unit(rng) * 2.5f;
-        const float heightScale = 0.4f + unit(rng) * 0.4f;
-        const float baseW = 1.2f + unit(rng) * 0.9f;
-        const float baseD = 0.9f + unit(rng) * 0.7f;
-        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
+    // === EAST RIDGE — 2 rows ===
+    for (int row = 0; row < 2; ++row) {
+        const float rowF = static_cast<float>(row);
+        const int count = 12 + row * 4;
+        for (int i = 0; i < count; ++i) {
+            const float t = (static_cast<float>(i) + 0.5f) /
+                            static_cast<float>(count);
+            float y = mtnMinY + t * mtnSpanY;
+            y += (unit(rng) - 0.5f) * 1.2f;
+            const float x = sceneMaxX + 2.5f + unit(rng) * 3.8f + rowF * 3.2f;
+            const float hs = 0.45f + unit(rng) * 0.48f + rowF * 0.1f;
+            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.3f;
+            const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.2f;
+            addMountain(x, y, bw, bd, hs, colorDist(rng));
+        }
+    }
+
+    // === CORNER FILLS — NW, NE, SW, SE clusters ===
+    const float cornerOffsets[4][2] = {
+        {sceneMinX - 4.0f, sceneMinY - 4.0f},
+        {sceneMaxX + 4.0f, sceneMinY - 4.0f},
+        {sceneMinX - 4.0f, sceneMaxY + 4.0f},
+        {sceneMaxX + 4.0f, sceneMaxY + 4.0f},
+    };
+    for (int c = 0; c < 4; ++c) {
+        const int count = 8;
+        for (int i = 0; i < count; ++i) {
+            const float angle = kTwoPi * static_cast<float>(i) /
+                                static_cast<float>(count)
+                              + unit(rng) * 0.6f;
+            const float r = 2.0f + unit(rng) * 6.0f;
+            const float x = cornerOffsets[c][0] + std::cos(angle) * r;
+            const float y = cornerOffsets[c][1] + std::sin(angle) * r * 0.6f;
+            const float hs = 0.40f + unit(rng) * 0.55f;
+            const float bw = 1.4f + unit(rng) * 1.3f;
+            const float bd = 1.0f + unit(rng) * 1.0f;
+            addMountain(x, y, bw, bd, hs, colorDist(rng));
+        }
     }
 
     // Sort back-to-front (ascending worldY for painter's algorithm)
@@ -4184,79 +4285,104 @@ void CityThemeRenderer::drawPresetRoadProp(IsometricRenderer& renderer,
 
 void CityThemeRenderer::drawMountain(const MountainPeak& peak) const {
     const IsoCoord iso = RenderUtils::worldToIso(peak.worldX, peak.worldY);
-    const ZoneVisibility zone = computeZoneVisibility(
-        peak.worldX, peak.worldY,
-        operationalCenterX, operationalCenterY,
-        operationalRadiusX, operationalRadiusY);
-    if (zone.transition <= 0.04f) {
+
+    // Mountains use extended zone visibility — background scenery should remain
+    // visible much further out than gameplay elements when zoomed out
+    const float dx = (peak.worldX < gZoneMinX) ? (gZoneMinX - peak.worldX)
+                   : (peak.worldX > gZoneMaxX) ? (peak.worldX - gZoneMaxX)
+                                               : 0.0f;
+    const float dy = (peak.worldY < gZoneMinY) ? (gZoneMinY - peak.worldY)
+                   : (peak.worldY > gZoneMaxY) ? (peak.worldY - gZoneMaxY)
+                                               : 0.0f;
+    const float mFalloffX = std::max(gZoneFalloffX * 3.0f, 14.0f);
+    const float mFalloffY = std::max(gZoneFalloffY * 3.0f, 12.0f);
+    const float outside = std::sqrt(
+        (dx / mFalloffX) * (dx / mFalloffX) +
+        (dy / mFalloffY) * (dy / mFalloffY));
+    const float transition = 1.0f - smoothRange(0.0f, 1.0f, outside);
+    if (transition <= 0.02f) {
         return;
     }
+
     const float zf = currentZoomFactor();
-    const float halfW = peak.baseWidth * 30.0f * zf;
-    const float halfD = peak.baseDepth * 20.0f * zf;
-    const float height = peak.heightScale * 65.0f * zf;
+    const float halfW = peak.baseWidth * 34.0f * zf;
+    const float halfD = peak.baseDepth * 24.0f * zf;
+    const float height = peak.heightScale * 80.0f * zf;
+    const float cv = peak.colorVar;
 
-    // Earthy mountain tones
-    Color baseLeft(0.08f + peak.colorVar * 0.02f,
-                   0.11f + peak.colorVar * 0.03f,
-                   0.09f + peak.colorVar * 0.01f, 0.96f);
-    Color baseRight(0.11f + peak.colorVar * 0.02f,
-                    0.14f + peak.colorVar * 0.03f,
-                    0.12f + peak.colorVar * 0.01f, 0.96f);
-    Color peakColor(0.18f + peak.colorVar * 0.04f,
-                    0.22f + peak.colorVar * 0.05f,
-                    0.20f + peak.colorVar * 0.02f, 0.96f);
+    // Rich Clash of Clans palette — 4 altitude tiers
+    // Tier 0: lush green-brown foothills
+    Color tier0(0.26f + cv * 0.03f, 0.36f + cv * 0.04f, 0.17f + cv * 0.02f, 0.96f);
+    // Tier 1: earthy brown slopes
+    Color tier1(0.35f + cv * 0.03f, 0.28f + cv * 0.03f, 0.19f + cv * 0.02f, 0.96f);
+    // Tier 2: grey rock face
+    Color tier2(0.40f + cv * 0.03f, 0.38f + cv * 0.03f, 0.36f + cv * 0.02f, 0.96f);
+    // Tier 3: light grey summit rock
+    Color tier3(0.55f + cv * 0.04f, 0.53f + cv * 0.04f, 0.50f + cv * 0.03f, 0.96f);
 
-    // Weather adjustments
-    switch (weather) {
-        case CityWeather::Stormy:
-            baseLeft = scaleColor(baseLeft, 0.60f);
-            baseRight = scaleColor(baseRight, 0.60f);
-            peakColor = scaleColor(peakColor, 0.65f);
+    const Color snowCol(0.88f, 0.92f, 0.96f, 0.96f);
+    float snowAmt = 0.0f;
+
+    // Seasonal colour shifts
+    switch (season) {
+        case CitySeason::Summer:
+            tier0 = mixColor(tier0, Color(0.30f, 0.44f, 0.18f, 0.96f), 0.20f);
             break;
-        case CityWeather::Rainy:
-            baseLeft = scaleColor(baseLeft, 0.78f);
-            baseRight = scaleColor(baseRight, 0.78f);
-            peakColor = scaleColor(peakColor, 0.82f);
+        case CitySeason::Autumn:
+            tier0 = mixColor(tier0, Color(0.42f, 0.32f, 0.15f, 0.96f), 0.30f);
+            tier1 = mixColor(tier1, Color(0.40f, 0.28f, 0.13f, 0.96f), 0.20f);
             break;
-        case CityWeather::Sunny:
-            baseRight = scaleColor(baseRight, 1.22f);
-            peakColor = scaleColor(peakColor, 1.18f);
+        case CitySeason::Winter:
+            if (hasWinterStormActive())  snowAmt = 0.85f;
+            else if (hasSnowfall())      snowAmt = 0.60f;
+            else                         snowAmt = 0.30f;
+            tier0 = desaturateColor(tier0, 0.30f);
+            tier1 = desaturateColor(tier1, 0.20f);
             break;
         default:
             break;
     }
 
-    // Snow on peaks in winter
-    if (season == CitySeason::Winter) {
-        const Color snowCol(0.82f, 0.86f, 0.92f, 0.96f);
-        if (hasWinterStormActive()) {
-            peakColor = mixColor(peakColor, snowCol, 0.72f);
-            baseLeft  = mixColor(baseLeft,  snowCol, 0.28f);
-            baseRight = mixColor(baseRight, snowCol, 0.32f);
-        } else if (hasSnowfall()) {
-            peakColor = mixColor(peakColor, snowCol, 0.55f);
-            baseLeft  = mixColor(baseLeft,  snowCol, 0.10f);
-            baseRight = mixColor(baseRight, snowCol, 0.12f);
-        } else {
-            peakColor = mixColor(peakColor, snowCol, 0.25f);
-        }
+    // Weather lighting
+    switch (weather) {
+        case CityWeather::Stormy:
+            tier0 = scaleColor(tier0, 0.52f);
+            tier1 = scaleColor(tier1, 0.52f);
+            tier2 = scaleColor(tier2, 0.56f);
+            tier3 = scaleColor(tier3, 0.58f);
+            break;
+        case CityWeather::Rainy:
+            tier0 = scaleColor(tier0, 0.70f);
+            tier1 = scaleColor(tier1, 0.70f);
+            tier2 = scaleColor(tier2, 0.74f);
+            tier3 = scaleColor(tier3, 0.76f);
+            break;
+        case CityWeather::Sunny:
+            tier1 = scaleColor(tier1, 1.14f);
+            tier2 = scaleColor(tier2, 1.18f);
+            tier3 = scaleColor(tier3, 1.22f);
+            break;
+        default:
+            break;
     }
 
-    // Zone attenuation for depth fog
-    const Color voidTint(0.01f, 0.02f, 0.03f, 0.96f);
-    baseLeft  = attenuateToZone(baseLeft,  zone, voidTint, 0.04f, 0.40f, 0.04f);
-    baseRight = attenuateToZone(baseRight, zone, voidTint, 0.06f, 0.36f, 0.04f);
-    peakColor = attenuateToZone(peakColor, zone, voidTint, 0.08f, 0.30f, 0.04f);
+    // Distance fog — fade toward dark void proportional to distance
+    const Color voidTint(0.04f, 0.05f, 0.06f, 0.96f);
+    const float fogBlend = (1.0f - transition) * 0.70f;
+    tier0 = mixColor(tier0, voidTint, fogBlend);
+    tier1 = mixColor(tier1, voidTint, fogBlend);
+    tier2 = mixColor(tier2, voidTint, fogBlend);
+    tier3 = mixColor(tier3, voidTint, fogBlend);
 
-    // Soft foothill glow to blend mountain base with ground
+    // Soft foothill glow blends mountain base into the terrain
     drawGradientEllipse(iso.x, iso.y + halfD * 0.3f,
-                        halfW * 1.6f, halfD * 1.2f,
-                        withAlpha(baseLeft, 0.22f),
-                        withAlpha(baseLeft, 0.0f));
+                        halfW * 1.9f, halfD * 1.5f,
+                        withAlpha(tier0, 0.28f * transition),
+                        withAlpha(tier0, 0.0f));
 
     drawMountainShape(iso.x, iso.y, halfW, halfD, height,
-                      baseLeft, baseRight, peakColor);
+                      tier0, tier1, tier2, tier3,
+                      snowAmt, snowCol);
 }
 
 void CityThemeRenderer::drawTrafficLight(IsometricRenderer& renderer,
