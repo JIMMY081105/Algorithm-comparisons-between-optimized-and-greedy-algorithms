@@ -32,6 +32,10 @@ private:
     char inputBuffer[512];
     std::string lastReply;
     std::string lastRecommendation;
+    bool expanded;
+
+    // Draw the collapsed sparkle icon button. Returns true when clicked.
+    bool drawIcon(ChatbotService::Status status);
 };
 
 #endif // CHATBOT_PANEL_H
