@@ -7,3 +7,6 @@ output/*
 
 # ImGui config (generated at runtime)
 imgui.ini
+
+# API key (never commit secrets)
+ai_key.txt

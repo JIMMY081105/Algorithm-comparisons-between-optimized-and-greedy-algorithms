@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -217,6 +218,8 @@ void Application::initSimulation() {
                                                wasteSystem.getGraph());
     environmentController.applyActiveWeights(wasteSystem.getGraph());
 
+    chatbotService.loadKeyFromFile();
+
     lastFrameTime = static_cast<float>(glfwGetTime());
 }
 
@@ -306,6 +309,9 @@ void Application::renderFrame() {
 
     // Process all UI actions
     handleUIActions(actions);
+
+    renderChatbotPanel();
+    pollChatbotResponse();
 
     endImGuiFrame();
 }
@@ -561,4 +567,157 @@ void Application::shutdown() {
     glfwTerminate();
 
     initialized = false;
+}
+
+std::string Application::buildChatbotContext() const {
+    // Give Gemini a compact, authoritative view of the current day so it can
+    // reason about the map without hallucinating coordinates or waste levels.
+    std::ostringstream out;
+    const ThemeDashboardInfo info = environmentController.getDashboardInfo();
+    const MapGraph& graph = wasteSystem.getGraph();
+
+    out << "You are the in-game AI assistant for the EcoRoute Smart Waste "
+           "Clearance simulation. Only answer questions about this simulation "
+           "or its current state. If asked something unrelated, politely "
+           "decline.\n\n";
+    out << "CURRENT STATE\n";
+    out << "Environment: " << info.themeLabel << " (" << info.subtitle << ")\n";
+    if (info.supportsSeasons) {
+        out << "Season: " << info.seasonLabel << "\n";
+    }
+    if (info.supportsWeather) {
+        out << "Weather: " << info.weatherLabel << "\n";
+    }
+    out << "Atmosphere: " << info.atmosphereLabel << "\n";
+    out << "Congestion: " << info.congestionLevel
+        << "  Incidents: " << info.incidentCount << "\n";
+    out << "Day: " << wasteSystem.getDayNumber()
+        << "  Seed: " << wasteSystem.getCurrentSeed() << "\n";
+    out << "Collection threshold (percent): "
+        << wasteSystem.getCollectionThreshold() << "\n";
+    out << "HQ node id: " << graph.getHQNode().getId()
+        << " (" << graph.getHQNode().getName() << ")\n\n";
+
+    out << "NODES (id | name | x | y | waste%)\n";
+    for (int i = 0; i < graph.getNodeCount(); ++i) {
+        const WasteNode& node = graph.getNode(i);
+        out << node.getId() << " | " << node.getName()
+            << " | " << node.getWorldX()
+            << " | " << node.getWorldY()
+            << " | ";
+        if (node.getIsHQ()) {
+            out << "HQ";
+        } else {
+            out << node.getWasteLevel() << "%";
+        }
+        out << "\n";
+    }
+
+    const std::vector<int> eligible = wasteSystem.getEligibleNodes();
+    out << "\nELIGIBLE NODE IDS (waste >= threshold): ";
+    for (std::size_t i = 0; i < eligible.size(); ++i) {
+        if (i > 0) out << ",";
+        out << eligible[i];
+    }
+    out << "\n";
+
+    const auto& results = comparisonManager.getResults();
+    if (!results.empty()) {
+        out << "\nRECENT ALGORITHM RESULTS\n";
+        for (const RouteResult& r : results) {
+            if (!r.isValid()) continue;
+            out << r.algorithmName
+                << ": distance=" << r.totalDistance << "km"
+                << ", cost=RM" << r.totalCost
+                << ", order=";
+            for (std::size_t i = 0; i < r.visitOrder.size(); ++i) {
+                if (i > 0) out << ",";
+                out << r.visitOrder[i];
+            }
+            out << "\n";
+        }
+    }
+
+    out << "\nRESPONSE RULES\n";
+    out << "- Keep answers under 150 words.\n";
+    out << "- When recommending the best route, the route MUST visit EVERY "
+           "node in the ELIGIBLE list above — no node may be skipped. "
+           "Optimise the visiting order to minimise total travel distance "
+           "while accounting for weather/season conditions.\n";
+    out << "- The route MUST start and end at the HQ node id "
+        << graph.getHQNode().getId() << ".\n";
+    out << "- Only visit nodes from the ELIGIBLE list above, but you MUST "
+           "visit ALL of them.\n";
+    out << "- Always end your reply with ONE line in this exact format:\n"
+           "  ROUTE: id1,id2,id3,...,0\n"
+           "  where the list includes ALL eligible node IDs.\n"
+           "  If the user did not ask for a route, write:  ROUTE: NONE\n";
+    return out.str();
+}
+
+void Application::renderChatbotPanel() {
+    const std::string context = buildChatbotContext();
+    ChatbotPanel::Actions actions = chatbotPanel.render(chatbotService, context);
+
+    if (actions.submitQuestion && !actions.prompt.empty()) {
+        chatbotService.submit(actions.prompt, context, false);
+    } else if (actions.requestBestRoute) {
+        const std::string prompt =
+            "Recommend the optimal pickup route for today. The route MUST "
+            "visit ALL eligible nodes to collect all garbage — do not skip "
+            "any. Find the best ordering to minimise total travel distance. "
+            "Explain briefly why this ordering is good given the weather "
+            "and node positions. End with the ROUTE: line containing every "
+            "eligible node ID.";
+        chatbotService.submit(prompt, context, true);
+    }
+}
+
+void Application::pollChatbotResponse() {
+    ChatbotService::Response response;
+    if (!chatbotService.tryConsumeResponse(response)) {
+        return;
+    }
+
+    chatbotPanel.setLastReply(response.text);
+
+    if (response.isRecommendation && !response.recommendedRoute.empty()) {
+        applyRecommendedRoute(response.recommendedRoute);
+    } else if (!response.isRecommendation) {
+        chatbotPanel.setLastRecommendationSummary("");
+    }
+}
+
+void Application::applyRecommendedRoute(const std::vector<int>& order) {
+    const MapGraph& graph = wasteSystem.getGraph();
+    std::vector<int> sanitized;
+    sanitized.reserve(order.size());
+    for (int nodeId : order) {
+        if (graph.findNodeIndex(nodeId) >= 0) {
+            sanitized.push_back(nodeId);
+        }
+    }
+    if (sanitized.size() < 2) {
+        chatbotPanel.setLastRecommendationSummary("route ignored (invalid ids)");
+        return;
+    }
+
+    RouteResult aiResult;
+    aiResult.algorithmName = "AI (Gemini)";
+    aiResult.visitOrder = sanitized;
+    aiResult.totalDistance = graph.calculateRouteDistance(sanitized);
+    aiResult.wasteCollected = wasteSystem.computeWasteCollected(sanitized);
+    aiResult.runtimeMs = 0.0;
+    wasteSystem.populateCosts(aiResult);
+
+    std::ostringstream summary;
+    summary << (sanitized.size() - 1) << " stops, "
+            << aiResult.totalDistance << " km, RM "
+            << aiResult.totalCost;
+    chatbotPanel.setLastRecommendationSummary(summary.str());
+
+    wasteSystem.getEventLog().addEvent(
+        "AI recommended route applied: " + summary.str());
+
+    loadMissionRoute(aiResult, true);
 }

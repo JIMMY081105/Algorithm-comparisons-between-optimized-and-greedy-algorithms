@@ -1,11 +1,13 @@
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
+#include "ai/ChatbotService.h"
 #include "algorithms/ComparisonManager.h"
 #include "core/WasteSystem.h"
 #include "environment/EnvironmentController.h"
 #include "persistence/ResultLogger.h"
 #include "visualization/AnimationController.h"
+#include "visualization/ChatbotPanel.h"
 #include "visualization/DashboardUI.h"
 #include "visualization/IsometricRenderer.h"
 
@@ -30,6 +32,8 @@ private:
     DashboardUI dashboardUI;
     ResultLogger resultLogger;
     EnvironmentController environmentController;
+    ChatbotService chatbotService;
+    ChatbotPanel chatbotPanel;
 
     RouteResult currentResult;
     MissionPresentation currentMission;
@@ -64,6 +68,14 @@ private:
 
     void beginImGuiFrame();
     void endImGuiFrame();
+
+    // AI assistant helpers — build system context, dispatch user prompts, and
+    // convert a recommended visit order into a RouteResult the animation
+    // controller can replay like any other algorithm output.
+    std::string buildChatbotContext() const;
+    void renderChatbotPanel();
+    void pollChatbotResponse();
+    void applyRecommendedRoute(const std::vector<int>& order);
 
 public:
     Application();

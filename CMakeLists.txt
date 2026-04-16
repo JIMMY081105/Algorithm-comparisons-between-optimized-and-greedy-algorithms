@@ -88,6 +88,11 @@ set(VISUALIZATION_SOURCES
     src/visualization/AnimationController.cpp
     src/visualization/DashboardStyle.cpp
     src/visualization/DashboardUI.cpp
+    src/visualization/ChatbotPanel.cpp
+)
+
+set(AI_SOURCES
+    src/ai/ChatbotService.cpp
 )
 
 set(ENVIRONMENT_SOURCES
@@ -112,6 +117,7 @@ add_executable(SmartWasteClearance
     ${ENVIRONMENT_SOURCES}
     ${VISUALIZATION_SOURCES}
     ${PERSISTENCE_SOURCES}
+    ${AI_SOURCES}
     ${APP_SOURCES}
 )
 
@@ -127,6 +133,10 @@ target_link_libraries(SmartWasteClearance PRIVATE
     glad
     imgui
 )
+
+if(WIN32)
+    target_link_libraries(SmartWasteClearance PRIVATE wininet)
+endif()
 
 if(MINGW)
     get_filename_component(MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
