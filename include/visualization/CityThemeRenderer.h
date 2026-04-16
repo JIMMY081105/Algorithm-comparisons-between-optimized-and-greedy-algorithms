@@ -282,10 +282,19 @@ private:
         float worldX, worldY;
     };
 
+    struct MountainPeak {
+        float worldX, worldY;
+        float baseWidth;
+        float baseDepth;
+        float heightScale;
+        float colorVar;
+    };
+
     std::vector<PlacedPresetBuilding> presetBuildings;
     std::vector<PlacedEnvironment> presetEnvironments;
     std::vector<PlacedVehicle> presetVehicles;
     std::vector<PlacedRoadProp> presetRoadProps;
+    std::vector<MountainPeak> mountains;
 
     void generateGridNetwork(const MapGraph& graph, std::mt19937& rng);
     void assignNodeAnchors(const MapGraph& graph);
@@ -333,6 +342,7 @@ private:
     void drawPresetRoadProp(IsometricRenderer& renderer,
                             const PlacedRoadProp& placed,
                             float animationTime) const;
+    void drawMountain(const MountainPeak& peak) const;
     void populateFromAssetLibrary(const MapGraph& graph, std::mt19937& rng);
     void drawTrafficLight(IsometricRenderer& renderer,
                           const Intersection& intersection,

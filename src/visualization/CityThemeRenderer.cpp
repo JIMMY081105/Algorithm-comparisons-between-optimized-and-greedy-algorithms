@@ -335,6 +335,55 @@ void drawBlockMass(const BlockFaces& faces,
     drawImmediateQuad(faces.top, roofColor);
 }
 
+void drawMountainShape(float cx, float cy,
+                       float halfW, float halfD, float peakHeight,
+                       const Color& baseLeft, const Color& baseRight,
+                       const Color& peakCol) {
+    const float peakX = cx;
+    const float peakY = cy - peakHeight;
+    const float northY = cy - halfD;
+    const float southY = cy + halfD;
+    const float westX = cx - halfW;
+    const float eastX = cx + halfW;
+
+    const Color backL = scaleColor(baseLeft, 0.70f);
+    const Color backR = scaleColor(baseRight, 0.76f);
+
+    glBegin(GL_TRIANGLES);
+    // Back-left face (North -> West -> Peak)
+    glColor4f(backL.r, backL.g, backL.b, backL.a);
+    glVertex2f(cx, northY);
+    glColor4f(backL.r, backL.g, backL.b, backL.a);
+    glVertex2f(westX, cy);
+    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
+    glVertex2f(peakX, peakY);
+
+    // Back-right face (North -> East -> Peak)
+    glColor4f(backR.r, backR.g, backR.b, backR.a);
+    glVertex2f(cx, northY);
+    glColor4f(backR.r, backR.g, backR.b, backR.a);
+    glVertex2f(eastX, cy);
+    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
+    glVertex2f(peakX, peakY);
+
+    // Front-left face (West -> South -> Peak)
+    glColor4f(baseLeft.r, baseLeft.g, baseLeft.b, baseLeft.a);
+    glVertex2f(westX, cy);
+    glColor4f(baseLeft.r, baseLeft.g, baseLeft.b, baseLeft.a);
+    glVertex2f(cx, southY);
+    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
+    glVertex2f(peakX, peakY);
+
+    // Front-right face (East -> South -> Peak)
+    glColor4f(baseRight.r, baseRight.g, baseRight.b, baseRight.a);
+    glVertex2f(eastX, cy);
+    glColor4f(baseRight.r, baseRight.g, baseRight.b, baseRight.a);
+    glVertex2f(cx, southY);
+    glColor4f(peakCol.r, peakCol.g, peakCol.b, peakCol.a);
+    glVertex2f(peakX, peakY);
+    glEnd();
+}
+
 void drawFaceBands(const std::array<IsoCoord, 4>& face,
                    int bandCount,
                    float inset,
@@ -1444,8 +1493,8 @@ void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
         drawPresetVehicle(renderer, vehicle);
     }
 
-    for (const auto& building : backgroundBuildings) {
-        drawBuildingLot(renderer, building);
+    for (const auto& peak : mountains) {
+        drawMountain(peak);
     }
 }
 
@@ -2335,117 +2384,83 @@ void CityThemeRenderer::populateFromAssetLibrary(const MapGraph& graph,
 void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     backgroundBuildings.clear();
     ambientStreets.clear();
+    mountains.clear();
 
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
-    std::uniform_real_distribution<float> hueDistribution(-0.03f, 0.02f);
+    std::uniform_real_distribution<float> colorDist(-1.0f, 1.0f);
 
-    auto addBackgroundLot = [&](float x, float y, float width, float depth, float height,
-                                BuildingFamily family, BuildingForm form,
-                                float brightnessBias) {
-        backgroundBuildings.push_back(BuildingLot{
-            x,
-            y,
-            width,
-            depth,
-            height,
-            hueDistribution(rng),
-            0.06f + unit(rng) * 0.08f,
-            0.12f + brightnessBias + unit(rng) * 0.08f,
-            0.10f + unit(rng) * 0.12f,
-            0.10f + unit(rng) * 0.12f,
-            0.10f + unit(rng) * 0.12f,
-            0.12f + unit(rng) * 0.16f,
-            0.18f + unit(rng) * 0.08f,
-            0.82f,
-            0.0f,
-            0.10f + unit(rng) * 0.08f,
-            0.16f + unit(rng) * 0.18f,
-            DistrictType::Service,
-            family,
-            RoofProfile::Flat,
-            form,
-            VisualTier::Peripheral,
-            false
-        });
+    auto addMountain = [&](float wx, float wy, float bw, float bd,
+                           float hs, float cv) {
+        mountains.push_back(MountainPeak{wx, wy, bw, bd, hs, cv});
     };
 
-    const int northCount = 10;
+    // North ridge — main backdrop mountain range (tallest)
+    const float northBaseY = sceneMinY - 2.0f;
+    const int northCount = 14;
     for (int i = 0; i < northCount; ++i) {
-        const float x = peripheralMinX + (static_cast<float>(i) + 0.5f) *
-            ((peripheralMaxX - peripheralMinX) / static_cast<float>(northCount));
-        const float y = sceneMinY - 1.2f - unit(rng) * 3.4f;
-        addBackgroundLot(x, y,
-                         1.0f + unit(rng) * 1.8f,
-                         0.8f + unit(rng) * 1.4f,
-                         9.0f + unit(rng) * 12.0f,
-                         (i % 4 == 0) ? BuildingFamily::Residential : BuildingFamily::Commercial,
-                         (i % 4 == 0) ? BuildingForm::Slab : BuildingForm::Tower,
-                         0.02f);
+        const float t = (static_cast<float>(i) + 0.5f) /
+                        static_cast<float>(northCount);
+        float x = peripheralMinX + t * (peripheralMaxX - peripheralMinX);
+        x += (unit(rng) - 0.5f) * 1.2f;
+        const float y = northBaseY - unit(rng) * 2.8f;
+        float heightScale = 0.6f + unit(rng) * 0.5f;
+        const float centerBoost = 1.0f - std::abs(t - 0.5f) * 1.6f;
+        heightScale += std::max(0.0f, centerBoost) * 0.4f;
+        const float baseW = 1.4f + unit(rng) * 1.0f;
+        const float baseD = 1.0f + unit(rng) * 0.8f;
+        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
     }
 
-    const int southCount = 8;
+    // South hills — lower foreground ridges
+    const float southBaseY = sceneMaxY + 2.0f;
+    const int southCount = 10;
     for (int i = 0; i < southCount; ++i) {
-        const float x = peripheralMinX + (static_cast<float>(i) + 0.5f) *
-            ((peripheralMaxX - peripheralMinX) / static_cast<float>(southCount));
-        const float y = sceneMaxY + 1.4f + unit(rng) * 3.8f;
-        addBackgroundLot(x, y,
-                         0.9f + unit(rng) * 1.6f,
-                         0.8f + unit(rng) * 1.2f,
-                         8.0f + unit(rng) * 10.0f,
-                         (i % 3 == 0) ? BuildingFamily::Utility : BuildingFamily::Residential,
-                         (i % 3 == 0) ? BuildingForm::Pavilion : BuildingForm::Terrace,
-                         0.00f);
+        const float t = (static_cast<float>(i) + 0.5f) /
+                        static_cast<float>(southCount);
+        float x = peripheralMinX + t * (peripheralMaxX - peripheralMinX);
+        x += (unit(rng) - 0.5f) * 1.0f;
+        const float y = southBaseY + unit(rng) * 2.4f;
+        const float heightScale = 0.3f + unit(rng) * 0.35f;
+        const float baseW = 1.2f + unit(rng) * 0.8f;
+        const float baseD = 0.8f + unit(rng) * 0.6f;
+        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
     }
 
-    const int westCount = 6;
+    // West ridge
+    const int westCount = 7;
     for (int i = 0; i < westCount; ++i) {
-        const float x = sceneMinX - 1.2f - unit(rng) * 3.0f;
-        const float y = peripheralMinY + (static_cast<float>(i) + 0.7f) *
-            ((peripheralMaxY - peripheralMinY) / static_cast<float>(westCount));
-        addBackgroundLot(x, y,
-                         1.2f + unit(rng) * 1.4f,
-                         1.0f + unit(rng) * 1.2f,
-                         7.0f + unit(rng) * 9.0f,
-                         BuildingFamily::Utility,
-                         BuildingForm::Slab,
-                         -0.01f);
+        const float t = (static_cast<float>(i) + 0.5f) /
+                        static_cast<float>(westCount);
+        float y = peripheralMinY + t * (peripheralMaxY - peripheralMinY);
+        y += (unit(rng) - 0.5f) * 0.8f;
+        const float x = sceneMinX - 2.0f - unit(rng) * 2.5f;
+        const float heightScale = 0.4f + unit(rng) * 0.4f;
+        const float baseW = 1.2f + unit(rng) * 0.9f;
+        const float baseD = 0.9f + unit(rng) * 0.7f;
+        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
     }
 
-    const int eastCount = 6;
+    // East ridge
+    const int eastCount = 7;
     for (int i = 0; i < eastCount; ++i) {
-        const float x = sceneMaxX + 1.4f + unit(rng) * 3.4f;
-        const float y = peripheralMinY + (static_cast<float>(i) + 0.6f) *
-            ((peripheralMaxY - peripheralMinY) / static_cast<float>(eastCount));
-        addBackgroundLot(x, y,
-                         1.0f + unit(rng) * 1.8f,
-                         0.9f + unit(rng) * 1.3f,
-                         8.0f + unit(rng) * 11.0f,
-                         (i % 2 == 0) ? BuildingFamily::Commercial : BuildingFamily::Residential,
-                         (i % 2 == 0) ? BuildingForm::Tower : BuildingForm::Slab,
-                         0.01f);
+        const float t = (static_cast<float>(i) + 0.5f) /
+                        static_cast<float>(eastCount);
+        float y = peripheralMinY + t * (peripheralMaxY - peripheralMinY);
+        y += (unit(rng) - 0.5f) * 0.8f;
+        const float x = sceneMaxX + 2.0f + unit(rng) * 2.5f;
+        const float heightScale = 0.4f + unit(rng) * 0.4f;
+        const float baseW = 1.2f + unit(rng) * 0.9f;
+        const float baseD = 0.9f + unit(rng) * 0.7f;
+        addMountain(x, y, baseW, baseD, heightScale, colorDist(rng));
     }
 
-    std::sort(backgroundBuildings.begin(), backgroundBuildings.end(),
-              [](const BuildingLot& lhs, const BuildingLot& rhs) {
-                  if (std::abs(lhs.y - rhs.y) > 0.02f) {
-                      return lhs.y < rhs.y;
-                  }
-                  return lhs.x < rhs.x;
+    // Sort back-to-front (ascending worldY for painter's algorithm)
+    std::sort(mountains.begin(), mountains.end(),
+              [](const MountainPeak& a, const MountainPeak& b) {
+                  if (std::abs(a.worldY - b.worldY) > 0.02f)
+                      return a.worldY < b.worldY;
+                  return a.worldX < b.worldX;
               });
-    const int streetCount = 7;
-    for (int i = 0; i < streetCount; ++i) {
-        const float y = peripheralMinY +
-            (static_cast<float>(i) + 0.5f) * ((peripheralMaxY - peripheralMinY) / streetCount);
-        ambientStreets.push_back(AmbientStreet{
-            peripheralMinX,
-            y + unit(rng) * 0.6f - 0.3f,
-            peripheralMaxX,
-            y + unit(rng) * 0.6f - 0.3f,
-            3.8f + unit(rng) * 2.2f,
-            0.10f + unit(rng) * 0.10f,
-            VisualTier::Peripheral
-        });
-    }
 }
 
 void CityThemeRenderer::generateAmbientCars(std::mt19937& rng) {
@@ -4165,6 +4180,83 @@ void CityThemeRenderer::drawPresetRoadProp(IsometricRenderer& renderer,
         break;
     }
     }
+}
+
+void CityThemeRenderer::drawMountain(const MountainPeak& peak) const {
+    const IsoCoord iso = RenderUtils::worldToIso(peak.worldX, peak.worldY);
+    const ZoneVisibility zone = computeZoneVisibility(
+        peak.worldX, peak.worldY,
+        operationalCenterX, operationalCenterY,
+        operationalRadiusX, operationalRadiusY);
+    if (zone.transition <= 0.04f) {
+        return;
+    }
+    const float zf = currentZoomFactor();
+    const float halfW = peak.baseWidth * 30.0f * zf;
+    const float halfD = peak.baseDepth * 20.0f * zf;
+    const float height = peak.heightScale * 65.0f * zf;
+
+    // Earthy mountain tones
+    Color baseLeft(0.08f + peak.colorVar * 0.02f,
+                   0.11f + peak.colorVar * 0.03f,
+                   0.09f + peak.colorVar * 0.01f, 0.96f);
+    Color baseRight(0.11f + peak.colorVar * 0.02f,
+                    0.14f + peak.colorVar * 0.03f,
+                    0.12f + peak.colorVar * 0.01f, 0.96f);
+    Color peakColor(0.18f + peak.colorVar * 0.04f,
+                    0.22f + peak.colorVar * 0.05f,
+                    0.20f + peak.colorVar * 0.02f, 0.96f);
+
+    // Weather adjustments
+    switch (weather) {
+        case CityWeather::Stormy:
+            baseLeft = scaleColor(baseLeft, 0.60f);
+            baseRight = scaleColor(baseRight, 0.60f);
+            peakColor = scaleColor(peakColor, 0.65f);
+            break;
+        case CityWeather::Rainy:
+            baseLeft = scaleColor(baseLeft, 0.78f);
+            baseRight = scaleColor(baseRight, 0.78f);
+            peakColor = scaleColor(peakColor, 0.82f);
+            break;
+        case CityWeather::Sunny:
+            baseRight = scaleColor(baseRight, 1.22f);
+            peakColor = scaleColor(peakColor, 1.18f);
+            break;
+        default:
+            break;
+    }
+
+    // Snow on peaks in winter
+    if (season == CitySeason::Winter) {
+        const Color snowCol(0.82f, 0.86f, 0.92f, 0.96f);
+        if (hasWinterStormActive()) {
+            peakColor = mixColor(peakColor, snowCol, 0.72f);
+            baseLeft  = mixColor(baseLeft,  snowCol, 0.28f);
+            baseRight = mixColor(baseRight, snowCol, 0.32f);
+        } else if (hasSnowfall()) {
+            peakColor = mixColor(peakColor, snowCol, 0.55f);
+            baseLeft  = mixColor(baseLeft,  snowCol, 0.10f);
+            baseRight = mixColor(baseRight, snowCol, 0.12f);
+        } else {
+            peakColor = mixColor(peakColor, snowCol, 0.25f);
+        }
+    }
+
+    // Zone attenuation for depth fog
+    const Color voidTint(0.01f, 0.02f, 0.03f, 0.96f);
+    baseLeft  = attenuateToZone(baseLeft,  zone, voidTint, 0.04f, 0.40f, 0.04f);
+    baseRight = attenuateToZone(baseRight, zone, voidTint, 0.06f, 0.36f, 0.04f);
+    peakColor = attenuateToZone(peakColor, zone, voidTint, 0.08f, 0.30f, 0.04f);
+
+    // Soft foothill glow to blend mountain base with ground
+    drawGradientEllipse(iso.x, iso.y + halfD * 0.3f,
+                        halfW * 1.6f, halfD * 1.2f,
+                        withAlpha(baseLeft, 0.22f),
+                        withAlpha(baseLeft, 0.0f));
+
+    drawMountainShape(iso.x, iso.y, halfW, halfD, height,
+                      baseLeft, baseRight, peakColor);
 }
 
 void CityThemeRenderer::drawTrafficLight(IsometricRenderer& renderer,
