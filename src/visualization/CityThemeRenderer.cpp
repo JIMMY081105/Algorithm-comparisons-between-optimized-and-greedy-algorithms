@@ -1549,16 +1549,22 @@ void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
     for (const auto& vehicle : presetVehicles) {
         drawPresetVehicle(renderer, vehicle);
     }
-
-    for (const auto& peak : mountains) {
-        drawMountain(peak);
-    }
 }
 
 void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
                                                const MapGraph&,
                                                float animationTime) {
     (void)renderer;
+
+    // Mountains render here (after ground, decorations, transit network,
+    // nodes and truck) so tall peaks visually occlude road edges and block
+    // borders — matching real parallax where a taller object closer to the
+    // camera covers the flat terrain behind it. Routing is graph-based and
+    // unaffected by draw order.
+    for (const auto& peak : mountains) {
+        drawMountain(peak);
+    }
+
     const float spanX = std::max(1.0f, peripheralMaxX - peripheralMinX);
     const float spanY = std::max(1.0f, peripheralMaxY - peripheralMinY);
 
@@ -2437,22 +2443,32 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     const float mtnMaxY = peripheralMaxY + 36.0f;
     const float mtnSpanY = mtnMaxY - mtnMinY;
 
+    // Innermost ring (row 0 on every side) gets a tall-peak boost so silhouettes
+    // project up in screen space and visually occlude the adjacent road rows —
+    // routing graph is independent, so no impact on pathfinding.
+    const float frontPeakBoost = 0.85f;
+    const float frontPeakExtra = 0.35f;
+    const float frontWidthBoost = 0.35f;
+
     // === NORTH RIDGE — 8 rows, tallest backdrop range ===
     for (int row = 0; row < 8; ++row) {
         const float rowF = static_cast<float>(row);
         const float baseY = sceneMinY - 0.6f - rowF * 3.4f;
         const int count = 28 + row * 4;
         const float hBoost = 0.12f * rowF;
+        const float rowFrontBoost = (row == 0) ? frontPeakBoost : 0.0f;
+        const float rowWidthBoost = (row == 0) ? frontWidthBoost : 0.0f;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
             float x = mtnMinX + t * mtnSpanX;
             x += (unit(rng) - 0.5f) * 1.8f;
             const float y = baseY - unit(rng) * 3.4f;
-            float hs = 0.55f + unit(rng) * 0.55f + hBoost;
+            float hs = 0.55f + unit(rng) * 0.55f + hBoost + rowFrontBoost;
             const float cb = 1.0f - std::abs(t - 0.5f) * 1.4f;
             hs += std::max(0.0f, cb) * 0.5f;
-            const float bw = 1.6f + unit(rng) * 1.5f + rowF * 0.25f;
+            if (row == 0) hs += unit(rng) * frontPeakExtra;
+            const float bw = 1.6f + unit(rng) * 1.5f + rowF * 0.25f + rowWidthBoost;
             const float bd = 1.1f + unit(rng) * 1.0f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
@@ -2463,14 +2479,17 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
         const float rowF = static_cast<float>(row);
         const float baseY = sceneMaxY + 0.6f + rowF * 3.2f;
         const int count = 24 + row * 4;
+        const float rowFrontBoost = (row == 0) ? frontPeakBoost : 0.0f;
+        const float rowWidthBoost = (row == 0) ? frontWidthBoost : 0.0f;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
             float x = mtnMinX + t * mtnSpanX;
             x += (unit(rng) - 0.5f) * 1.5f;
             const float y = baseY + unit(rng) * 3.0f;
-            const float hs = 0.35f + unit(rng) * 0.48f + rowF * 0.10f;
-            const float bw = 1.4f + unit(rng) * 1.3f + rowF * 0.25f;
+            float hs = 0.35f + unit(rng) * 0.48f + rowF * 0.10f + rowFrontBoost;
+            if (row == 0) hs += unit(rng) * frontPeakExtra;
+            const float bw = 1.4f + unit(rng) * 1.3f + rowF * 0.25f + rowWidthBoost;
             const float bd = 0.9f + unit(rng) * 0.9f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
@@ -2480,14 +2499,17 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     for (int row = 0; row < 7; ++row) {
         const float rowF = static_cast<float>(row);
         const int count = 22 + row * 4;
+        const float rowFrontBoost = (row == 0) ? frontPeakBoost : 0.0f;
+        const float rowWidthBoost = (row == 0) ? frontWidthBoost : 0.0f;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
             float y = mtnMinY + t * mtnSpanY;
             y += (unit(rng) - 0.5f) * 1.2f;
             const float x = sceneMinX - 0.8f - unit(rng) * 3.0f - rowF * 3.0f;
-            const float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f;
-            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f;
+            float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f + rowFrontBoost;
+            if (row == 0) hs += unit(rng) * frontPeakExtra;
+            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f + rowWidthBoost;
             const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
@@ -2497,14 +2519,17 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     for (int row = 0; row < 7; ++row) {
         const float rowF = static_cast<float>(row);
         const int count = 22 + row * 4;
+        const float rowFrontBoost = (row == 0) ? frontPeakBoost : 0.0f;
+        const float rowWidthBoost = (row == 0) ? frontWidthBoost : 0.0f;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
             float y = mtnMinY + t * mtnSpanY;
             y += (unit(rng) - 0.5f) * 1.2f;
             const float x = sceneMaxX + 0.8f + unit(rng) * 3.0f + rowF * 3.0f;
-            const float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f;
-            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f;
+            float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f + rowFrontBoost;
+            if (row == 0) hs += unit(rng) * frontPeakExtra;
+            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f + rowWidthBoost;
             const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
