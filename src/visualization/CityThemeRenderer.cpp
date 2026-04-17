@@ -2452,19 +2452,19 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     };
 
     // Extended placement area — mountains spread far beyond the city
-    const float mtnMinX = peripheralMinX - 14.0f;
-    const float mtnMaxX = peripheralMaxX + 14.0f;
+    const float mtnMinX = peripheralMinX - 40.0f;
+    const float mtnMaxX = peripheralMaxX + 40.0f;
     const float mtnSpanX = mtnMaxX - mtnMinX;
-    const float mtnMinY = peripheralMinY - 12.0f;
-    const float mtnMaxY = peripheralMaxY + 12.0f;
+    const float mtnMinY = peripheralMinY - 36.0f;
+    const float mtnMaxY = peripheralMaxY + 36.0f;
     const float mtnSpanY = mtnMaxY - mtnMinY;
 
-    // === NORTH RIDGE — 3 rows, tallest backdrop range ===
-    for (int row = 0; row < 3; ++row) {
+    // === NORTH RIDGE — 8 rows, tallest backdrop range ===
+    for (int row = 0; row < 8; ++row) {
         const float rowF = static_cast<float>(row);
-        const float baseY = sceneMinY - 2.0f - rowF * 3.8f;
-        const int count = 18 + row * 5;
-        const float hBoost = 0.16f * rowF;
+        const float baseY = sceneMinY - 2.0f - rowF * 3.4f;
+        const int count = 28 + row * 4;
+        const float hBoost = 0.12f * rowF;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
@@ -2474,83 +2474,138 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
             float hs = 0.55f + unit(rng) * 0.55f + hBoost;
             const float cb = 1.0f - std::abs(t - 0.5f) * 1.4f;
             hs += std::max(0.0f, cb) * 0.5f;
-            const float bw = 1.6f + unit(rng) * 1.5f + rowF * 0.3f;
-            const float bd = 1.1f + unit(rng) * 1.0f + rowF * 0.2f;
+            const float bw = 1.6f + unit(rng) * 1.5f + rowF * 0.25f;
+            const float bd = 1.1f + unit(rng) * 1.0f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
     }
 
-    // === SOUTH HILLS — 2 rows, lower foreground ridges ===
-    for (int row = 0; row < 2; ++row) {
+    // === SOUTH HILLS — 7 rows, lower foreground ridges ===
+    for (int row = 0; row < 7; ++row) {
         const float rowF = static_cast<float>(row);
         const float baseY = sceneMaxY + 2.0f + rowF * 3.2f;
-        const int count = 14 + row * 4;
+        const int count = 24 + row * 4;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
             float x = mtnMinX + t * mtnSpanX;
             x += (unit(rng) - 0.5f) * 1.5f;
             const float y = baseY + unit(rng) * 3.0f;
-            const float hs = 0.35f + unit(rng) * 0.42f + rowF * 0.12f;
-            const float bw = 1.4f + unit(rng) * 1.3f + rowF * 0.3f;
-            const float bd = 0.9f + unit(rng) * 0.9f + rowF * 0.2f;
+            const float hs = 0.35f + unit(rng) * 0.48f + rowF * 0.10f;
+            const float bw = 1.4f + unit(rng) * 1.3f + rowF * 0.25f;
+            const float bd = 0.9f + unit(rng) * 0.9f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
     }
 
-    // === WEST RIDGE — 2 rows ===
-    for (int row = 0; row < 2; ++row) {
+    // === WEST RIDGE — 7 rows ===
+    for (int row = 0; row < 7; ++row) {
         const float rowF = static_cast<float>(row);
-        const int count = 12 + row * 4;
+        const int count = 22 + row * 4;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
             float y = mtnMinY + t * mtnSpanY;
             y += (unit(rng) - 0.5f) * 1.2f;
-            const float x = sceneMinX - 2.5f - unit(rng) * 3.8f - rowF * 3.2f;
-            const float hs = 0.45f + unit(rng) * 0.48f + rowF * 0.1f;
-            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.3f;
-            const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.2f;
+            const float x = sceneMinX - 2.5f - unit(rng) * 3.8f - rowF * 3.0f;
+            const float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f;
+            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f;
+            const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
     }
 
-    // === EAST RIDGE — 2 rows ===
-    for (int row = 0; row < 2; ++row) {
+    // === EAST RIDGE — 7 rows ===
+    for (int row = 0; row < 7; ++row) {
         const float rowF = static_cast<float>(row);
-        const int count = 12 + row * 4;
+        const int count = 22 + row * 4;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
                             static_cast<float>(count);
             float y = mtnMinY + t * mtnSpanY;
             y += (unit(rng) - 0.5f) * 1.2f;
-            const float x = sceneMaxX + 2.5f + unit(rng) * 3.8f + rowF * 3.2f;
-            const float hs = 0.45f + unit(rng) * 0.48f + rowF * 0.1f;
-            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.3f;
-            const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.2f;
+            const float x = sceneMaxX + 2.5f + unit(rng) * 3.8f + rowF * 3.0f;
+            const float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f;
+            const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f;
+            const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.18f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
     }
 
-    // === CORNER FILLS — NW, NE, SW, SE clusters ===
+    // === CORNER FILLS — NW, NE, SW, SE clusters (denser, larger radius) ===
     const float cornerOffsets[4][2] = {
-        {sceneMinX - 4.0f, sceneMinY - 4.0f},
-        {sceneMaxX + 4.0f, sceneMinY - 4.0f},
-        {sceneMinX - 4.0f, sceneMaxY + 4.0f},
-        {sceneMaxX + 4.0f, sceneMaxY + 4.0f},
+        {sceneMinX - 6.0f, sceneMinY - 6.0f},
+        {sceneMaxX + 6.0f, sceneMinY - 6.0f},
+        {sceneMinX - 6.0f, sceneMaxY + 6.0f},
+        {sceneMaxX + 6.0f, sceneMaxY + 6.0f},
     };
     for (int c = 0; c < 4; ++c) {
-        const int count = 8;
+        const int count = 32;
         for (int i = 0; i < count; ++i) {
             const float angle = kTwoPi * static_cast<float>(i) /
                                 static_cast<float>(count)
                               + unit(rng) * 0.6f;
-            const float r = 2.0f + unit(rng) * 6.0f;
+            const float r = 2.0f + unit(rng) * 18.0f;
             const float x = cornerOffsets[c][0] + std::cos(angle) * r;
-            const float y = cornerOffsets[c][1] + std::sin(angle) * r * 0.6f;
+            const float y = cornerOffsets[c][1] + std::sin(angle) * r * 0.7f;
             const float hs = 0.40f + unit(rng) * 0.55f;
             const float bw = 1.4f + unit(rng) * 1.3f;
             const float bd = 1.0f + unit(rng) * 1.0f;
+            addMountain(x, y, bw, bd, hs, colorDist(rng));
+        }
+    }
+
+    // === OUTER HALO SCATTER — blanket the entire peripheral zone outside
+    // the scene box so any remaining black space is filled with mountains ===
+    {
+        const float haloMinX = mtnMinX - 6.0f;
+        const float haloMaxX = mtnMaxX + 6.0f;
+        const float haloMinY = mtnMinY - 6.0f;
+        const float haloMaxY = mtnMaxY + 6.0f;
+        const float stepX = 2.2f;
+        const float stepY = 2.2f;
+        for (float gy = haloMinY; gy <= haloMaxY; gy += stepY) {
+            for (float gx = haloMinX; gx <= haloMaxX; gx += stepX) {
+                // Skip the inner scene so mountains don't overlap the city
+                const float pad = 3.0f;
+                if (gx > sceneMinX - pad && gx < sceneMaxX + pad &&
+                    gy > sceneMinY - pad && gy < sceneMaxY + pad) {
+                    continue;
+                }
+                const float x = gx + (unit(rng) - 0.5f) * stepX * 0.9f;
+                const float y = gy + (unit(rng) - 0.5f) * stepY * 0.9f;
+                const float hs = 0.38f + unit(rng) * 0.70f;
+                const float bw = 1.3f + unit(rng) * 1.6f;
+                const float bd = 0.9f + unit(rng) * 1.2f;
+                addMountain(x, y, bw, bd, hs, colorDist(rng));
+            }
+        }
+    }
+
+    // === FAR FIELD — extra distant peaks beyond the halo for depth ===
+    {
+        const int farCount = 260;
+        const float farPad = 10.0f;
+        for (int i = 0; i < farCount; ++i) {
+            const int side = static_cast<int>(unit(rng) * 4.0f) % 4;
+            float x = 0.0f;
+            float y = 0.0f;
+            if (side == 0) { // north band
+                x = mtnMinX - farPad + unit(rng) * (mtnSpanX + 2.0f * farPad);
+                y = mtnMinY - farPad - unit(rng) * 10.0f;
+            } else if (side == 1) { // south band
+                x = mtnMinX - farPad + unit(rng) * (mtnSpanX + 2.0f * farPad);
+                y = mtnMaxY + farPad + unit(rng) * 10.0f;
+            } else if (side == 2) { // west band
+                x = mtnMinX - farPad - unit(rng) * 10.0f;
+                y = mtnMinY - farPad + unit(rng) * (mtnSpanY + 2.0f * farPad);
+            } else { // east band
+                x = mtnMaxX + farPad + unit(rng) * 10.0f;
+                y = mtnMinY - farPad + unit(rng) * (mtnSpanY + 2.0f * farPad);
+            }
+            const float hs = 0.55f + unit(rng) * 0.80f;
+            const float bw = 1.8f + unit(rng) * 2.0f;
+            const float bd = 1.2f + unit(rng) * 1.4f;
             addMountain(x, y, bw, bd, hs, colorDist(rng));
         }
     }
