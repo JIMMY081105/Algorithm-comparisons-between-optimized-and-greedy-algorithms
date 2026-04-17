@@ -1692,37 +1692,6 @@ void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
     glVertex2f(midX, bottom);
     glEnd();
 
-    const float zoneCenterX = (gZoneMinX + gZoneMaxX) * 0.5f;
-    const float zoneCenterY = (gZoneMinY + gZoneMaxY) * 0.5f;
-    const IsoCoord zoneIso = RenderUtils::worldToIso(zoneCenterX, zoneCenterY);
-    const std::array<IsoCoord, 4> zoneCorners{{
-        RenderUtils::worldToIso(gZoneMinX, gZoneMinY),
-        RenderUtils::worldToIso(gZoneMaxX, gZoneMinY),
-        RenderUtils::worldToIso(gZoneMaxX, gZoneMaxY),
-        RenderUtils::worldToIso(gZoneMinX, gZoneMaxY)
-    }};
-
-    float clearRadiusX = 0.0f;
-    float clearRadiusY = 0.0f;
-    for (const IsoCoord& corner : zoneCorners) {
-        clearRadiusX = std::max(clearRadiusX, std::abs(corner.x - zoneIso.x));
-        clearRadiusY = std::max(clearRadiusY, std::abs(corner.y - zoneIso.y));
-    }
-    clearRadiusX += 22.0f;
-    clearRadiusY += 14.0f;
-
-    drawGradientRingEllipse(zoneIso.x, zoneIso.y,
-                            clearRadiusX, clearRadiusY,
-                            clearRadiusX * 1.26f, clearRadiusY * 1.22f,
-                            Color(0.00f, 0.00f, 0.00f, 0.0f),
-                            Color(0.00f, 0.00f, 0.00f,
-                                  0.18f + weatherOverlayStrength() * 0.16f));
-    drawGradientRingEllipse(zoneIso.x, zoneIso.y,
-                            clearRadiusX * 1.12f, clearRadiusY * 1.10f,
-                            clearRadiusX * 1.88f, clearRadiusY * 1.66f,
-                            Color(0.00f, 0.00f, 0.00f, 0.0f),
-                            Color(0.00f, 0.00f, 0.00f,
-                                  0.72f + weatherOverlayStrength() * 0.18f));
 }
 
 void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937& rng) {
