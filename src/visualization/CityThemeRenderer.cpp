@@ -4342,20 +4342,27 @@ void CityThemeRenderer::drawMountain(const MountainPeak& peak) const {
     const IsoCoord iso = RenderUtils::worldToIso(peak.worldX, peak.worldY);
 
     // Mountains use extended zone visibility — background scenery should remain
-    // visible much further out than gameplay elements when zoomed out
+    // visible much further out than gameplay elements when zoomed out.
+    // Instead of a hard cull that produces a visible black ring, we fade each
+    // ring progressively into the void so distant mountains blend with the
+    // background rather than popping off at a fixed radius.
     const float dx = (peak.worldX < gZoneMinX) ? (gZoneMinX - peak.worldX)
                    : (peak.worldX > gZoneMaxX) ? (peak.worldX - gZoneMaxX)
                                                : 0.0f;
     const float dy = (peak.worldY < gZoneMinY) ? (gZoneMinY - peak.worldY)
                    : (peak.worldY > gZoneMaxY) ? (peak.worldY - gZoneMaxY)
                                                : 0.0f;
-    const float mFalloffX = std::max(gZoneFalloffX * 3.0f, 14.0f);
-    const float mFalloffY = std::max(gZoneFalloffY * 3.0f, 12.0f);
+    const float mFalloffX = std::max(gZoneFalloffX * 6.0f, 40.0f);
+    const float mFalloffY = std::max(gZoneFalloffY * 6.0f, 34.0f);
     const float outside = std::sqrt(
         (dx / mFalloffX) * (dx / mFalloffX) +
         (dy / mFalloffY) * (dy / mFalloffY));
-    const float transition = 1.0f - smoothRange(0.0f, 1.0f, outside);
-    if (transition <= 0.02f) {
+    // fade: 0 at city edge → 1 at the outer ring (fully void-tinted)
+    const float fade = std::min(1.0f, smoothRange(0.0f, 1.0f, outside));
+    const float transition = 1.0f - fade;
+    // Only cull mountains so far out they'd be indistinguishable from the
+    // background even at full void tint — no hard visible cutoff.
+    if (outside > 1.35f) {
         return;
     }
 
@@ -4421,9 +4428,13 @@ void CityThemeRenderer::drawMountain(const MountainPeak& peak) const {
             break;
     }
 
-    // Distance fog — fade toward dark void proportional to distance
-    const Color voidTint(0.04f, 0.05f, 0.06f, 0.96f);
-    const float fogBlend = (1.0f - transition) * 0.70f;
+    // Distance fog — ring-by-ring darkening toward the void.
+    // fogBlend ramps from 0 at the city edge up to 1.0 at the outer ring so
+    // each successive ring of mountains reads darker than the one in front of
+    // it and the furthest peaks fade cleanly into the black background
+    // (no hard circular cutoff).
+    const Color voidTint(0.02f, 0.03f, 0.04f, 0.96f);
+    const float fogBlend = std::pow(fade, 0.75f);
     tier0 = mixColor(tier0, voidTint, fogBlend);
     tier1 = mixColor(tier1, voidTint, fogBlend);
     tier2 = mixColor(tier2, voidTint, fogBlend);
