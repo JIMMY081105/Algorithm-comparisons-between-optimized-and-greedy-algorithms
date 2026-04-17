@@ -2415,8 +2415,17 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
     std::uniform_real_distribution<float> colorDist(-1.0f, 1.0f);
 
+    // Keep mountain bases just outside the city envelope — tight to the
+    // roadside boundary but never crossing it. Only the mountain's own
+    // footprint counts as the buffer, so peaks press right up to the edge.
     auto addMountain = [&](float wx, float wy, float bw, float bd,
                            float hs, float cv) {
+        const float footprintPadX = bw * 0.45f;
+        const float footprintPadY = bd * 0.45f;
+        if (wx > sceneMinX - footprintPadX && wx < sceneMaxX + footprintPadX &&
+            wy > sceneMinY - footprintPadY && wy < sceneMaxY + footprintPadY) {
+            return;
+        }
         mountains.push_back(MountainPeak{wx, wy, bw, bd, hs, cv});
     };
 
