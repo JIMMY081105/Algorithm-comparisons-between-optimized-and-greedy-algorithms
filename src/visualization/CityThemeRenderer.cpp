@@ -2440,7 +2440,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     // === NORTH RIDGE — 8 rows, tallest backdrop range ===
     for (int row = 0; row < 8; ++row) {
         const float rowF = static_cast<float>(row);
-        const float baseY = sceneMinY - 2.0f - rowF * 3.4f;
+        const float baseY = sceneMinY - 0.6f - rowF * 3.4f;
         const int count = 28 + row * 4;
         const float hBoost = 0.12f * rowF;
         for (int i = 0; i < count; ++i) {
@@ -2461,7 +2461,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
     // === SOUTH HILLS — 7 rows, lower foreground ridges ===
     for (int row = 0; row < 7; ++row) {
         const float rowF = static_cast<float>(row);
-        const float baseY = sceneMaxY + 2.0f + rowF * 3.2f;
+        const float baseY = sceneMaxY + 0.6f + rowF * 3.2f;
         const int count = 24 + row * 4;
         for (int i = 0; i < count; ++i) {
             const float t = (static_cast<float>(i) + 0.5f) /
@@ -2485,7 +2485,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
                             static_cast<float>(count);
             float y = mtnMinY + t * mtnSpanY;
             y += (unit(rng) - 0.5f) * 1.2f;
-            const float x = sceneMinX - 2.5f - unit(rng) * 3.8f - rowF * 3.0f;
+            const float x = sceneMinX - 0.8f - unit(rng) * 3.0f - rowF * 3.0f;
             const float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f;
             const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f;
             const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.18f;
@@ -2502,7 +2502,7 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
                             static_cast<float>(count);
             float y = mtnMinY + t * mtnSpanY;
             y += (unit(rng) - 0.5f) * 1.2f;
-            const float x = sceneMaxX + 2.5f + unit(rng) * 3.8f + rowF * 3.0f;
+            const float x = sceneMaxX + 0.8f + unit(rng) * 3.0f + rowF * 3.0f;
             const float hs = 0.45f + unit(rng) * 0.52f + rowF * 0.09f;
             const float bw = 1.4f + unit(rng) * 1.2f + rowF * 0.25f;
             const float bd = 1.0f + unit(rng) * 0.9f + rowF * 0.18f;
@@ -2512,10 +2512,10 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
 
     // === CORNER FILLS — NW, NE, SW, SE clusters (denser, larger radius) ===
     const float cornerOffsets[4][2] = {
-        {sceneMinX - 6.0f, sceneMinY - 6.0f},
-        {sceneMaxX + 6.0f, sceneMinY - 6.0f},
-        {sceneMinX - 6.0f, sceneMaxY + 6.0f},
-        {sceneMaxX + 6.0f, sceneMaxY + 6.0f},
+        {sceneMinX - 2.5f, sceneMinY - 2.5f},
+        {sceneMaxX + 2.5f, sceneMinY - 2.5f},
+        {sceneMinX - 2.5f, sceneMaxY + 2.5f},
+        {sceneMaxX + 2.5f, sceneMaxY + 2.5f},
     };
     for (int c = 0; c < 4; ++c) {
         const int count = 32;
@@ -2544,10 +2544,10 @@ void CityThemeRenderer::generatePeripheralScene(std::mt19937& rng) {
         const float stepY = 2.2f;
         for (float gy = haloMinY; gy <= haloMaxY; gy += stepY) {
             for (float gx = haloMinX; gx <= haloMaxX; gx += stepX) {
-                // Skip the inner scene so mountains don't overlap the city
-                const float pad = 3.0f;
-                if (gx > sceneMinX - pad && gx < sceneMaxX + pad &&
-                    gy > sceneMinY - pad && gy < sceneMaxY + pad) {
+                // Coarse skip — the addMountain exclusion does the precise
+                // boundary check; this just avoids wasted work inside the city.
+                if (gx > sceneMinX && gx < sceneMaxX &&
+                    gy > sceneMinY && gy < sceneMaxY) {
                     continue;
                 }
                 const float x = gx + (unit(rng) - 0.5f) * stepX * 0.9f;
