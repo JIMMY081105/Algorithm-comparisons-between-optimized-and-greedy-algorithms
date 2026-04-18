@@ -75,6 +75,9 @@ set(ALGORITHM_SOURCES
     src/algorithms/GreedyRoute.cpp
     src/algorithms/MSTRoute.cpp
     src/algorithms/TSPRoute.cpp
+    src/algorithms/DijkstraRoute.cpp
+    src/algorithms/BellmanFordRoute.cpp
+    src/algorithms/FloydWarshallRoute.cpp
     src/algorithms/ComparisonManager.cpp
 )
 

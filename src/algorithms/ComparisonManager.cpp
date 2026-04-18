@@ -4,6 +4,9 @@
 #include "algorithms/MSTRoute.h"
 #include "algorithms/RegularRoute.h"
 #include "algorithms/TSPRoute.h"
+#include "algorithms/DijkstraRoute.h"
+#include "algorithms/BellmanFordRoute.h"
+#include "algorithms/FloydWarshallRoute.h"
 
 #include <limits>
 #include <sstream>
@@ -32,6 +35,9 @@ void registerDefaultAlgorithms(
     algorithms.push_back(std::make_unique<GreedyRouteAlgorithm>());
     algorithms.push_back(std::make_unique<MSTRouteAlgorithm>());
     algorithms.push_back(std::make_unique<TSPRouteAlgorithm>());
+    algorithms.push_back(std::make_unique<DijkstraRouteAlgorithm>());
+    algorithms.push_back(std::make_unique<BellmanFordRouteAlgorithm>());
+    algorithms.push_back(std::make_unique<FloydWarshallRouteAlgorithm>());
 }
 
 bool isValidAlgorithmIndex(

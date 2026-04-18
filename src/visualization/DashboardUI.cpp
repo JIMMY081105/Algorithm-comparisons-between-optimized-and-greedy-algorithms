@@ -206,10 +206,26 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
     }
 
     ImGui::SeparatorText("Algorithm");
-    const char* algorithmLabels[] = {"Regular", "Greedy", "MST", "TSP"};
-    for (int index = 0; index < 4; ++index) {
-        ImGui::RadioButton(algorithmLabels[index], &selectedAlgorithm, index);
-        if (index < 3) {
+    // Row 1: the four classic routing strategies
+    struct AlgoEntry { const char* label; const char* tooltip; };
+    static const AlgoEntry kAlgoEntries[] = {
+        {"Regular",      "Baseline: visits nodes in default ID order, no optimisation."},
+        {"Greedy",       "Nearest-neighbour: always picks the closest unvisited node next."},
+        {"MST",          "Prim's MST + double-tree shortcut (2-approximation of TSP)."},
+        {"TSP",          "Optimal bitmask DP (exact for n<=12); NN + 2-opt otherwise."},
+        {"Dijkstra",     "Dijkstra shortest paths from HQ; visits nodes in depot-distance order."},
+        {"B-Ford",       "Bellman-Ford shortest paths + cheapest-insertion tour construction."},
+        {"Floyd-W",      "Floyd-Warshall all-pairs paths + farthest-insertion tour construction."},
+    };
+    constexpr int kAlgoCount = 7;
+    for (int index = 0; index < kAlgoCount; ++index) {
+        ImGui::RadioButton(kAlgoEntries[index].label, &selectedAlgorithm, index);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", kAlgoEntries[index].tooltip);
+        }
+        // 4 per row on first row, 3 on second
+        const bool endOfRow = (index == 3) || (index == kAlgoCount - 1);
+        if (!endOfRow) {
             ImGui::SameLine();
         }
     }
@@ -497,9 +513,16 @@ void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
                                   const WasteSystem& system) {
     const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.legendPos, ImGuiCond_Always);
+
+    // Prevent the legend from expanding into the chatbot icon area at the
+    // bottom-left. The icon sits 108 px (48 icon + 60 offset) from the bottom,
+    // plus a small margin — reserve 120 px total to stay clear.
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float chatbotReserved = 120.0f;
+    const float legendMaxHeight = vp->WorkSize.y - chatbotReserved - layout.legendPos.y + vp->WorkPos.y;
     ImGui::SetNextWindowSizeConstraints(
         ImVec2(layout.legendSize.x, 0.0f),
-        ImVec2(layout.legendSize.x, FLT_MAX));
+        ImVec2(layout.legendSize.x, std::max(50.0f, legendMaxHeight)));
     ImGui::SetNextWindowBgAlpha(0.95f);
 
     ImGui::Begin("Legend", nullptr,
