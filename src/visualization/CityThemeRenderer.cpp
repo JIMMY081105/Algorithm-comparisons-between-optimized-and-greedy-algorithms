@@ -22,6 +22,100 @@
 #undef max
 #endif
 
+void StaticCityBatch::upload(const std::vector<float>& verts) {
+    constexpr GLsizei kStrideFloats = 6;
+    vertexCount = static_cast<GLsizei>(verts.size() / kStrideFloats);
+
+    if (vao == 0) {
+        glGenVertexArrays(1, &vao);
+    }
+    if (vbo == 0) {
+        glGenBuffers(1, &vbo);
+    }
+
+    GLint previousVAO = 0;
+    GLint previousArrayBuffer = 0;
+    const GLboolean previousVertexArray = glIsEnabled(GL_VERTEX_ARRAY);
+    const GLboolean previousColorArray = glIsEnabled(GL_COLOR_ARRAY);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVAO);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousArrayBuffer);
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(verts.size() * sizeof(float)),
+                 verts.empty() ? nullptr : verts.data(),
+                 GL_STATIC_DRAW);
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glVertexPointer(2, GL_FLOAT, kStrideFloats * sizeof(float), nullptr);
+    glColorPointer(4, GL_FLOAT, kStrideFloats * sizeof(float),
+                   reinterpret_cast<void*>(2 * sizeof(float)));
+
+    glBindVertexArray(static_cast<GLuint>(previousVAO));
+    glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(previousArrayBuffer));
+    if (previousVertexArray) {
+        glEnableClientState(GL_VERTEX_ARRAY);
+    } else {
+        glDisableClientState(GL_VERTEX_ARRAY);
+    }
+    if (previousColorArray) {
+        glEnableClientState(GL_COLOR_ARRAY);
+    } else {
+        glDisableClientState(GL_COLOR_ARRAY);
+    }
+    dirty = false;
+}
+
+void StaticCityBatch::draw() const {
+    if (vao == 0 || vertexCount <= 0) {
+        return;
+    }
+
+    GLint previousProgram = 0;
+    GLint previousVAO = 0;
+    GLint previousArrayBuffer = 0;
+    const GLboolean previousVertexArray = glIsEnabled(GL_VERTEX_ARRAY);
+    const GLboolean previousColorArray = glIsEnabled(GL_COLOR_ARRAY);
+    glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVAO);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousArrayBuffer);
+
+    glUseProgram(0);
+    glBindVertexArray(vao);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+
+    glBindVertexArray(static_cast<GLuint>(previousVAO));
+    glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(previousArrayBuffer));
+    if (previousVertexArray) {
+        glEnableClientState(GL_VERTEX_ARRAY);
+    } else {
+        glDisableClientState(GL_VERTEX_ARRAY);
+    }
+    if (previousColorArray) {
+        glEnableClientState(GL_COLOR_ARRAY);
+    } else {
+        glDisableClientState(GL_COLOR_ARRAY);
+    }
+    glUseProgram(static_cast<GLuint>(previousProgram));
+}
+
+void StaticCityBatch::destroy() {
+    if (vbo != 0) {
+        glDeleteBuffers(1, &vbo);
+        vbo = 0;
+    }
+    if (vao != 0) {
+        glDeleteVertexArrays(1, &vao);
+        vao = 0;
+    }
+    vertexCount = 0;
+    dirty = true;
+}
+
 namespace {
 
 constexpr float kCityPaddingX = 2.0f;
@@ -41,6 +135,191 @@ float gZoneMinY = -1.0f;
 float gZoneMaxY = 1.0f;
 float gZoneFalloffX = 4.0f;
 float gZoneFalloffY = 4.0f;
+std::vector<float>* gStaticBatchVerts = nullptr;
+
+bool isCapturingStaticBatch() {
+    return gStaticBatchVerts != nullptr;
+}
+
+class ScopedStaticBatchCapture {
+public:
+    explicit ScopedStaticBatchCapture(std::vector<float>& verts)
+        : previous(gStaticBatchVerts) {
+        gStaticBatchVerts = &verts;
+    }
+
+    ~ScopedStaticBatchCapture() {
+        gStaticBatchVerts = previous;
+    }
+
+    ScopedStaticBatchCapture(const ScopedStaticBatchCapture&) = delete;
+    ScopedStaticBatchCapture& operator=(const ScopedStaticBatchCapture&) = delete;
+
+private:
+    std::vector<float>* previous;
+};
+
+void appendBatchVertex(float x, float y, const Color& color) {
+    if (gStaticBatchVerts == nullptr) {
+        return;
+    }
+
+    gStaticBatchVerts->push_back(x);
+    gStaticBatchVerts->push_back(y);
+    gStaticBatchVerts->push_back(color.r);
+    gStaticBatchVerts->push_back(color.g);
+    gStaticBatchVerts->push_back(color.b);
+    gStaticBatchVerts->push_back(color.a);
+}
+
+void appendBatchTriangle(const IsoCoord& a, const Color& ca,
+                         const IsoCoord& b, const Color& cb,
+                         const IsoCoord& c, const Color& cc) {
+    appendBatchVertex(a.x, a.y, ca);
+    appendBatchVertex(b.x, b.y, cb);
+    appendBatchVertex(c.x, c.y, cc);
+}
+
+void appendBatchQuad(const std::array<IsoCoord, 4>& pts, const Color& color) {
+    appendBatchTriangle(pts[0], color, pts[1], color, pts[2], color);
+    appendBatchTriangle(pts[0], color, pts[2], color, pts[3], color);
+}
+
+void appendBatchGradientQuad(const std::array<IsoCoord, 4>& pts,
+                             const std::array<Color, 4>& colors) {
+    appendBatchTriangle(pts[0], colors[0], pts[1], colors[1], pts[2], colors[2]);
+    appendBatchTriangle(pts[0], colors[0], pts[2], colors[2], pts[3], colors[3]);
+}
+
+void appendBatchDiamond(float cx, float cy, float w, float h, const Color& color) {
+    appendBatchQuad({
+        IsoCoord{cx, cy - h},
+        IsoCoord{cx + w, cy},
+        IsoCoord{cx, cy + h},
+        IsoCoord{cx - w, cy}
+    }, color);
+}
+
+void appendBatchLine(float x1, float y1, float x2, float y2,
+                     const Color& color, float width) {
+    const float dx = x2 - x1;
+    const float dy = y2 - y1;
+    const float length = std::sqrt(dx * dx + dy * dy);
+    if (length <= 0.0001f || color.a <= 0.001f || width <= 0.0f) {
+        return;
+    }
+
+    const float halfWidth = width * 0.5f;
+    const float nx = -dy / length * halfWidth;
+    const float ny = dx / length * halfWidth;
+
+    appendBatchQuad({
+        IsoCoord{x1 + nx, y1 + ny},
+        IsoCoord{x2 + nx, y2 + ny},
+        IsoCoord{x2 - nx, y2 - ny},
+        IsoCoord{x1 - nx, y1 - ny}
+    }, color);
+}
+
+void appendBatchLineLoop(const std::array<IsoCoord, 4>& pts,
+                         const Color& color,
+                         float width) {
+    for (int i = 0; i < 4; ++i) {
+        const IsoCoord& start = pts[static_cast<std::size_t>(i)];
+        const IsoCoord& end = pts[static_cast<std::size_t>((i + 1) % 4)];
+        appendBatchLine(start.x, start.y, end.x, end.y, color, width);
+    }
+}
+
+void appendBatchGradientEllipse(float cx, float cy,
+                                float radiusX, float radiusY,
+                                const Color& centerColor,
+                                const Color& edgeColor,
+                                int segments) {
+    if (radiusX <= 0.0f || radiusY <= 0.0f || segments <= 0) {
+        return;
+    }
+
+    const IsoCoord center{cx, cy};
+    IsoCoord previous{
+        cx + radiusX,
+        cy
+    };
+    for (int i = 1; i <= segments; ++i) {
+        const float angle = kTwoPi * static_cast<float>(i) / static_cast<float>(segments);
+        const IsoCoord current{
+            cx + std::cos(angle) * radiusX,
+            cy + std::sin(angle) * radiusY
+        };
+        appendBatchTriangle(center, centerColor, previous, edgeColor, current, edgeColor);
+        previous = current;
+    }
+}
+
+void appendBatchGradientRingEllipse(float cx, float cy,
+                                    float innerRadiusX, float innerRadiusY,
+                                    float outerRadiusX, float outerRadiusY,
+                                    const Color& innerColor,
+                                    const Color& outerColor,
+                                    int segments) {
+    if (innerRadiusX <= 0.0f || innerRadiusY <= 0.0f ||
+        outerRadiusX <= innerRadiusX || outerRadiusY <= innerRadiusY ||
+        segments <= 0) {
+        return;
+    }
+
+    for (int i = 0; i < segments; ++i) {
+        const float a0 = kTwoPi * static_cast<float>(i) / static_cast<float>(segments);
+        const float a1 = kTwoPi * static_cast<float>(i + 1) / static_cast<float>(segments);
+        const float c0 = std::cos(a0);
+        const float s0 = std::sin(a0);
+        const float c1 = std::cos(a1);
+        const float s1 = std::sin(a1);
+
+        const IsoCoord i0{cx + c0 * innerRadiusX, cy + s0 * innerRadiusY};
+        const IsoCoord o0{cx + c0 * outerRadiusX, cy + s0 * outerRadiusY};
+        const IsoCoord i1{cx + c1 * innerRadiusX, cy + s1 * innerRadiusY};
+        const IsoCoord o1{cx + c1 * outerRadiusX, cy + s1 * outerRadiusY};
+
+        appendBatchTriangle(i0, innerColor, o0, outerColor, o1, outerColor);
+        appendBatchTriangle(i0, innerColor, o1, outerColor, i1, innerColor);
+    }
+}
+
+void drawOrAppendLine(IsometricRenderer& renderer,
+                      float x1, float y1, float x2, float y2,
+                      const Color& color, float width) {
+    if (isCapturingStaticBatch()) {
+        appendBatchLine(x1, y1, x2, y2, color, width);
+        return;
+    }
+    renderer.drawLine(x1, y1, x2, y2, color, width);
+}
+
+void drawOrAppendDiamond(IsometricRenderer& renderer,
+                         float cx, float cy, float w, float h,
+                         const Color& color) {
+    if (isCapturingStaticBatch()) {
+        appendBatchDiamond(cx, cy, w, h, color);
+        return;
+    }
+    renderer.drawDiamond(cx, cy, w, h, color);
+}
+
+void drawOrAppendDiamondOutline(IsometricRenderer& renderer,
+                                float cx, float cy, float w, float h,
+                                const Color& color, float width) {
+    if (isCapturingStaticBatch()) {
+        appendBatchLineLoop({
+            IsoCoord{cx, cy - h},
+            IsoCoord{cx + w, cy},
+            IsoCoord{cx, cy + h},
+            IsoCoord{cx - w, cy}
+        }, color, width);
+        return;
+    }
+    renderer.drawDiamondOutline(cx, cy, w, h, color, width);
+}
 
 float clamp01(float value) {
     return std::max(0.0f, std::min(1.0f, value));
@@ -226,6 +505,11 @@ IsoCoord lerpIso(const IsoCoord& a, const IsoCoord& b, float t) {
 }
 
 void drawImmediateQuad(const std::array<IsoCoord, 4>& pts, const Color& color) {
+    if (isCapturingStaticBatch()) {
+        appendBatchQuad(pts, color);
+        return;
+    }
+
     glColor4f(color.r, color.g, color.b, color.a);
     glBegin(GL_QUADS);
     for (const IsoCoord& pt : pts) {
@@ -254,6 +538,12 @@ void drawGradientEllipse(float cx, float cy,
         return;
     }
 
+    if (isCapturingStaticBatch()) {
+        appendBatchGradientEllipse(cx, cy, radiusX, radiusY,
+                                   centerColor, edgeColor, segments);
+        return;
+    }
+
     glBegin(GL_TRIANGLE_FAN);
     glColor4f(centerColor.r, centerColor.g, centerColor.b, centerColor.a);
     glVertex2f(cx, cy);
@@ -275,6 +565,15 @@ void drawGradientRingEllipse(float cx, float cy,
                              int segments = 72) {
     if (innerRadiusX <= 0.0f || innerRadiusY <= 0.0f ||
         outerRadiusX <= innerRadiusX || outerRadiusY <= innerRadiusY) {
+        return;
+    }
+
+    if (isCapturingStaticBatch()) {
+        appendBatchGradientRingEllipse(cx, cy,
+                                       innerRadiusX, innerRadiusY,
+                                       outerRadiusX, outerRadiusY,
+                                       innerColor, outerColor,
+                                       segments);
         return;
     }
 
@@ -357,6 +656,55 @@ void drawMountainShape(float cx, float cy,
     };
 
     const Color tierCols[4] = {tier0Col, tier1Col, tier2Col, tier3Col};
+
+    if (isCapturingStaticBatch()) {
+        for (int t = 0; t < 4; ++t) {
+            const float tw = halfW * tiers[t].wScale;
+            const float td = halfD * tiers[t].dScale;
+            const float tierBaseY = cy - peakHeight * tiers[t].baseFrac;
+            const float tierPeakY = cy - peakHeight * tiers[t].peakFrac;
+
+            Color faceCol = tierCols[t];
+
+            if (snowAmt > 0.0f) {
+                float blend = 0.0f;
+                if (t == 3)      blend = snowAmt * 0.88f;
+                else if (t == 2) blend = snowAmt * 0.38f;
+                else if (t == 1) blend = snowAmt * 0.10f;
+                if (blend > 0.0f) faceCol = mixColor(faceCol, snowCol, blend);
+            }
+
+            const Color rightFace = scaleColor(faceCol, 1.14f);
+            const Color leftFace  = scaleColor(faceCol, 0.76f);
+            const Color backLeft  = scaleColor(faceCol, 0.56f);
+            const Color backRight = scaleColor(faceCol, 0.64f);
+            const Color tipCol    = (t == 3 && snowAmt > 0.3f)
+                ? mixColor(scaleColor(faceCol, 1.30f), snowCol, snowAmt * 0.7f)
+                : scaleColor(faceCol, 1.28f);
+
+            const float northY = tierBaseY - td;
+            const float southY = tierBaseY + td;
+            const float westX  = cx - tw;
+            const float eastX  = cx + tw;
+            const IsoCoord north{cx, northY};
+            const IsoCoord west{westX, tierBaseY};
+            const IsoCoord east{eastX, tierBaseY};
+            const IsoCoord south{cx, southY};
+            const IsoCoord peak{cx, tierPeakY};
+
+            appendBatchTriangle(north, backLeft, west, backLeft, peak, tipCol);
+            appendBatchTriangle(north, backRight, east, backRight, peak, tipCol);
+            appendBatchTriangle(west, leftFace, south, leftFace, peak, tipCol);
+            appendBatchTriangle(east, rightFace, south, rightFace, peak, tipCol);
+
+            Color edgeCol = scaleColor(faceCol, 0.48f);
+            edgeCol.a = 0.45f;
+            appendBatchLine(west.x, west.y, peak.x, peak.y, edgeCol, 1.0f);
+            appendBatchLine(peak.x, peak.y, east.x, east.y, edgeCol, 1.0f);
+            appendBatchLine(south.x, south.y, peak.x, peak.y, edgeCol, 1.0f);
+        }
+        return;
+    }
 
     for (int t = 0; t < 4; ++t) {
         const float tw = halfW * tiers[t].wScale;
@@ -450,6 +798,17 @@ void drawFaceBands(const std::array<IsoCoord, 4>& face,
         return;
     }
 
+    if (isCapturingStaticBatch()) {
+        for (int i = 0; i < bandCount; ++i) {
+            const float t = inset + (static_cast<float>(i) + 1.0f) *
+                ((1.0f - inset * 2.0f) / static_cast<float>(bandCount + 1));
+            const IsoCoord start = lerpIso(face[0], face[3], t);
+            const IsoCoord end = lerpIso(face[1], face[2], t);
+            appendBatchLine(start.x, start.y, end.x, end.y, color, width);
+        }
+        return;
+    }
+
     glLineWidth(width);
     glColor4f(color.r, color.g, color.b, color.a);
     glBegin(GL_LINES);
@@ -466,6 +825,11 @@ void drawFaceBands(const std::array<IsoCoord, 4>& face,
 }
 
 void drawOutlineLoop(const std::array<IsoCoord, 4>& pts, const Color& color, float width) {
+    if (isCapturingStaticBatch()) {
+        appendBatchLineLoop(pts, color, width);
+        return;
+    }
+
     glLineWidth(width);
     glColor4f(color.r, color.g, color.b, color.a);
     glBegin(GL_LINE_LOOP);
@@ -595,7 +959,12 @@ CityThemeRenderer::CityThemeRenderer()
       operationalCenterY(0.0f),
       operationalRadiusX(1.0f),
       operationalRadiusY(1.0f),
-      activeGraph(nullptr) {}
+      activeGraph(nullptr),
+      staticBatchProjectionValid(false),
+      staticBatchTileWidth(0.0f),
+      staticBatchTileHeight(0.0f),
+      staticBatchOffsetX(0.0f),
+      staticBatchOffsetY(0.0f) {}
 
 EnvironmentTheme CityThemeRenderer::getTheme() const {
     return EnvironmentTheme::City;
@@ -603,6 +972,34 @@ EnvironmentTheme CityThemeRenderer::getTheme() const {
 
 bool CityThemeRenderer::init() {
     return true;
+}
+
+void CityThemeRenderer::markStaticBatchesDirty() {
+    groundBatch.dirty = true;
+    decorativeBatch.dirty = true;
+    transitBatch.dirty = true;
+    mountainBatch.dirty = true;
+}
+
+void CityThemeRenderer::ensureStaticBatchProjectionCurrent() {
+    const RenderUtils::ProjectionState& projection = RenderUtils::getProjection();
+    const bool changed =
+        !staticBatchProjectionValid ||
+        std::abs(staticBatchTileWidth - projection.tileWidth) > 0.001f ||
+        std::abs(staticBatchTileHeight - projection.tileHeight) > 0.001f ||
+        std::abs(staticBatchOffsetX - projection.offsetX) > 0.001f ||
+        std::abs(staticBatchOffsetY - projection.offsetY) > 0.001f;
+
+    if (!changed) {
+        return;
+    }
+
+    staticBatchTileWidth = projection.tileWidth;
+    staticBatchTileHeight = projection.tileHeight;
+    staticBatchOffsetX = projection.offsetX;
+    staticBatchOffsetY = projection.offsetY;
+    staticBatchProjectionValid = true;
+    markStaticBatchesDirty();
 }
 
 void CityThemeRenderer::rebuildScene(const MapGraph& graph, unsigned int seed) {
@@ -625,6 +1022,7 @@ void CityThemeRenderer::rebuildScene(const MapGraph& graph, unsigned int seed) {
 
     refreshPairRoutes(graph);
     refreshDashboardInfo();
+    markStaticBatchesDirty();
 }
 
 void CityThemeRenderer::update(float deltaTime) {
@@ -764,6 +1162,7 @@ CitySeason CityThemeRenderer::getSeason() const {
 void CityThemeRenderer::setSeason(CitySeason newSeason) {
     season = newSeason;
     refreshSeasonalRoadState();
+    markStaticBatchesDirty();
     std::mt19937 carRng(layoutSeed ^ 0x41C7A93u ^
                         static_cast<unsigned int>(season) * 131u ^
                         static_cast<unsigned int>(weather) * 257u);
@@ -781,6 +1180,7 @@ CityWeather CityThemeRenderer::getWeather() const {
 void CityThemeRenderer::setWeather(CityWeather newWeather) {
     weather = newWeather;
     refreshSeasonalRoadState();
+    markStaticBatchesDirty();
     std::mt19937 carRng(layoutSeed ^ 0x41C7A93u ^
                         static_cast<unsigned int>(season) * 131u ^
                         static_cast<unsigned int>(weather) * 257u);
@@ -795,6 +1195,7 @@ void CityThemeRenderer::randomizeTrafficConditions(unsigned int seed) {
     std::mt19937 trafficRng(seed ^ 0x6D2F41Bu);
     applyTrafficConditions(trafficRng);
     refreshSeasonalRoadState();
+    markStaticBatchesDirty();
 
     std::mt19937 carRng(seed ^ 0x41C7A93u);
     generateAmbientCars(carRng);
@@ -817,6 +1218,8 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
                                         float animationTime) {
     (void)renderer;
     (void)animationTime;
+
+    ensureStaticBatchProjectionCurrent();
 
     GLint viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);
@@ -896,6 +1299,7 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
     glVertex2f(left, bottom);
     glEnd();
 
+    auto buildGroundGeometry = [&]() {
     const float peripheralDarken = snowfall ? (winterStorm ? 0.02f : 0.12f) : 0.44f;
     groundBase = mixColor(groundBase, Color(0.03f, 0.04f, 0.07f, groundBase.a),
                           peripheralDarken);
@@ -1075,6 +1479,19 @@ void CityThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
                                    0.24f));
         }
     }
+
+    };
+
+    if (groundBatch.dirty) {
+        std::vector<float> verts;
+        verts.reserve(4096);
+        {
+            ScopedStaticBatchCapture capture(verts);
+            buildGroundGeometry();
+        }
+        groundBatch.upload(verts);
+    }
+    groundBatch.draw();
 }
 
 void CityThemeRenderer::drawTransitNetwork(
@@ -1085,6 +1502,8 @@ void CityThemeRenderer::drawTransitNetwork(
     float routeRevealProgress,
     float animationTime) {
     (void)graph;
+
+    ensureStaticBatchProjectionCurrent();
 
     for (std::size_t i = 0; i < roads.size(); ++i) {
         const RoadSegment& road = roads[i];
@@ -1181,9 +1600,18 @@ void CityThemeRenderer::drawTransitNetwork(
                                  0.24f));
     }
 
-    for (const auto& placed : presetBuildings) {
-        drawPresetBuilding(renderer, placed);
+    if (transitBatch.dirty) {
+        std::vector<float> verts;
+        verts.reserve(presetBuildings.size() * 720);
+        {
+            ScopedStaticBatchCapture capture(verts);
+            for (const auto& placed : presetBuildings) {
+                drawPresetBuilding(renderer, placed);
+            }
+        }
+        transitBatch.upload(verts);
     }
+    transitBatch.draw();
 
     if (layerToggles.showIncidents) {
         for (std::size_t i = 0; i < roads.size(); ++i) {
@@ -1498,6 +1926,8 @@ void CityThemeRenderer::drawTruck(IsometricRenderer& renderer,
 void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
                                                const MapGraph&,
                                                float animationTime) {
+    ensureStaticBatchProjectionCurrent();
+
     const float pulse = 0.5f + 0.5f * std::sin(animationTime * 1.4f);
 
     for (const AmbientStreet& street : ambientStreets) {
@@ -1546,24 +1976,43 @@ void CityThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
         drawPresetRoadProp(renderer, prop, animationTime);
     }
 
-    for (const auto& vehicle : presetVehicles) {
-        drawPresetVehicle(renderer, vehicle);
+    if (decorativeBatch.dirty) {
+        std::vector<float> verts;
+        verts.reserve(presetVehicles.size() * 36);
+        {
+            ScopedStaticBatchCapture capture(verts);
+            for (const auto& vehicle : presetVehicles) {
+                drawPresetVehicle(renderer, vehicle);
+            }
+        }
+        decorativeBatch.upload(verts);
     }
+    decorativeBatch.draw();
 }
 
 void CityThemeRenderer::drawAtmosphericEffects(IsometricRenderer& renderer,
                                                const MapGraph&,
                                                float animationTime) {
     (void)renderer;
+    ensureStaticBatchProjectionCurrent();
 
     // Mountains render here (after ground, decorations, transit network,
     // nodes and truck) so tall peaks visually occlude road edges and block
     // borders — matching real parallax where a taller object closer to the
     // camera covers the flat terrain behind it. Routing is graph-based and
     // unaffected by draw order.
-    for (const auto& peak : mountains) {
-        drawMountain(peak);
+    if (mountainBatch.dirty) {
+        std::vector<float> verts;
+        verts.reserve(mountains.size() * 180);
+        {
+            ScopedStaticBatchCapture capture(verts);
+            for (const auto& peak : mountains) {
+                drawMountain(peak);
+            }
+        }
+        mountainBatch.upload(verts);
     }
+    mountainBatch.draw();
 
     const float spanX = std::max(1.0f, peripheralMaxX - peripheralMinX);
     const float spanY = std::max(1.0f, peripheralMaxY - peripheralMinY);
@@ -3723,6 +4172,13 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
         return;
     }
     const float zf = currentZoomFactor();
+    auto emitDiamond = [&](float cx, float cy, float w, float h, const Color& color) {
+        drawOrAppendDiamond(renderer, cx, cy, w, h, color);
+    };
+    auto emitLine = [&](float x1, float y1, float x2, float y2,
+                        const Color& color, float width) {
+        drawOrAppendLine(renderer, x1, y1, x2, y2, color, width);
+    };
 
     // Compute authored dual-tone colors from preset
     const Color facade = mixColor(p.material, p.accent, 0.40f);
@@ -3797,18 +4253,18 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
             0.32f,
             0.04f,
             0.10f);
-        renderer.drawDiamond(iso.x, groundCenterY + shadowDepth * 0.22f,
-                             baseWidth * 1.16f, baseDepth * 0.88f,
-                             snowGround);
-        renderer.drawDiamond(iso.x, groundCenterY + shadowDepth * 0.12f,
-                             baseWidth * 0.86f, baseDepth * 0.64f,
-                             withAlpha(scaleColor(snowGround, 1.04f), snowGround.a * 0.55f));
+        emitDiamond(iso.x, groundCenterY + shadowDepth * 0.22f,
+                    baseWidth * 1.16f, baseDepth * 0.88f,
+                    snowGround);
+        emitDiamond(iso.x, groundCenterY + shadowDepth * 0.12f,
+                    baseWidth * 0.86f, baseDepth * 0.64f,
+                    withAlpha(scaleColor(snowGround, 1.04f), snowGround.a * 0.55f));
     }
 
     // Shadow
     const float shadowScale = (p.category == CityAssets::BuildingCategory::Landmark) ? 1.14f : 1.06f;
-    renderer.drawDiamond(iso.x, groundCenterY + shadowDepth, baseWidth * shadowScale,
-                         shadowDepth, shadowColor);
+    emitDiamond(iso.x, groundCenterY + shadowDepth, baseWidth * shadowScale,
+                shadowDepth, shadowColor);
 
     // Drawing helper
     auto drawMass = [&](float offsetX, float offsetY,
@@ -3826,12 +4282,12 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
         drawFaceBands(faces.right, bands, 0.12f,
                       attenuatedWindow, 0.8f * zf + 0.35f);
         drawOutlineLoop(faces.top, attenuatedOutline, std::max(0.8f, 0.85f * zf));
-        renderer.drawLine(faces.top[1].x, faces.top[1].y,
-                          faces.right[2].x, faces.right[2].y,
-                          attenuatedOutline, std::max(0.8f, 0.9f * zf));
-        renderer.drawLine(faces.top[3].x, faces.top[3].y,
-                          faces.left[2].x, faces.left[2].y,
-                          attenuatedOutline, std::max(0.8f, 0.9f * zf));
+        emitLine(faces.top[1].x, faces.top[1].y,
+                 faces.right[2].x, faces.right[2].y,
+                 attenuatedOutline, std::max(0.8f, 0.9f * zf));
+        emitLine(faces.top[3].x, faces.top[3].y,
+                 faces.left[2].x, faces.left[2].y,
+                 attenuatedOutline, std::max(0.8f, 0.9f * zf));
         return faces;
     };
 
@@ -3871,44 +4327,43 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
 
         // Skybridge
         const float bridgeY = groundCenterY - podiumHeight - towerH * 0.46f;
-        glColor4f(0.84f, 0.90f, 0.98f, 0.50f);
-        glBegin(GL_QUADS);
-        glVertex2f(iso.x - towerOffset * 0.76f, bridgeY - 3.4f * zf);
-        glVertex2f(iso.x + towerOffset * 0.76f, bridgeY - 3.4f * zf);
-        glVertex2f(iso.x + towerOffset * 0.70f, bridgeY + 2.6f * zf);
-        glVertex2f(iso.x - towerOffset * 0.70f, bridgeY + 2.6f * zf);
-        glEnd();
+        drawImmediateQuad({
+            IsoCoord{iso.x - towerOffset * 0.76f, bridgeY - 3.4f * zf},
+            IsoCoord{iso.x + towerOffset * 0.76f, bridgeY - 3.4f * zf},
+            IsoCoord{iso.x + towerOffset * 0.70f, bridgeY + 2.6f * zf},
+            IsoCoord{iso.x - towerOffset * 0.70f, bridgeY + 2.6f * zf}
+        }, Color(0.84f, 0.90f, 0.98f, 0.50f));
 
         // Spires
-        renderer.drawLine(leftTower.top[0].x, leftTower.top[0].y - 1.0f * zf,
-                          leftTower.top[0].x, leftTower.top[0].y - 18.0f * zf,
-                          attenuateToZone(
-                              Color(0.94f, 0.98f, 1.0f, 0.34f),
-                              zone,
-                              Color(0.02f, 0.03f, 0.05f, 0.34f),
-                              0.40f,
-                              0.06f,
-                              0.08f), 1.4f);
-        renderer.drawLine(rightTower.top[0].x, rightTower.top[0].y - 1.0f * zf,
-                          rightTower.top[0].x, rightTower.top[0].y - 17.0f * zf,
-                          attenuateToZone(
-                              Color(0.94f, 0.98f, 1.0f, 0.34f),
-                              zone,
-                              Color(0.02f, 0.03f, 0.05f, 0.34f),
-                              0.40f,
-                              0.06f,
-                              0.08f), 1.4f);
+        emitLine(leftTower.top[0].x, leftTower.top[0].y - 1.0f * zf,
+                 leftTower.top[0].x, leftTower.top[0].y - 18.0f * zf,
+                 attenuateToZone(
+                     Color(0.94f, 0.98f, 1.0f, 0.34f),
+                     zone,
+                     Color(0.02f, 0.03f, 0.05f, 0.34f),
+                     0.40f,
+                     0.06f,
+                     0.08f), 1.4f);
+        emitLine(rightTower.top[0].x, rightTower.top[0].y - 1.0f * zf,
+                 rightTower.top[0].x, rightTower.top[0].y - 17.0f * zf,
+                 attenuateToZone(
+                     Color(0.94f, 0.98f, 1.0f, 0.34f),
+                     zone,
+                     Color(0.02f, 0.03f, 0.05f, 0.34f),
+                     0.40f,
+                     0.06f,
+                     0.08f), 1.4f);
 
         // Glow halo at top
-        renderer.drawDiamond(iso.x, groundCenterY - podiumHeight - towerH * 0.44f,
-                             baseWidth * 0.20f, baseDepth * 0.08f,
-                             attenuateToZone(
-                                  Color(0.84f, 0.92f, 0.98f, 0.12f),
-                                 zone,
-                                 Color(0.02f, 0.03f, 0.05f, 0.12f),
-                                 0.28f,
-                                 0.08f,
-                                 0.04f));
+        emitDiamond(iso.x, groundCenterY - podiumHeight - towerH * 0.44f,
+                    baseWidth * 0.20f, baseDepth * 0.08f,
+                    attenuateToZone(
+                         Color(0.84f, 0.92f, 0.98f, 0.12f),
+                        zone,
+                        Color(0.02f, 0.03f, 0.05f, 0.12f),
+                        0.28f,
+                        0.08f,
+                        0.04f));
     } else {
         // === STANDARD BUILDING FORM ===
         // Podium base
@@ -3936,29 +4391,29 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
                 drawMass(0.0f, -podiumHeight - mainHeight,
                          towerWidth * 0.36f, towerDepth * 0.36f,
                          std::max(2.0f * zf, mainHeight * 0.12f), 0.40f);
-                renderer.drawLine(mainFaces.top[0].x, mainFaces.top[0].y,
-                                  mainFaces.top[0].x, mainFaces.top[0].y - 7.0f * zf,
-                                  attenuateToZone(
-                                      Color(0.82f, 0.88f, 0.96f, 0.20f),
-                                      zone,
-                                      Color(0.02f, 0.03f, 0.05f, 0.20f),
-                                      0.34f,
-                                      0.08f,
-                                      0.05f), 1.0f);
+                emitLine(mainFaces.top[0].x, mainFaces.top[0].y,
+                         mainFaces.top[0].x, mainFaces.top[0].y - 7.0f * zf,
+                         attenuateToZone(
+                             Color(0.82f, 0.88f, 0.96f, 0.20f),
+                             zone,
+                             Color(0.02f, 0.03f, 0.05f, 0.20f),
+                             0.34f,
+                             0.08f,
+                             0.05f), 1.0f);
                 break;
             case CityAssets::RoofStyle::Spire:
                 drawMass(0.0f, -podiumHeight - mainHeight,
                          towerWidth * 0.30f, towerDepth * 0.32f,
                          std::max(1.8f * zf, mainHeight * 0.10f), 0.40f);
-                renderer.drawLine(mainFaces.top[0].x, mainFaces.top[0].y - 1.0f * zf,
-                                  mainFaces.top[0].x, mainFaces.top[0].y - 14.0f * zf,
-                                  attenuateToZone(
-                                      Color(0.90f, 0.96f, 1.0f, 0.30f),
-                                      zone,
-                                      Color(0.02f, 0.03f, 0.05f, 0.30f),
-                                      0.38f,
-                                      0.06f,
-                                      0.06f), 1.2f);
+                emitLine(mainFaces.top[0].x, mainFaces.top[0].y - 1.0f * zf,
+                         mainFaces.top[0].x, mainFaces.top[0].y - 14.0f * zf,
+                         attenuateToZone(
+                             Color(0.90f, 0.96f, 1.0f, 0.30f),
+                             zone,
+                             Color(0.02f, 0.03f, 0.05f, 0.30f),
+                             0.38f,
+                             0.06f,
+                             0.06f), 1.2f);
                 break;
         }
     }
@@ -3966,15 +4421,15 @@ void CityThemeRenderer::drawPresetBuilding(IsometricRenderer& renderer,
     // Focus glow for landmarks
     if (p.category == CityAssets::BuildingCategory::Landmark ||
         p.category == CityAssets::BuildingCategory::OfficeTower) {
-        renderer.drawDiamond(iso.x, groundCenterY - totalHeight - 2.0f * zf,
-                             baseWidth * 0.18f, baseDepth * 0.08f,
-                             attenuateToZone(
-                                  Color(0.70f, 0.82f, 0.96f, 0.04f),
-                                 zone,
-                                 Color(0.02f, 0.03f, 0.05f, 0.08f),
-                                 0.22f,
-                                 0.06f,
-                                 0.03f));
+        emitDiamond(iso.x, groundCenterY - totalHeight - 2.0f * zf,
+                    baseWidth * 0.18f, baseDepth * 0.08f,
+                    attenuateToZone(
+                         Color(0.70f, 0.82f, 0.96f, 0.04f),
+                        zone,
+                        Color(0.02f, 0.03f, 0.05f, 0.08f),
+                        0.22f,
+                        0.06f,
+                        0.03f));
     }
 }
 
@@ -4222,27 +4677,27 @@ void CityThemeRenderer::drawPresetVehicle(IsometricRenderer& renderer,
         return;
     }
     const IsoCoord iso = RenderUtils::worldToIso(placed.worldX, placed.worldY);
-    renderer.drawDiamond(iso.x, iso.y, v.length, v.width,
-                         attenuateToZone(
-                             v.body, zone, Color(0.01f, 0.02f, 0.04f, v.body.a),
-                             0.24f, 0.16f, 0.08f));
-    renderer.drawDiamondOutline(iso.x, iso.y, v.length, v.width,
-                                attenuateToZone(
-                                    v.outline, zone, Color(0.00f, 0.00f, 0.00f, v.outline.a),
-                                    0.18f, 0.08f, 0.04f), 1.0f);
+    drawOrAppendDiamond(renderer, iso.x, iso.y, v.length, v.width,
+                        attenuateToZone(
+                            v.body, zone, Color(0.01f, 0.02f, 0.04f, v.body.a),
+                            0.24f, 0.16f, 0.08f));
+    drawOrAppendDiamondOutline(renderer, iso.x, iso.y, v.length, v.width,
+                               attenuateToZone(
+                                   v.outline, zone, Color(0.00f, 0.00f, 0.00f, v.outline.a),
+                                   0.18f, 0.08f, 0.04f), 1.0f);
 
     // Windshield highlight for sedans and vans
     if (v.category == CityAssets::VehicleCategory::Sedan ||
         v.category == CityAssets::VehicleCategory::Van) {
-        renderer.drawDiamond(iso.x, iso.y - v.width * 0.15f,
-                             v.length * 0.35f, v.width * 0.45f,
-                             attenuateToZone(
-                                 Color(0.58f, 0.68f, 0.82f, 0.28f),
-                                 zone,
-                                 Color(0.02f, 0.03f, 0.05f, 0.28f),
-                                 0.24f,
-                                 0.08f,
-                                 0.06f));
+        drawOrAppendDiamond(renderer, iso.x, iso.y - v.width * 0.15f,
+                            v.length * 0.35f, v.width * 0.45f,
+                            attenuateToZone(
+                                Color(0.58f, 0.68f, 0.82f, 0.28f),
+                                zone,
+                                Color(0.02f, 0.03f, 0.05f, 0.28f),
+                                0.24f,
+                                0.08f,
+                                0.06f));
     }
 }
 
@@ -4500,6 +4955,12 @@ void CityThemeRenderer::drawTrafficLight(IsometricRenderer& renderer,
 }
 
 void CityThemeRenderer::cleanup() {
+    groundBatch.destroy();
+    decorativeBatch.destroy();
+    transitBatch.destroy();
+    mountainBatch.destroy();
+    staticBatchProjectionValid = false;
+
     presetBuildings.clear();
     presetEnvironments.clear();
     presetVehicles.clear();

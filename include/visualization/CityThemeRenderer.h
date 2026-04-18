@@ -4,8 +4,21 @@
 #include "visualization/IThemeRenderer.h"
 #include "visualization/CityAssetLibrary.h"
 
+#include <glad/glad.h>
+
 #include <random>
 #include <vector>
+
+struct StaticCityBatch {
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    GLsizei vertexCount = 0;
+    bool dirty = true;
+
+    void upload(const std::vector<float>& verts);
+    void draw() const;
+    void destroy();
+};
 
 class CityThemeRenderer : public IThemeRenderer {
 public:
@@ -247,6 +260,15 @@ private:
     float operationalRadiusX;
     float operationalRadiusY;
     const MapGraph* activeGraph;
+    StaticCityBatch groundBatch;
+    StaticCityBatch decorativeBatch;
+    StaticCityBatch transitBatch;
+    StaticCityBatch mountainBatch;
+    bool staticBatchProjectionValid;
+    float staticBatchTileWidth;
+    float staticBatchTileHeight;
+    float staticBatchOffsetX;
+    float staticBatchOffsetY;
 
     std::vector<Intersection> intersections;
     std::vector<RoadSegment> roads;
@@ -307,6 +329,8 @@ private:
     void refreshSeasonalRoadState();
     void refreshPairRoutes(const MapGraph& graph);
     std::vector<int> shortestPath(int startIntersection, int endIntersection) const;
+    void markStaticBatchesDirty();
+    void ensureStaticBatchProjectionCurrent();
 
     bool isRoadNetworkConnected() const;
     bool hasSnowfall() const;
