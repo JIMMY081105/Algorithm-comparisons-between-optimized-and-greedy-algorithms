@@ -3,15 +3,17 @@
 
 #include "RouteAlgorithm.h"
 
-// Exact TSP solver using bitmask dynamic programming.
+// TSP solver. Two paths depending on input size:
 //
-// This is the most computationally intensive algorithm in the system.
-// It finds the truly optimal route that starts at HQ, visits all
-// eligible nodes, and returns to HQ with minimum total distance.
+//   * n <= 12: exact bitmask dynamic programming (Held-Karp).
+//     Complexity O(n^2 * 2^n) — at most ~50k states for n=12, fine in
+//     well under a second. Returns the provably optimal Hamiltonian circuit.
 //
-// Complexity is O(n^2 * 2^n) where n is the number of nodes to visit.
-// With our 8-10 eligible nodes this means at most ~102,400 states,
-// which runs in well under a second on any modern machine.
+//   * n > 12: nearest-neighbour seed + 2-opt local search until no
+//     improving 2-edge swap remains. This is a textbook heuristic that
+//     reliably improves on plain nearest-neighbour and so produces a
+//     route that is *meaningfully different* from the Greedy algorithm
+//     (the previous fallback collapsed to identical Greedy output).
 //
 // The bitmask encodes which nodes have been visited:
 //   bit i set = node i has been visited
