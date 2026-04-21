@@ -18,6 +18,8 @@ constexpr float kDefaultCollectionThreshold = 5.0f;
 constexpr float kDistanceScaleKmPerGridUnit = 1.5f;
 constexpr float kMinimumDailyWasteLevel = 5.0f;
 constexpr float kMaximumDailyWasteLevel = 100.0f;
+constexpr float kFuelPriceMin = 2.00f;
+constexpr float kFuelPriceMax = 3.80f;
 
 constexpr std::array<MapNodeDefinition, 21> kIndianOceanLocations{{
     {0, "Command Anchorage",   11.50f, 11.25f,   0.0f, true},
@@ -43,6 +45,18 @@ constexpr std::array<MapNodeDefinition, 21> kIndianOceanLocations{{
     {20, "Coral Arc",          28.40f, 17.10f, 360.0f, false},
 }};
 
+// Fixed toll stations on key edges that algorithms commonly traverse.
+// Fees are fixed (real tolls don't change daily); only fuel price varies.
+const std::array<TollStation, 7> kFixedTolls{{
+    TollStation{ 0, 15, 3.50f, "Central Gate"},
+    TollStation{15,  7, 2.00f, "North Checkpoint"},
+    TollStation{ 1, 12, 4.00f, "West Toll"},
+    TollStation{13,  4, 5.00f, "Southwest Pass"},
+    TollStation{18, 14, 3.00f, "East Crossing"},
+    TollStation{ 6, 10, 4.50f, "South Gate"},
+    TollStation{11, 20, 6.00f, "Far East Toll"},
+}};
+
 unsigned int makeTimeSeed() {
     return static_cast<unsigned int>(
         std::chrono::steady_clock::now().time_since_epoch().count());
@@ -56,7 +70,8 @@ std::string buildMapInitializedMessage(int nodeCount) {
 WasteSystem::WasteSystem()
     : currentSeed(0),
       dayNumber(0),
-      collectionThreshold(kDefaultCollectionThreshold) {
+      collectionThreshold(kDefaultCollectionThreshold),
+      dailyFuelPricePerLitre(2.50f) {
     currentSeed = makeTimeSeed();
     rng.seed(currentSeed);
 }
@@ -72,15 +87,27 @@ void WasteSystem::addDefaultLocations() {
     }
 }
 
+void WasteSystem::setupTollStations() {
+    tollStations.clear();
+    for (const TollStation& t : kFixedTolls) {
+        tollStations.push_back(t);
+    }
+}
+
+void WasteSystem::randomizeFuelPrice() {
+    std::uniform_real_distribution<float> priceDist(kFuelPriceMin, kFuelPriceMax);
+    dailyFuelPricePerLitre = priceDist(rng);
+    // Round to 2 decimal places for realism
+    dailyFuelPricePerLitre = std::round(dailyFuelPricePerLitre * 100.0f) / 100.0f;
+    costModel.setDailyFuelPricePerLitre(dailyFuelPricePerLitre);
+}
+
 void WasteSystem::initializeMap() {
-    // The coursework uses one fixed sector so algorithm behaviour is easier to
-    // compare and explain during the demo and in the final report.
     graph.clear();
     addDefaultLocations();
-
     graph.setDistanceScale(kDistanceScaleKmPerGridUnit);
     graph.buildFullyConnectedGraph();
-
+    setupTollStations();
     eventLog.addEvent(buildMapInitializedMessage(graph.getNodeCount()));
 }
 
@@ -95,7 +122,6 @@ void WasteSystem::assignWasteLevelsForCurrentDay() {
     for (int i = 0; i < graph.getNodeCount(); ++i) {
         WasteNode& node = graph.getNodeMutable(i);
         node.resetForNewDay();
-
         if (!node.getIsHQ()) {
             node.setWasteLevel(wasteLevelDistribution(rng));
         }
@@ -108,30 +134,55 @@ void WasteSystem::generateNewDayWithSeed(unsigned int seed) {
     ++dayNumber;
 
     assignWasteLevelsForCurrentDay();
+    randomizeFuelPrice();
 
     std::ostringstream message;
-    message << "Day " << dayNumber << " generated (seed: " << seed << ")";
+    message << "Day " << dayNumber
+            << " | Fuel: RM " << dailyFuelPricePerLitre << "/L"
+            << " (seed: " << seed << ")";
     eventLog.addEvent(message.str());
 }
 
-MapGraph& WasteSystem::getGraph() { return graph; }
-const MapGraph& WasteSystem::getGraph() const { return graph; }
-CostModel& WasteSystem::getCostModel() { return costModel; }
-const CostModel& WasteSystem::getCostModel() const { return costModel; }
-EventLog& WasteSystem::getEventLog() { return eventLog; }
-const EventLog& WasteSystem::getEventLog() const { return eventLog; }
+MapGraph& WasteSystem::getGraph()                       { return graph; }
+const MapGraph& WasteSystem::getGraph() const           { return graph; }
+CostModel& WasteSystem::getCostModel()                  { return costModel; }
+const CostModel& WasteSystem::getCostModel() const      { return costModel; }
+EventLog& WasteSystem::getEventLog()                    { return eventLog; }
+const EventLog& WasteSystem::getEventLog() const        { return eventLog; }
+float WasteSystem::getCollectionThreshold() const       { return collectionThreshold; }
+void WasteSystem::setCollectionThreshold(float t)       { collectionThreshold = t; }
+const std::vector<TollStation>& WasteSystem::getTollStations() const { return tollStations; }
+float WasteSystem::getDailyFuelPricePerLitre() const    { return dailyFuelPricePerLitre; }
 
-float WasteSystem::getCollectionThreshold() const { return collectionThreshold; }
+float WasteSystem::calculateTollCost(const std::vector<int>& route) const {
+    float total = 0.0f;
+    for (int i = 0; i + 1 < static_cast<int>(route.size()); ++i) {
+        for (const TollStation& toll : tollStations) {
+            if (toll.isCrossedBy(route[i], route[i + 1])) {
+                total += toll.fee;
+            }
+        }
+    }
+    return total;
+}
 
-void WasteSystem::setCollectionThreshold(float threshold) {
-    collectionThreshold = threshold;
+std::vector<std::string> WasteSystem::getTollNamesCrossed(
+    const std::vector<int>& route) const {
+    std::vector<std::string> names;
+    for (int i = 0; i + 1 < static_cast<int>(route.size()); ++i) {
+        for (const TollStation& toll : tollStations) {
+            if (toll.isCrossedBy(route[i], route[i + 1])) {
+                names.push_back(toll.name);
+            }
+        }
+    }
+    return names;
 }
 
 std::vector<int> WasteSystem::getEligibleNodes(float thresholdOverride) const {
     const float activeThreshold = thresholdOverride >= 0.0f
                                       ? thresholdOverride
                                       : collectionThreshold;
-
     std::vector<int> eligibleNodeIds;
     eligibleNodeIds.reserve(graph.getNodeCount());
     for (int i = 0; i < graph.getNodeCount(); ++i) {
@@ -157,31 +208,35 @@ void WasteSystem::resetCollectionStatus() {
 }
 
 float WasteSystem::computeWasteCollected(const std::vector<int>& route) const {
-    float totalWasteCollected = 0.0f;
-
+    float total = 0.0f;
     for (int nodeId : route) {
         const int nodeIndex = graph.findNodeIndex(nodeId);
-        if (nodeIndex < 0) {
-            continue;
-        }
-
+        if (nodeIndex < 0) continue;
         const WasteNode& node = graph.getNode(nodeIndex);
         if (!node.getIsHQ()) {
-            totalWasteCollected += node.getWasteAmount();
+            total += node.getWasteAmount();
         }
     }
-
-    return totalWasteCollected;
+    return total;
 }
 
 void WasteSystem::populateCosts(RouteResult& result) const {
-    result.totalDistance = graph.calculateRouteDistance(result.visitOrder);
-    result.travelTime = costModel.calculateTravelTime(result.totalDistance);
-    result.fuelCost = costModel.calculateFuelCost(result.totalDistance);
-    result.wageCost = costModel.calculateWageCost(result.totalDistance);
-    result.totalCost = costModel.calculateTotalCost(result.totalDistance);
-    result.wasteCollected = computeWasteCollected(result.visitOrder);
+    result.totalDistance   = graph.calculateRouteDistance(result.visitOrder);
+    result.travelTime      = costModel.calculateTravelTime(result.totalDistance);
+
+    result.fuelCost        = costModel.calculateFuelCost(result.totalDistance);
+
+    result.basePay         = costModel.calculateBasePay();
+    result.perKmBonus      = costModel.calculatePerKmBonus(result.totalDistance);
+    result.efficiencyBonus = costModel.calculateEfficiencyBonus(result.totalDistance);
+    result.wageCost        = result.basePay + result.perKmBonus + result.efficiencyBonus;
+
+    result.tollCost        = calculateTollCost(result.visitOrder);
+    result.tollsCrossed    = getTollNamesCrossed(result.visitOrder);
+
+    result.totalCost       = result.fuelCost + result.wageCost + result.tollCost;
+    result.wasteCollected  = computeWasteCollected(result.visitOrder);
 }
 
-int WasteSystem::getDayNumber() const { return dayNumber; }
+int WasteSystem::getDayNumber() const           { return dayNumber; }
 unsigned int WasteSystem::getCurrentSeed() const { return currentSeed; }

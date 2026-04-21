@@ -45,7 +45,19 @@ void writeRouteMetrics(std::ostream& output, const RouteResult& result) {
     output << "Total Distance:    " << result.totalDistance << " km\n";
     output << "Travel Time:       " << result.travelTime << " hours\n";
     output << "Fuel Cost:         RM " << result.fuelCost << "\n";
-    output << "Driver Wage:       RM " << result.wageCost << "\n";
+    output << "  Base Pay:        RM " << result.basePay << "\n";
+    output << "  Per-km Bonus:    RM " << result.perKmBonus << "\n";
+    output << "  Efficiency Bonus:RM " << result.efficiencyBonus << "\n";
+    output << "  Wage Total:      RM " << result.wageCost << "\n";
+    output << "Toll Cost:         RM " << result.tollCost << "\n";
+    if (!result.tollsCrossed.empty()) {
+        output << "  Tolls crossed: ";
+        for (std::size_t i = 0; i < result.tollsCrossed.size(); ++i) {
+            if (i > 0) output << ", ";
+            output << result.tollsCrossed[i];
+        }
+        output << "\n";
+    }
     output << "Total Cost:        RM " << result.totalCost << "\n";
     output << "Waste Collected:   " << result.wasteCollected << " kg\n";
     output << "Compute Time:      " << result.runtimeMs << " ms\n";
@@ -177,8 +189,9 @@ std::string FileExporter::exportComparisonCsv(const std::vector<RouteResult>& re
     std::ofstream file = openOutputFile(filename);
 
     file << "Algorithm,Distance (km),Travel Time (h),Fuel Cost (RM),"
-         << "Wage Cost (RM),Total Cost (RM),Waste Collected (kg),"
-         << "Runtime (ms)\n";
+         << "Base Pay (RM),Per-km Bonus (RM),Efficiency Bonus (RM),"
+         << "Wage Total (RM),Toll Cost (RM),Total Cost (RM),"
+         << "Waste Collected (kg),Runtime (ms)\n";
 
     file << std::fixed << std::setprecision(2);
     for (const RouteResult& result : results) {
@@ -186,7 +199,11 @@ std::string FileExporter::exportComparisonCsv(const std::vector<RouteResult>& re
              << result.totalDistance << ","
              << result.travelTime << ","
              << result.fuelCost << ","
+             << result.basePay << ","
+             << result.perKmBonus << ","
+             << result.efficiencyBonus << ","
              << result.wageCost << ","
+             << result.tollCost << ","
              << result.totalCost << ","
              << result.wasteCollected << ","
              << result.runtimeMs << "\n";

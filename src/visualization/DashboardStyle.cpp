@@ -20,6 +20,8 @@ constexpr float kComparisonMaxWidth = 620.0f;
 constexpr float kControlsHeightRatio = 0.48f;
 constexpr float kMinMetricsHeight = 92.0f;
 constexpr float kNodeDetailsWidth = 300.0f;
+constexpr float kFuelWageWidth = 290.0f;
+constexpr float kFuelWageHeight = 380.0f;
 }
 
 SidebarLayout buildSidebarLayout() {
@@ -55,6 +57,8 @@ SidebarLayout buildSidebarLayout() {
     layout.metricsSize = ImVec2(kSidebarWidth, metricsHeight);
     layout.legendPos = ImVec2(leftX, top);
     layout.legendSize = ImVec2(kLegendWidth, kLegendHeight);
+    layout.fuelWagePos = ImVec2(leftX, top + kLegendHeight + kPanelMargin);
+    layout.fuelWageSize = ImVec2(kFuelWageWidth, kFuelWageHeight);
     layout.nodeDetailsPos = ImVec2(
         layout.controlsPos.x - kPanelMargin - kNodeDetailsWidth,
         layout.controlsPos.y);

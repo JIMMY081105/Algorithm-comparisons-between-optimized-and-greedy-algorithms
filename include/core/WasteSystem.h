@@ -5,13 +5,14 @@
 #include "EventLog.h"
 #include "MapGraph.h"
 #include "RouteResult.h"
+#include "TollStation.h"
 
 #include <random>
 #include <vector>
 
 // Central simulation state for the coursework scenario.
-// WasteSystem owns the fixed map, the current day's waste levels, the
-// collection threshold, and the event log consumed by the UI.
+// WasteSystem owns the fixed map, the current day's waste levels, toll
+// stations, the randomized daily fuel price, and the event log.
 class WasteSystem {
 private:
     MapGraph graph;
@@ -21,22 +22,25 @@ private:
     unsigned int currentSeed;
     int dayNumber;
 
-    // Nodes below the threshold are ignored when algorithms build routes.
     float collectionThreshold;
+
+    // Toll stations — placed once on map init, fees stay fixed
+    std::vector<TollStation> tollStations;
+
+    // Fuel price is re-randomized every new day (RM 2.00–3.80 per litre)
+    float dailyFuelPricePerLitre;
 
     void addDefaultLocations();
     void assignWasteLevelsForCurrentDay();
+    void setupTollStations();
+    void randomizeFuelPrice();
 
 public:
     WasteSystem();
 
-    // Initialize the fixed Indian Ocean cleanup sector used across the app.
     void initializeMap();
 
-    // Generate a fresh simulation day using a time-based seed.
     void generateNewDay();
-
-    // Generate the day with a specific seed for reproducible demos and testing.
     void generateNewDayWithSeed(unsigned int seed);
 
     MapGraph& getGraph();
@@ -49,16 +53,20 @@ public:
     float getCollectionThreshold() const;
     void setCollectionThreshold(float threshold);
 
-    // Return the node IDs eligible for collection on the current day.
+    // --- Toll station access ---
+    const std::vector<TollStation>& getTollStations() const;
+    float calculateTollCost(const std::vector<int>& route) const;
+    std::vector<std::string> getTollNamesCrossed(const std::vector<int>& route) const;
+
+    // --- Daily fuel price ---
+    float getDailyFuelPricePerLitre() const;
+
     std::vector<int> getEligibleNodes(float thresholdOverride = -1.0f) const;
-
-    // Mark a node as collected so playback and rendering can show progress.
     void markNodeCollected(int nodeId);
-
-    // Clear the collected state before a fresh comparison or replay.
     void resetCollectionStatus();
-
     float computeWasteCollected(const std::vector<int>& route) const;
+
+    // Fills all cost fields of result including tolls and wage breakdown.
     void populateCosts(RouteResult& result) const;
 
     int getDayNumber() const;

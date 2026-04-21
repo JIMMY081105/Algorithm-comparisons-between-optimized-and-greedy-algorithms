@@ -63,6 +63,12 @@ private:
                              AnimationController::PlaybackState playState,
                              float progress);
     void drawExportPanel(UIActions& actions);
+    void drawFuelWagePanel(const WasteSystem& system,
+                           const RouteResult& currentResult,
+                           const ThemeDashboardInfo& environmentInfo);
+    void drawTollOverlays(const WasteSystem& system,
+                          const RouteResult& currentResult,
+                          EnvironmentTheme activeTheme);
 
 public:
     DashboardUI();

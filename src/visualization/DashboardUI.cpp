@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace {
 constexpr ImVec4 kSeaPrimary(0.15f, 0.72f, 0.94f, 1.0f);
@@ -77,6 +78,8 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
     }
 
     drawExportPanel(actions);
+    drawFuelWagePanel(system, currentResult, environmentInfo);
+    drawTollOverlays(system, currentResult, activeTheme);
 
     return actions;
 }
@@ -337,9 +340,23 @@ void DashboardUI::drawMetricsPanel(const RouteResult& currentResult,
         ImGui::NextColumn();
         ImGui::Text("RM %.2f", currentResult.fuelCost); ImGui::NextColumn();
 
-        ImGui::TextColored(kTextSubtle, "Driver Wage");
+        ImGui::TextColored(kTextSubtle, "Wage (Base)");
         ImGui::NextColumn();
-        ImGui::Text("RM %.2f", currentResult.wageCost); ImGui::NextColumn();
+        ImGui::Text("RM %.2f", currentResult.basePay); ImGui::NextColumn();
+
+        ImGui::TextColored(kTextSubtle, "Wage (+/km)");
+        ImGui::NextColumn();
+        ImGui::Text("RM %.2f", currentResult.perKmBonus); ImGui::NextColumn();
+
+        ImGui::TextColored(kTextSubtle, "Efficiency +");
+        ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.30f, 0.90f, 0.50f, 1.0f),
+                           "RM %.2f", currentResult.efficiencyBonus); ImGui::NextColumn();
+
+        ImGui::TextColored(kTextSubtle, "Toll Cost");
+        ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.99f, 0.75f, 0.20f, 1.0f),
+                           "RM %.2f", currentResult.tollCost); ImGui::NextColumn();
 
         ImGui::TextColored(kTextSubtle, "Total Cost");
         ImGui::NextColumn();
@@ -400,16 +417,20 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr,
                             environmentInfo.themeLabel.c_str());
         ImGui::Spacing();
 
-        if (ImGui::BeginTable("CompTable", 8,
+        if (ImGui::BeginTable("CompTable", 11,
                               ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                   ImGuiTableFlags_SizingStretchProp |
-                                  ImGuiTableFlags_PadOuterX)) {
+                                  ImGuiTableFlags_PadOuterX |
+                                  ImGuiTableFlags_ScrollX)) {
 
             ImGui::TableSetupColumn("Algorithm");
-            ImGui::TableSetupColumn("Distance (km)");
+            ImGui::TableSetupColumn("Dist (km)");
             ImGui::TableSetupColumn("Time (h)");
             ImGui::TableSetupColumn("Fuel (RM)");
-            ImGui::TableSetupColumn("Wage (RM)");
+            ImGui::TableSetupColumn("Base Pay");
+            ImGui::TableSetupColumn("+/km");
+            ImGui::TableSetupColumn("Effic +");
+            ImGui::TableSetupColumn("Toll (RM)");
             ImGui::TableSetupColumn("Total (RM)");
             ImGui::TableSetupColumn("Garbage (kg)");
             ImGui::TableSetupColumn("Runtime (ms)");
@@ -433,13 +454,22 @@ void DashboardUI::drawComparisonTable(const ComparisonManager& compMgr,
                     ImGui::Text("%s", r.algorithmName.c_str());
                 }
 
-                ImGui::TableSetColumnIndex(1); ImGui::Text("%.2f", r.totalDistance);
-                ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f", r.travelTime);
-                ImGui::TableSetColumnIndex(3); ImGui::Text("%.2f", r.fuelCost);
-                ImGui::TableSetColumnIndex(4); ImGui::Text("%.2f", r.wageCost);
-                ImGui::TableSetColumnIndex(5); ImGui::Text("%.2f", r.totalCost);
-                ImGui::TableSetColumnIndex(6); ImGui::Text("%.1f", r.wasteCollected);
-                ImGui::TableSetColumnIndex(7); ImGui::Text("%.3f", r.runtimeMs);
+                ImGui::TableSetColumnIndex(1);  ImGui::Text("%.2f", r.totalDistance);
+                ImGui::TableSetColumnIndex(2);  ImGui::Text("%.2f", r.travelTime);
+                ImGui::TableSetColumnIndex(3);  ImGui::Text("%.2f", r.fuelCost);
+                ImGui::TableSetColumnIndex(4);  ImGui::Text("%.2f", r.basePay);
+                ImGui::TableSetColumnIndex(5);  ImGui::Text("%.2f", r.perKmBonus);
+                ImGui::TableSetColumnIndex(6);
+                ImGui::TextColored(ImVec4(0.30f, 0.90f, 0.50f, 1.0f),
+                                   "%.2f", r.efficiencyBonus);
+                ImGui::TableSetColumnIndex(7);
+                ImGui::TextColored(ImVec4(0.99f, 0.75f, 0.20f, 1.0f),
+                                   "%.2f", r.tollCost);
+                ImGui::TableSetColumnIndex(8);
+                ImGui::TextColored(ImVec4(0.95f, 0.82f, 0.18f, 1.0f),
+                                   "%.2f", r.totalCost);
+                ImGui::TableSetColumnIndex(9);  ImGui::Text("%.1f", r.wasteCollected);
+                ImGui::TableSetColumnIndex(10); ImGui::Text("%.3f", r.runtimeMs);
             }
 
             ImGui::EndTable();
@@ -733,4 +763,198 @@ void DashboardUI::drawExportPanel(UIActions& actions) {
 
 int DashboardUI::getSelectedAlgorithm() const {
     return selectedAlgorithm;
+}
+
+// ---------------------------------------------------------------------------
+// Fuel & Wage Panel — shows today's live fuel price and the wage model
+// ---------------------------------------------------------------------------
+void DashboardUI::drawFuelWagePanel(const WasteSystem& system,
+                                    const RouteResult& currentResult,
+                                    const ThemeDashboardInfo& environmentInfo) {
+    const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
+    ImGui::SetNextWindowPos(layout.fuelWagePos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(layout.fuelWageSize, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.95f);
+
+    ImGui::Begin("Fuel & Wage", nullptr, DashboardStyle::pinnedSidebarWindowFlags());
+
+    // --- Today's Fuel Price ---
+    const float price = system.getDailyFuelPricePerLitre();
+    const float fuelCostPerKm = system.getCostModel().getFuelCostPerKm();
+
+    ImGui::SeparatorText("Today's Fuel Price");
+    const ImVec4 priceColor = (price < 2.60f)
+        ? ImVec4(0.30f, 0.90f, 0.40f, 1.0f)    // green = cheap
+        : (price < 3.20f)
+            ? ImVec4(0.99f, 0.82f, 0.10f, 1.0f) // yellow = moderate
+            : ImVec4(0.95f, 0.30f, 0.25f, 1.0f); // red = expensive
+
+    ImGui::SetWindowFontScale(1.10f);
+    ImGui::TextColored(priceColor, "RM %.2f / litre", price);
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::TextColored(kTextSoft, "%.2f L/km  ->  RM %.4f / km",
+                       system.getCostModel().getLitresPerKm(), fuelCostPerKm);
+
+    // Visual price bar (RM 2.00 = left, RM 3.80 = right)
+    const float barW = ImGui::GetContentRegionAvail().x;
+    const float barH = 8.0f;
+    const ImVec2 bMin = ImGui::GetCursorScreenPos();
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(bMin, ImVec2(bMin.x + barW, bMin.y + barH),
+                        IM_COL32(40, 50, 65, 200), 3.0f);
+    const float fill = (price - 2.00f) / 1.80f;
+    const ImU32 barFill = (price < 2.60f)
+        ? IM_COL32(50, 200, 80, 220)
+        : (price < 3.20f)
+            ? IM_COL32(230, 190, 30, 220)
+            : IM_COL32(210, 60, 50, 220);
+    draw->AddRectFilled(bMin,
+                        ImVec2(bMin.x + barW * std::clamp(fill, 0.0f, 1.0f),
+                               bMin.y + barH),
+                        barFill, 3.0f);
+    ImGui::Dummy(ImVec2(barW, barH + 2.0f));
+
+    ImGui::TextColored(ImVec4(0.38f, 0.44f, 0.52f, 1.0f),
+                       "RM 2.00                      RM 3.80");
+
+    // --- Toll Stations ---
+    ImGui::Spacing();
+    ImGui::SeparatorText("Toll Stations");
+    const auto& tolls = system.getTollStations();
+    ImGui::Columns(2, "tollcols", false);
+    ImGui::SetColumnWidth(0, 110);
+    for (const auto& t : tolls) {
+        // Check if this toll was crossed in the current route
+        bool crossed = false;
+        for (const auto& name : currentResult.tollsCrossed) {
+            if (name == t.name) { crossed = true; break; }
+        }
+        if (crossed) {
+            ImGui::TextColored(ImVec4(0.99f, 0.75f, 0.20f, 1.0f),
+                               "%s", t.name.c_str());
+            ImGui::NextColumn();
+            ImGui::TextColored(ImVec4(0.99f, 0.75f, 0.20f, 1.0f),
+                               "+RM %.2f", t.fee);
+        } else {
+            ImGui::TextColored(kTextSoft, "%s", t.name.c_str());
+            ImGui::NextColumn();
+            ImGui::TextColored(kTextSoft, "RM %.2f", t.fee);
+        }
+        ImGui::NextColumn();
+    }
+    ImGui::Columns(1);
+
+    if (currentResult.isValid()) {
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.99f, 0.75f, 0.20f, 1.0f),
+                           "Crossed: %d  (RM %.2f)",
+                           static_cast<int>(currentResult.tollsCrossed.size()),
+                           currentResult.tollCost);
+    }
+
+    // --- Wage Model Summary ---
+    ImGui::Spacing();
+    ImGui::SeparatorText("Wage Model");
+    const CostModel& cm = system.getCostModel();
+    ImGui::TextColored(kTextSoft, "Base shift pay:  RM %.2f", cm.getBaseWagePerShift());
+    ImGui::TextColored(kTextSoft, "Per-km bonus:    RM %.2f/km", cm.getWagePerKmBonus());
+    ImGui::TextDisabled("Efficiency bonus tiers:");
+    ImGui::TextColored(ImVec4(0.30f, 0.90f, 0.50f, 1.0f), " <80 km  -> +RM 25.00");
+    ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.40f, 1.0f), " <120 km -> +RM 15.00");
+    ImGui::TextColored(ImVec4(0.80f, 0.80f, 0.30f, 1.0f), " <180 km -> +RM  8.00");
+    ImGui::TextColored(ImVec4(0.85f, 0.55f, 0.25f, 1.0f), " <250 km -> +RM  3.00");
+    ImGui::TextColored(kTextSoft,                          " >=250 km-> +RM  0.00");
+
+    ImGui::End();
+}
+
+// ---------------------------------------------------------------------------
+// Toll overlay — draws gold booth markers and "+RM" labels on the 3D map
+// using ImGui's foreground draw list (screen-space, no OpenGL needed).
+// ---------------------------------------------------------------------------
+void DashboardUI::drawTollOverlays(const WasteSystem& system,
+                                   const RouteResult& currentResult,
+                                   EnvironmentTheme activeTheme) {
+    if (activeTheme != EnvironmentTheme::City) return;
+
+    const auto& tolls = system.getTollStations();
+    const MapGraph& g = system.getGraph();
+    ImDrawList* fg    = ImGui::GetForegroundDrawList();
+
+    for (const auto& toll : tolls) {
+        const int idxA = g.findNodeIndex(toll.nodeA);
+        const int idxB = g.findNodeIndex(toll.nodeB);
+        if (idxA < 0 || idxB < 0) continue;
+
+        const WasteNode& nA = g.getNode(idxA);
+        const WasteNode& nB = g.getNode(idxB);
+
+        const float mx = (nA.getWorldX() + nB.getWorldX()) * 0.5f;
+        const float my = (nA.getWorldY() + nB.getWorldY()) * 0.5f;
+        const IsoCoord sc = RenderUtils::worldToIso(mx, my);
+
+        bool crossed = false;
+        for (const auto& name : currentResult.tollsCrossed) {
+            if (name == toll.name) { crossed = true; break; }
+        }
+
+        // Barrier gate: two dark pillars + striped horizontal arm
+        constexpr float kPillarW  = 5.0f;
+        constexpr float kPillarH  = 14.0f;
+        constexpr float kArmLen   = 24.0f;
+        constexpr float kArmH     = 5.0f;
+        constexpr int   kStripes  = 4;
+        const ImU32 pillarCol     = crossed
+            ? IM_COL32(60, 65, 78, 255)
+            : IM_COL32(50, 54, 65, 200);
+
+        // Left pillar
+        fg->AddRectFilled(
+            ImVec2(sc.x - kArmLen * 0.5f - kPillarW, sc.y - kPillarH * 0.5f),
+            ImVec2(sc.x - kArmLen * 0.5f,             sc.y + kPillarH * 0.5f),
+            pillarCol, 1.5f);
+        // Right pillar
+        fg->AddRectFilled(
+            ImVec2(sc.x + kArmLen * 0.5f,             sc.y - kPillarH * 0.5f),
+            ImVec2(sc.x + kArmLen * 0.5f + kPillarW,  sc.y + kPillarH * 0.5f),
+            pillarCol, 1.5f);
+
+        // Striped boom arm — orange/white when uncrossed, red/white when crossed
+        const float stripeW = kArmLen / kStripes;
+        for (int i = 0; i < kStripes; ++i) {
+            const ImU32 col = (i % 2 == 0)
+                ? (crossed ? IM_COL32(230, 60, 50, 255) : IM_COL32(255, 135, 0, 230))
+                : IM_COL32(230, 230, 230, 230);
+            fg->AddRectFilled(
+                ImVec2(sc.x - kArmLen * 0.5f + i * stripeW,
+                       sc.y - kArmH * 0.5f),
+                ImVec2(sc.x - kArmLen * 0.5f + (i + 1) * stripeW,
+                       sc.y + kArmH * 0.5f),
+                col);
+        }
+        fg->AddRect(
+            ImVec2(sc.x - kArmLen * 0.5f, sc.y - kArmH * 0.5f),
+            ImVec2(sc.x + kArmLen * 0.5f, sc.y + kArmH * 0.5f),
+            IM_COL32(70, 70, 80, 200), 0.0f, 0, 1.0f);
+
+        // "+RM X.XX" notification pill — only when crossed
+        if (crossed) {
+            char label[24];
+            std::snprintf(label, sizeof(label), "+RM %.2f", toll.fee);
+            const ImVec2 tSize = ImGui::CalcTextSize(label);
+            constexpr float kPad = 5.0f;
+            const float pillY = sc.y - kPillarH * 0.5f - tSize.y - kPad * 2.0f - 4.0f;
+            fg->AddRectFilled(
+                ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
+                ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
+                IM_COL32(255, 200, 20, 245), 5.0f);
+            fg->AddRect(
+                ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
+                ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
+                IM_COL32(210, 155, 0, 200), 5.0f, 0, 1.0f);
+            fg->AddText(
+                ImVec2(sc.x - tSize.x * 0.5f, pillY + kPad * 0.5f),
+                IM_COL32(20, 14, 0, 255), label);
+        }
+    }
 }

@@ -5,25 +5,36 @@
 #include <vector>
 
 // Stores the complete output of running one routing algorithm.
-// This struct bundles the route order with all computed metrics
-// so we can display, compare, and export results easily.
+// Wage breakdown:
+//   wageCost = basePay + perKmBonus + efficiencyBonus
+// Full cost:
+//   totalCost = fuelCost + wageCost + tollCost
 struct RouteResult {
     std::string algorithmName;
     std::vector<int> visitOrder;    // sequence of node IDs visited
     float totalDistance;            // in kilometers
-    float travelTime;              // in hours
-    float fuelCost;                // in RM
-    float wageCost;                // in RM
-    float totalCost;               // fuel + wage combined
-    float wasteCollected;          // in kg
-    double runtimeMs;              // how long the algorithm took to compute
+    float travelTime;               // in hours
+
+    // Fuel
+    float fuelCost;                 // litres/km * daily price * distance
+
+    // Wage breakdown
+    float basePay;                  // flat shift pay (RM)
+    float perKmBonus;               // distance incentive (RM)
+    float efficiencyBonus;          // reward for short routes (RM)
+    float wageCost;                 // basePay + perKmBonus + efficiencyBonus
+
+    // Tolls
+    float tollCost;                 // sum of all toll fees crossed
+    std::vector<std::string> tollsCrossed;  // names of tolls hit
+
+    float totalCost;                // fuelCost + wageCost + tollCost
+    float wasteCollected;           // in kg
+    double runtimeMs;               // algorithm compute time
 
     RouteResult();
 
-    // Quick summary string for logging
     std::string toSummaryString() const;
-
-    // Check if this result is valid (has at least one node visited)
     bool isValid() const;
 };
 

@@ -20,6 +20,9 @@ struct SidebarLayout {
     ImVec2 legendSize;
     ImVec2 nodeDetailsPos;
     ImVec2 nodeDetailsSize;
+    // Fuel & Wage panel — placed left of the right sidebar in the map area
+    ImVec2 fuelWagePos;
+    ImVec2 fuelWageSize;
 };
 
 struct BottomOverlayLayout {
