@@ -649,16 +649,11 @@ void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
                                   const WasteSystem& system) {
     const DashboardStyle::SidebarLayout layout = DashboardStyle::buildSidebarLayout();
     ImGui::SetNextWindowPos(layout.legendPos, ImGuiCond_Always);
-
-    // Prevent the legend from expanding into the chatbot icon area at the
-    // bottom-left. The icon sits 108 px (48 icon + 60 offset) from the bottom,
-    // plus a small margin — reserve 120 px total to stay clear.
-    const ImGuiViewport* vp = ImGui::GetMainViewport();
-    const float chatbotReserved = 120.0f;
-    const float legendMaxHeight = vp->WorkSize.y - chatbotReserved - layout.legendPos.y + vp->WorkPos.y;
+    // Cap height to the gap between top-of-legend and top-of-fuel-wage panel.
+    // This ensures legend, fuel wage, and chatbot icon never overlap.
     ImGui::SetNextWindowSizeConstraints(
         ImVec2(layout.legendSize.x, 0.0f),
-        ImVec2(layout.legendSize.x, std::max(50.0f, legendMaxHeight)));
+        ImVec2(layout.legendSize.x, std::max(50.0f, layout.legendSize.y)));
     ImGui::SetNextWindowBgAlpha(0.95f);
 
     ImGui::Begin("Legend", nullptr,
@@ -686,6 +681,17 @@ void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
     ImGui::SameLine(); ImGui::Text("Completed");
 
     drawTrafficLegend();
+
+    if (selectedTheme == EnvironmentTheme::City) {
+        ImGui::Separator();
+        ImGui::TextDisabled("Road events");
+        ImGui::ColorButton("##flood", ImVec4(0.12f, 0.31f, 0.78f, 1.0f),
+                           ImGuiColorEditFlags_NoTooltip);
+        ImGui::SameLine(); ImGui::Text("Flood (impassable)");
+        ImGui::ColorButton("##fest",  ImVec4(0.55f, 0.31f, 0.10f, 1.0f),
+                           ImGuiColorEditFlags_NoTooltip);
+        ImGui::SameLine(); ImGui::Text("Festival (closed)");
+    }
 
     ImGui::Separator();
     ImGui::TextWrapped("%s", environmentInfo.atmosphereLabel.c_str());
@@ -1093,25 +1099,10 @@ void DashboardUI::drawRoadEventOverlays(const WasteSystem& system,
         const IsoCoord scA = RenderUtils::worldToIso(nA.getWorldX(), nA.getWorldY());
         const IsoCoord scB = RenderUtils::worldToIso(nB.getWorldX(), nB.getWorldY());
 
-        const float dx  = scB.x - scA.x;
-        const float dy  = scB.y - scA.y;
-        const float len = std::sqrt(dx * dx + dy * dy);
-        if (len < 1.0f) continue;
-
-        // Draw road band: dark outline + solid color fill to look like painted tarmac
-        if (ev.type == RoadEvent::FLOOD) {
-            // Dark navy outline, then dark blue fill — road is submerged
-            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
-                        IM_COL32(10, 20, 80, 220), 12.0f);
-            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
-                        IM_COL32(30, 80, 200, 200),  8.0f);
-        } else {
-            // Dark brown outline, then warm brown fill — road closed for festival
-            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
-                        IM_COL32(60, 30, 10, 220), 12.0f);
-            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
-                        IM_COL32(160, 100, 40, 200),  8.0f);
-        }
+        // Road segment colour is applied in CityThemeRenderer::drawTransitNetwork.
+        // Here we only draw the floating pill label so the event name is visible.
+        const float dx = scB.x - scA.x;
+        const float dy = scB.y - scA.y;
 
         // Midpoint pill label
         const float mx = scA.x + dx * 0.5f;

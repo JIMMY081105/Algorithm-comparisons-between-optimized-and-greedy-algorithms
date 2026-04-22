@@ -40,6 +40,11 @@ public:
     // Returns the base distance multiplied by the active road-event penalty.
     // Algorithms should call this instead of getDistance so they route around events.
     float getEffectiveDistance(int fromId, int toId) const;
+    // Returns the shortest path distance on the full graph while treating blocked
+    // edges (flood/festival) as completely impassable. Algorithms should use this
+    // so blocked roads are never traversed — not even as a last resort.
+    // Falls back to getEffectiveDistance only if no unblocked path exists.
+    float getShortestPathDistance(int fromId, int toId) const;
     const std::vector<std::vector<float>>& getAdjacencyMatrix() const;
     const std::vector<WasteNode>& getNodes() const;
 

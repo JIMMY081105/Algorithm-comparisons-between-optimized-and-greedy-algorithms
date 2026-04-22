@@ -139,6 +139,7 @@ private:
         float focusWeight = 0.0f;
         bool arterial = false;
         bool snowBlocked = false;
+        RoadEvent eventType = RoadEvent::NONE;
         VisualTier visualTier = VisualTier::Support;
     };
 
@@ -320,6 +321,7 @@ private:
 
     void generateGridNetwork(const MapGraph& graph, std::mt19937& rng);
     void assignNodeAnchors(const MapGraph& graph);
+    void applyRoadEvents(const MapGraph& graph);
     void updateSceneFocus(const MapGraph& graph);
     void generateBlocks(std::mt19937& rng);
     void generateBuildings(const MapGraph& graph, std::mt19937& rng);

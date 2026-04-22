@@ -1501,7 +1501,7 @@ void CityThemeRenderer::drawTransitNetwork(
     AnimationController::PlaybackState playbackState,
     float routeRevealProgress,
     float animationTime) {
-    (void)graph;
+    applyRoadEvents(graph);
 
     ensureStaticBatchProjectionCurrent();
 
@@ -1560,6 +1560,19 @@ void CityThemeRenderer::drawTransitNetwork(
         }
         if (road.snowBlocked) {
             centerLine = mixColor(centerLine, Color(0.92f, 0.96f, 1.0f, centerLine.a), 0.72f);
+        }
+
+        // Road events override all other visual states — flood = dark blue, festival = dark brown.
+        if (road.eventType == RoadEvent::FLOOD) {
+            curbColor  = Color(0.02f, 0.05f, 0.25f, 0.96f);
+            roadColor  = Color(0.09f, 0.28f, 0.75f, 1.0f);
+            centerLine = withAlpha(Color(0.40f, 0.70f, 1.00f, 1.0f), 0.22f);
+            glow       = Color(0.14f, 0.34f, 0.88f, 0.20f);
+        } else if (road.eventType == RoadEvent::FESTIVAL) {
+            curbColor  = Color(0.16f, 0.06f, 0.01f, 0.96f);
+            roadColor  = Color(0.51f, 0.28f, 0.07f, 1.0f);
+            centerLine = withAlpha(Color(0.85f, 0.58f, 0.22f, 1.0f), 0.22f);
+            glow       = Color(0.55f, 0.30f, 0.08f, 0.20f);
         }
 
         curbColor = attenuateToZone(
@@ -3485,6 +3498,38 @@ int CityThemeRenderer::findRoadIndex(int fromIntersection, int toIntersection) c
         }
     }
     return -1;
+}
+
+void CityThemeRenderer::applyRoadEvents(const MapGraph& graph) {
+    for (auto& road : roads) {
+        road.eventType = RoadEvent::NONE;
+    }
+
+    if (nodeAnchors.empty() || intersections.empty()) return;
+
+    for (const auto& ev : graph.getActiveEdgeEvents()) {
+        if (ev.type == RoadEvent::NONE) continue;
+
+        const int idxA = graph.findNodeIndex(ev.fromId);
+        const int idxB = graph.findNodeIndex(ev.toId);
+        if (idxA < 0 || idxB < 0) continue;
+        if (idxA >= static_cast<int>(nodeAnchors.size()) ||
+            idxB >= static_cast<int>(nodeAnchors.size())) continue;
+
+        const int anchorA = nodeAnchors[idxA];
+        const int anchorB = nodeAnchors[idxB];
+        if (anchorA < 0 || anchorA >= static_cast<int>(intersections.size())) continue;
+        if (anchorB < 0 || anchorB >= static_cast<int>(intersections.size())) continue;
+        if (anchorA == anchorB) continue;
+
+        const std::vector<int> path = shortestPath(anchorA, anchorB);
+        for (std::size_t k = 1; k < path.size(); ++k) {
+            const int roadIdx = findRoadIndex(path[k - 1], path[k]);
+            if (roadIdx >= 0 && roadIdx < static_cast<int>(roads.size())) {
+                roads[roadIdx].eventType = ev.type;
+            }
+        }
+    }
 }
 
 void CityThemeRenderer::refreshDashboardInfo() {

@@ -27,7 +27,7 @@ RouteResult DijkstraRouteAlgorithm::computeRoute(const MapGraph& graph,
     for (int i = 0; i < nodeCount; ++i) {
         for (int j = 0; j < nodeCount; ++j) {
             if (i != j) {
-                dist[i][j] = graph.getEffectiveDistance(nodeIds[i], nodeIds[j]);
+                dist[i][j] = graph.getShortestPathDistance(nodeIds[i], nodeIds[j]);
             }
         }
     }

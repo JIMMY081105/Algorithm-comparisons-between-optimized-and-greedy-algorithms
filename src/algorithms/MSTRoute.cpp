@@ -91,7 +91,7 @@ std::vector<std::vector<int>> MSTRouteAlgorithm::buildMST(
         nodeCount, std::vector<float>(nodeCount, 0.0f));
     for (int i = 0; i < nodeCount; ++i) {
         for (int j = i + 1; j < nodeCount; ++j) {
-            const float d = graph.getEffectiveDistance(nodeIds[i], nodeIds[j]);
+            const float d = graph.getShortestPathDistance(nodeIds[i], nodeIds[j]);
             localDist[i][j] = d;
             localDist[j][i] = d;
         }

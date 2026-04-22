@@ -10,7 +10,8 @@ constexpr float kHeaderWidth = 420.0f;
 constexpr float kLegendWidth = 290.0f;
 constexpr float kHeaderHeight = 74.0f;
 constexpr float kExportHeight = 112.0f;
-constexpr float kLegendHeight = 176.0f;
+// chatbot icon sits ~108 px from bottom — reserve 128 px clear zone
+constexpr float kChatbotReserved = 128.0f;
 constexpr float kEventLogWidth = 290.0f;
 constexpr float kEventLogHeight = 190.0f;
 constexpr float kRouteOrderWidth = 280.0f;
@@ -55,10 +56,15 @@ SidebarLayout buildSidebarLayout() {
     layout.metricsPos = ImVec2(rightX,
                                layout.exportPos.y + layout.exportSize.y + kPanelMargin);
     layout.metricsSize = ImVec2(kSidebarWidth, metricsHeight);
-    layout.legendPos = ImVec2(leftX, top);
-    layout.legendSize = ImVec2(kLegendWidth, kLegendHeight);
-    layout.fuelWagePos = ImVec2(leftX, top + kLegendHeight + kPanelMargin);
+    // Fuel wage anchored from the bottom of the viewport, above the chatbot zone.
+    const float fuelWageTopY = viewport->WorkPos.y + viewport->WorkSize.y -
+                               kChatbotReserved - kFuelWageHeight - kPanelMargin;
+    layout.fuelWagePos  = ImVec2(leftX, fuelWageTopY);
     layout.fuelWageSize = ImVec2(kFuelWageWidth, kFuelWageHeight);
+
+    // Legend sits at the top-left and is capped so it never overlaps the fuel wage panel.
+    layout.legendPos  = ImVec2(leftX, top);
+    layout.legendSize = ImVec2(kLegendWidth, fuelWageTopY - top - kPanelMargin);
     layout.nodeDetailsPos = ImVec2(
         layout.controlsPos.x - kPanelMargin - kNodeDetailsWidth,
         layout.controlsPos.y);

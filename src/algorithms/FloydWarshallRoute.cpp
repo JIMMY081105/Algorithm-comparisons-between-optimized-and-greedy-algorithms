@@ -31,7 +31,7 @@ RouteResult FloydWarshallRouteAlgorithm::computeRoute(const MapGraph& graph,
         fw[i][i] = 0.0f;
         for (int j = 0; j < nodeCount; ++j) {
             if (i != j) {
-                fw[i][j] = graph.getEffectiveDistance(nodeIds[i], nodeIds[j]);
+                fw[i][j] = graph.getShortestPathDistance(nodeIds[i], nodeIds[j]);
             }
         }
     }

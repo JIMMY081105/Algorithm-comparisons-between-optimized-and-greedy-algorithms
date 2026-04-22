@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <queue>
 #include <stdexcept>
 
 namespace {
@@ -141,6 +143,45 @@ float MapGraph::getEffectiveDistance(int fromId, int toId) const {
     const int ti = findNodeIndex(toId);
     if (fi < 0 || ti < 0) return base;
     return base * roadEventDistanceMultiplier(edgeEvents[fi][ti]);
+}
+
+float MapGraph::getShortestPathDistance(int fromId, int toId) const {
+    const int n = static_cast<int>(nodes.size());
+    const int startIdx = findNodeIndex(fromId);
+    const int endIdx   = findNodeIndex(toId);
+    if (startIdx < 0 || endIdx < 0 || n == 0) return getEffectiveDistance(fromId, toId);
+    if (startIdx == endIdx) return 0.0f;
+
+    const float kInf = std::numeric_limits<float>::max() / 2.0f;
+    std::vector<float> dist(n, kInf);
+    std::vector<bool> settled(n, false);
+    dist[startIdx] = 0.0f;
+
+    using Entry = std::pair<float, int>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pq;
+    pq.push({0.0f, startIdx});
+
+    while (!pq.empty()) {
+        const auto [d, u] = pq.top();
+        pq.pop();
+        if (settled[u]) continue;
+        settled[u] = true;
+        if (u == endIdx) break;
+
+        for (int v = 0; v < n; ++v) {
+            if (v == u || adjacencyMatrix[u][v] <= 0.0f) continue;
+            // Treat blocked edges as completely impassable — skip them.
+            if (!edgeEvents.empty() && edgeEvents[u][v] != RoadEvent::NONE) continue;
+            const float tentative = dist[u] + adjacencyMatrix[u][v];
+            if (tentative < dist[v]) {
+                dist[v] = tentative;
+                pq.push({tentative, v});
+            }
+        }
+    }
+
+    // No unblocked path exists — fall back so the algorithm still has a cost.
+    return (dist[endIdx] < kInf) ? dist[endIdx] : getEffectiveDistance(fromId, toId);
 }
 
 void MapGraph::setEdgeEvent(int fromId, int toId, RoadEvent event) {
