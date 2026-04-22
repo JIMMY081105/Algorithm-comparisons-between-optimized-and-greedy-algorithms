@@ -60,10 +60,13 @@ void MapGraph::addNode(const WasteNode& node) {
 void MapGraph::clear() {
     nodes.clear();
     adjacencyMatrix.clear();
+    edgeEvents.clear();
 }
 
 void MapGraph::buildFullyConnectedGraph() {
     adjacencyMatrix = buildEuclideanMatrix();
+    const int n = static_cast<int>(nodes.size());
+    edgeEvents.assign(n, std::vector<RoadEvent>(n, RoadEvent::NONE));
 }
 
 void MapGraph::installWeightedMatrix(const std::vector<std::vector<float>>& matrix) {
@@ -129,6 +132,49 @@ std::vector<std::pair<int, float>> MapGraph::getNeighbors(int nodeId) const {
         }
     }
     return neighbors;
+}
+
+float MapGraph::getEffectiveDistance(int fromId, int toId) const {
+    const float base = getDistance(fromId, toId);
+    if (base <= 0.0f || edgeEvents.empty()) return base;
+    const int fi = findNodeIndex(fromId);
+    const int ti = findNodeIndex(toId);
+    if (fi < 0 || ti < 0) return base;
+    return base * roadEventDistanceMultiplier(edgeEvents[fi][ti]);
+}
+
+void MapGraph::setEdgeEvent(int fromId, int toId, RoadEvent event) {
+    const int fi = findNodeIndex(fromId);
+    const int ti = findNodeIndex(toId);
+    if (fi < 0 || ti < 0 || edgeEvents.empty()) return;
+    edgeEvents[fi][ti] = event;
+    edgeEvents[ti][fi] = event;
+}
+
+RoadEvent MapGraph::getEdgeEvent(int fromId, int toId) const {
+    const int fi = findNodeIndex(fromId);
+    const int ti = findNodeIndex(toId);
+    if (fi < 0 || ti < 0 || edgeEvents.empty()) return RoadEvent::NONE;
+    return edgeEvents[fi][ti];
+}
+
+void MapGraph::clearAllEvents() {
+    for (auto& row : edgeEvents) {
+        std::fill(row.begin(), row.end(), RoadEvent::NONE);
+    }
+}
+
+std::vector<ActiveEdgeEvent> MapGraph::getActiveEdgeEvents() const {
+    std::vector<ActiveEdgeEvent> result;
+    const int n = static_cast<int>(nodes.size());
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (edgeEvents[i][j] != RoadEvent::NONE) {
+                result.push_back({nodes[i].getId(), nodes[j].getId(), edgeEvents[i][j]});
+            }
+        }
+    }
+    return result;
 }
 
 float MapGraph::calculateRouteDistance(const std::vector<int>& route) const {

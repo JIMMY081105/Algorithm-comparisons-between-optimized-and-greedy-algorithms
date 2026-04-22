@@ -35,7 +35,10 @@ DashboardUI::DashboardUI()
       selectedSeason(CitySeason::Spring),
       showComparisonTable(false),
       showEventLog(true),
-      showNodeDetails(false) {}
+      showNodeDetails(false),
+      roadEventFromIdx(0),
+      roadEventToIdx(1),
+      roadEventTypeIdx(1) {}
 
 DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
                                            ComparisonManager& compMgr,
@@ -80,6 +83,7 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
     drawExportPanel(actions);
     drawFuelWagePanel(system, currentResult, environmentInfo);
     drawTollOverlays(system, currentResult, activeTheme);
+    drawRoadEventOverlays(system, activeTheme);
 
     return actions;
 }
@@ -275,6 +279,108 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
     ImGui::ProgressBar(missionProgress, ImVec2(-1, 12));
     ImGui::TextColored(DashboardStyle::playbackTint(playState, hasMission),
                        "%s", DashboardStyle::playbackLabel(playState, hasMission));
+
+    // Road Events (city only)
+    if (selectedTheme == EnvironmentTheme::City) {
+        ImGui::SeparatorText("Road Events");
+
+        const MapGraph& g = system.getGraph();
+        const auto& nodes = g.getNodes();
+        const int nodeCount = g.getNodeCount();
+
+        if (roadEventFromIdx >= nodeCount) roadEventFromIdx = 0;
+        if (roadEventToIdx   >= nodeCount) roadEventToIdx   = std::min(1, nodeCount - 1);
+
+        std::vector<std::string> nodeNames;
+        nodeNames.reserve(nodeCount);
+        for (const auto& n : nodes) nodeNames.push_back(n.getName());
+
+        auto nameGetter = [](void* d, int i, const char** out) -> bool {
+            const auto& v = *static_cast<std::vector<std::string>*>(d);
+            if (i < 0 || i >= static_cast<int>(v.size())) return false;
+            *out = v[i].c_str();
+            return true;
+        };
+
+        ImGui::TextDisabled("From");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::Combo("##reFrom", &roadEventFromIdx, nameGetter, &nodeNames, nodeCount);
+        ImGui::TextDisabled("To");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::Combo("##reTo",   &roadEventToIdx,   nameGetter, &nodeNames, nodeCount);
+
+        static const char* kEventTypes[] = {
+            "None (clear)", "Flood", "Festival"
+        };
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::Combo("##reType", &roadEventTypeIdx, kEventTypes, 3);
+
+        const bool sameNode = (roadEventFromIdx == roadEventToIdx);
+        if (sameNode) ImGui::BeginDisabled();
+        if (ImGui::Button("Apply & Re-run##re", ImVec2(-1.0f, 22.0f))) {
+            const int fromId = nodes[roadEventFromIdx].getId();
+            const int toId   = nodes[roadEventToIdx].getId();
+            const RoadEvent ev = static_cast<RoadEvent>(roadEventTypeIdx);
+            system.getGraph().setEdgeEvent(fromId, toId, ev);
+
+            char logMsg[100];
+            if (ev == RoadEvent::NONE) {
+                std::snprintf(logMsg, sizeof(logMsg), "Cleared: %s <-> %s",
+                              nodeNames[roadEventFromIdx].c_str(),
+                              nodeNames[roadEventToIdx].c_str());
+            } else {
+                std::snprintf(logMsg, sizeof(logMsg), "%s: %s <-> %s",
+                              roadEventFullName(ev),
+                              nodeNames[roadEventFromIdx].c_str(),
+                              nodeNames[roadEventToIdx].c_str());
+            }
+            system.getEventLog().addEvent(logMsg);
+            actions.runSelectedAlgorithm = true;
+            actions.algorithmToRun = selectedAlgorithm;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Sets the road condition and immediately re-runs\nthe selected algorithm to update the route.");
+        }
+        if (sameNode) {
+            ImGui::EndDisabled();
+            ImGui::TextColored(ImVec4(0.85f, 0.50f, 0.20f, 1.0f), "Select different nodes");
+        }
+
+        // Active event list
+        const auto activeEvents = system.getGraph().getActiveEdgeEvents();
+        if (!activeEvents.empty()) {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Active:");
+            for (const auto& ev : activeEvents) {
+                const int ia = g.findNodeIndex(ev.fromId);
+                const int ib = g.findNodeIndex(ev.toId);
+                const char* na = (ia >= 0) ? nodes[ia].getName().c_str() : "?";
+                const char* nb = (ib >= 0) ? nodes[ib].getName().c_str() : "?";
+
+                const ImVec4 col =
+                    (ev.type == RoadEvent::FLOOD)
+                        ? ImVec4(0.22f, 0.48f, 0.95f, 1.0f)   // dark blue
+                        : ImVec4(0.72f, 0.48f, 0.20f, 1.0f);  // brown
+
+                ImGui::TextColored(col, "[%s]", roadEventLabel(ev.type));
+                ImGui::SameLine();
+                ImGui::TextColored(kTextSoft, "%s-%s", na, nb);
+                ImGui::SameLine();
+                char btnId[32];
+                std::snprintf(btnId, sizeof(btnId), "X##clr%d_%d", ev.fromId, ev.toId);
+                if (ImGui::SmallButton(btnId)) {
+                    system.getGraph().setEdgeEvent(ev.fromId, ev.toId, RoadEvent::NONE);
+                    char logMsg[80];
+                    std::snprintf(logMsg, sizeof(logMsg), "Cleared: %s <-> %s", na, nb);
+                    system.getEventLog().addEvent(logMsg);
+                }
+            }
+            if (ImGui::SmallButton("Clear All Events##reAll")) {
+                system.getGraph().clearAllEvents();
+                system.getEventLog().addEvent("All road events cleared");
+            }
+        }
+    }
 
     ImGui::SeparatorText("Panels");
     ImGui::Checkbox("Comparison", &showComparisonTable);
@@ -956,5 +1062,73 @@ void DashboardUI::drawTollOverlays(const WasteSystem& system,
                 ImVec2(sc.x - tSize.x * 0.5f, pillY + kPad * 0.5f),
                 IM_COL32(20, 14, 0, 255), label);
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Road event overlays — thick colored bands painted over blocked road segments.
+// FLOOD = dark blue, FESTIVAL = brown. Both are fully impassable.
+// City-only.
+// ---------------------------------------------------------------------------
+void DashboardUI::drawRoadEventOverlays(const WasteSystem& system,
+                                        EnvironmentTheme activeTheme) {
+    if (activeTheme != EnvironmentTheme::City) return;
+
+    const auto activeEvents = system.getGraph().getActiveEdgeEvents();
+    if (activeEvents.empty()) return;
+
+    const MapGraph& g = system.getGraph();
+    ImDrawList*    fg = ImGui::GetForegroundDrawList();
+
+    for (const auto& ev : activeEvents) {
+        if (ev.type == RoadEvent::NONE) continue;
+
+        const int idxA = g.findNodeIndex(ev.fromId);
+        const int idxB = g.findNodeIndex(ev.toId);
+        if (idxA < 0 || idxB < 0) continue;
+
+        const WasteNode& nA = g.getNode(idxA);
+        const WasteNode& nB = g.getNode(idxB);
+
+        const IsoCoord scA = RenderUtils::worldToIso(nA.getWorldX(), nA.getWorldY());
+        const IsoCoord scB = RenderUtils::worldToIso(nB.getWorldX(), nB.getWorldY());
+
+        const float dx  = scB.x - scA.x;
+        const float dy  = scB.y - scA.y;
+        const float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 1.0f) continue;
+
+        // Draw road band: dark outline + solid color fill to look like painted tarmac
+        if (ev.type == RoadEvent::FLOOD) {
+            // Dark navy outline, then dark blue fill — road is submerged
+            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
+                        IM_COL32(10, 20, 80, 220), 12.0f);
+            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
+                        IM_COL32(30, 80, 200, 200),  8.0f);
+        } else {
+            // Dark brown outline, then warm brown fill — road closed for festival
+            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
+                        IM_COL32(60, 30, 10, 220), 12.0f);
+            fg->AddLine(ImVec2(scA.x, scA.y), ImVec2(scB.x, scB.y),
+                        IM_COL32(160, 100, 40, 200),  8.0f);
+        }
+
+        // Midpoint pill label
+        const float mx = scA.x + dx * 0.5f;
+        const float my = scA.y + dy * 0.5f;
+
+        const ImU32 pillBg = (ev.type == RoadEvent::FLOOD)
+                             ? IM_COL32(20, 60, 180, 245)
+                             : IM_COL32(120, 70, 20, 245);
+
+        const char* label = roadEventLabel(ev.type);
+        const ImVec2 tSize = ImGui::CalcTextSize(label);
+        constexpr float kPad = 4.5f;
+        fg->AddRectFilled(
+            ImVec2(mx - tSize.x * 0.5f - kPad, my - tSize.y * 0.5f - kPad * 0.5f),
+            ImVec2(mx + tSize.x * 0.5f + kPad, my + tSize.y * 0.5f + kPad * 0.5f),
+            pillBg, 4.0f);
+        fg->AddText(ImVec2(mx - tSize.x * 0.5f, my - tSize.y * 0.5f),
+                    IM_COL32(255, 255, 255, 255), label);
     }
 }

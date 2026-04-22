@@ -133,6 +133,7 @@ void WasteSystem::generateNewDayWithSeed(unsigned int seed) {
     rng.seed(seed);
     ++dayNumber;
 
+    graph.clearAllEvents();
     assignWasteLevelsForCurrentDay();
     randomizeFuelPrice();
 
@@ -221,10 +222,26 @@ float WasteSystem::computeWasteCollected(const std::vector<int>& route) const {
 }
 
 void WasteSystem::populateCosts(RouteResult& result) const {
-    result.totalDistance   = graph.calculateRouteDistance(result.visitOrder);
-    result.travelTime      = costModel.calculateTravelTime(result.totalDistance);
+    result.totalDistance = graph.calculateRouteDistance(result.visitOrder);
 
-    result.fuelCost        = costModel.calculateFuelCost(result.totalDistance);
+    // Per-segment time and fuel: road events reduce speed and raise fuel consumption.
+    // Regular (no-event) segments use the flat model; affected segments are penalized.
+    float travelTime = 0.0f;
+    float fuelCost   = 0.0f;
+    const float normalSpeed  = costModel.getTruckSpeedKmh();
+    const float litresPerKm  = costModel.getLitresPerKm();
+    const float pricePerLitre = costModel.getDailyFuelPricePerLitre();
+    for (std::size_t i = 0; i + 1 < result.visitOrder.size(); ++i) {
+        const int fromId = result.visitOrder[i];
+        const int toId   = result.visitOrder[i + 1];
+        const float segKm    = graph.getDistance(fromId, toId);
+        const RoadEvent ev   = graph.getEdgeEvent(fromId, toId);
+        const float segSpeed = normalSpeed * roadEventSpeedFraction(ev);
+        travelTime += (segSpeed > 0.0f) ? segKm / segSpeed : 0.0f;
+        fuelCost   += litresPerKm * roadEventFuelMultiplier(ev) * pricePerLitre * segKm;
+    }
+    result.travelTime = travelTime;
+    result.fuelCost   = fuelCost;
 
     result.basePay         = costModel.calculateBasePay();
     result.perKmBonus      = costModel.calculatePerKmBonus(result.totalDistance);

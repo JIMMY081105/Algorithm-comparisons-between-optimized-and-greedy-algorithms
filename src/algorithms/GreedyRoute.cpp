@@ -46,7 +46,7 @@ RouteResult GreedyRouteAlgorithm::computeRoute(const MapGraph& graph,
                 continue;
             }
 
-            const float dist = graph.getDistance(currentId, nodeIds[candidateIndex]);
+            const float dist = graph.getEffectiveDistance(currentId, nodeIds[candidateIndex]);
             if (dist < bestDistance) {
                 bestDistance = dist;
                 bestNodeIndex = static_cast<int>(candidateIndex);

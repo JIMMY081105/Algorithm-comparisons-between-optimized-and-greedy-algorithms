@@ -3,16 +3,19 @@
 
 #include <vector>
 #include <string>
+#include "RoadEvent.h"
 #include "WasteNode.h"
 
 // Represents the road network as a weighted undirected graph.
 // Internally uses an adjacency matrix where each entry stores
 // the Euclidean distance between two nodes (scaled to km).
-// This structure supports all four routing algorithms directly.
+// A parallel event matrix overlays road conditions (flood, traffic, festival)
+// that inflate effective distances seen by the routing algorithms.
 class MapGraph {
 private:
     std::vector<WasteNode> nodes;
     std::vector<std::vector<float>> adjacencyMatrix;
+    std::vector<std::vector<RoadEvent>> edgeEvents;
     float distanceScale;  // multiplier to convert grid units to km
 
     // Compute Euclidean distance between two nodes on the grid
@@ -34,8 +37,17 @@ public:
     const WasteNode& getNode(int index) const;
     WasteNode& getNodeMutable(int index);
     float getDistance(int fromId, int toId) const;
+    // Returns the base distance multiplied by the active road-event penalty.
+    // Algorithms should call this instead of getDistance so they route around events.
+    float getEffectiveDistance(int fromId, int toId) const;
     const std::vector<std::vector<float>>& getAdjacencyMatrix() const;
     const std::vector<WasteNode>& getNodes() const;
+
+    // Road event management
+    void setEdgeEvent(int fromId, int toId, RoadEvent event);
+    RoadEvent getEdgeEvent(int fromId, int toId) const;
+    void clearAllEvents();
+    std::vector<ActiveEdgeEvent> getActiveEdgeEvents() const;
 
     // Find node index by ID
     int findNodeIndex(int nodeId) const;

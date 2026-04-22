@@ -38,6 +38,11 @@ private:
     bool showEventLog;
     bool showNodeDetails;
 
+    // Road event panel state
+    int roadEventFromIdx;
+    int roadEventToIdx;
+    int roadEventTypeIdx;
+
     void drawHeaderPanel(const WasteSystem& system,
                          const ThemeDashboardInfo& environmentInfo,
                          AnimationController::PlaybackState playState,
@@ -69,6 +74,7 @@ private:
     void drawTollOverlays(const WasteSystem& system,
                           const RouteResult& currentResult,
                           EnvironmentTheme activeTheme);
+    void drawRoadEventOverlays(const WasteSystem& system, EnvironmentTheme activeTheme);
 
 public:
     DashboardUI();
