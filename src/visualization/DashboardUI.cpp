@@ -682,17 +682,6 @@ void DashboardUI::drawLegendPanel(const ThemeDashboardInfo& environmentInfo,
 
     drawTrafficLegend();
 
-    if (selectedTheme == EnvironmentTheme::City) {
-        ImGui::Separator();
-        ImGui::TextDisabled("Road events");
-        ImGui::ColorButton("##flood", ImVec4(0.12f, 0.31f, 0.78f, 1.0f),
-                           ImGuiColorEditFlags_NoTooltip);
-        ImGui::SameLine(); ImGui::Text("Flood (impassable)");
-        ImGui::ColorButton("##fest",  ImVec4(0.55f, 0.31f, 0.10f, 1.0f),
-                           ImGuiColorEditFlags_NoTooltip);
-        ImGui::SameLine(); ImGui::Text("Festival (closed)");
-    }
-
     ImGui::Separator();
     ImGui::TextWrapped("%s", environmentInfo.atmosphereLabel.c_str());
 
@@ -718,38 +707,68 @@ void DashboardUI::drawTrafficLegend() {
     const ImU32 slowColor   = IM_COL32(220, 120, 40, 235);
     const ImU32 jamColor    = IM_COL32(210, 40, 35, 240);
     const ImU32 snowColor   = IM_COL32(240, 245, 250, 240);
+    const ImU32 floodColor  = IM_COL32(23, 71, 190, 240);
+    const ImU32 festColor   = IM_COL32(130, 72, 18, 240);
     const ImU32 borderColor = IM_COL32(40, 50, 60, 200);
 
     const float barHeight = 10.0f;
     const float barWidth  = ImGui::GetContentRegionAvail().x;
-    const ImVec2 origin   = ImGui::GetCursorScreenPos();
     const float segment   = barWidth / 3.0f;
-
     ImDrawList* draw = ImGui::GetWindowDrawList();
-    draw->AddRectFilledMultiColor(
-        ImVec2(origin.x, origin.y),
-        ImVec2(origin.x + segment, origin.y + barHeight),
-        slowColor, slowColor, slowColor, slowColor);
-    draw->AddRectFilledMultiColor(
-        ImVec2(origin.x + segment, origin.y),
-        ImVec2(origin.x + segment * 2.0f, origin.y + barHeight),
-        jamColor, jamColor, jamColor, jamColor);
-    draw->AddRectFilledMultiColor(
-        ImVec2(origin.x + segment * 2.0f, origin.y),
-        ImVec2(origin.x + barWidth, origin.y + barHeight),
-        snowColor, snowColor, snowColor, snowColor);
-    draw->AddRect(
-        ImVec2(origin.x, origin.y),
-        ImVec2(origin.x + barWidth, origin.y + barHeight),
-        borderColor, 0.0f, 0, 1.0f);
 
-    ImGui::Dummy(ImVec2(barWidth, barHeight));
-
+    // Row 1: dynamic traffic conditions (slow / jam / snow)
+    {
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        draw->AddRectFilledMultiColor(
+            ImVec2(origin.x, origin.y),
+            ImVec2(origin.x + segment, origin.y + barHeight),
+            slowColor, slowColor, slowColor, slowColor);
+        draw->AddRectFilledMultiColor(
+            ImVec2(origin.x + segment, origin.y),
+            ImVec2(origin.x + segment * 2.0f, origin.y + barHeight),
+            jamColor, jamColor, jamColor, jamColor);
+        draw->AddRectFilledMultiColor(
+            ImVec2(origin.x + segment * 2.0f, origin.y),
+            ImVec2(origin.x + barWidth, origin.y + barHeight),
+            snowColor, snowColor, snowColor, snowColor);
+        draw->AddRect(
+            ImVec2(origin.x, origin.y),
+            ImVec2(origin.x + barWidth, origin.y + barHeight),
+            borderColor, 0.0f, 0, 1.0f);
+        ImGui::Dummy(ImVec2(barWidth, barHeight));
+    }
     ImGui::TextColored(ImVec4(0.86f, 0.48f, 0.18f, 1.0f), "Slow");
     ImGui::SameLine(segment + 4.0f);
     ImGui::TextColored(ImVec4(0.90f, 0.24f, 0.20f, 1.0f), "Jam");
     ImGui::SameLine(segment * 2.0f + 4.0f);
     ImGui::TextColored(ImVec4(0.92f, 0.95f, 0.98f, 1.0f), "Snow block");
+
+    // Row 2: road event conditions (flood / festival) — City mode only
+    if (selectedTheme == EnvironmentTheme::City) {
+        const float half = barWidth * 0.5f - 2.0f;
+        const ImVec2 origin2 = ImGui::GetCursorScreenPos();
+        draw->AddRectFilledMultiColor(
+            ImVec2(origin2.x, origin2.y),
+            ImVec2(origin2.x + half, origin2.y + barHeight),
+            floodColor, floodColor, floodColor, floodColor);
+        draw->AddRectFilledMultiColor(
+            ImVec2(origin2.x + half + 4.0f, origin2.y),
+            ImVec2(origin2.x + barWidth, origin2.y + barHeight),
+            festColor, festColor, festColor, festColor);
+        draw->AddRect(
+            ImVec2(origin2.x, origin2.y),
+            ImVec2(origin2.x + half, origin2.y + barHeight),
+            borderColor, 0.0f, 0, 1.0f);
+        draw->AddRect(
+            ImVec2(origin2.x + half + 4.0f, origin2.y),
+            ImVec2(origin2.x + barWidth, origin2.y + barHeight),
+            borderColor, 0.0f, 0, 1.0f);
+        ImGui::Dummy(ImVec2(barWidth, barHeight));
+
+        ImGui::TextColored(ImVec4(0.30f, 0.56f, 1.0f, 1.0f), "Flood");
+        ImGui::SameLine(half + 10.0f);
+        ImGui::TextColored(ImVec4(0.80f, 0.52f, 0.18f, 1.0f), "Festival");
+    }
 }
 
 void DashboardUI::drawRouteOrderPanel(const RouteResult& result,
@@ -1072,9 +1091,9 @@ void DashboardUI::drawTollOverlays(const WasteSystem& system,
 }
 
 // ---------------------------------------------------------------------------
-// Road event overlays — thick colored bands painted over blocked road segments.
-// FLOOD = dark blue, FESTIVAL = brown. Both are fully impassable.
-// City-only.
+// Road event overlays — floating pill labels ("FLOOD" / "FEST") at the midpoint
+// between the two selected nodes. The road segment colour itself is applied in
+// CityThemeRenderer::drawTransitNetwork via applyRoadEvents(). City-only.
 // ---------------------------------------------------------------------------
 void DashboardUI::drawRoadEventOverlays(const WasteSystem& system,
                                         EnvironmentTheme activeTheme) {
