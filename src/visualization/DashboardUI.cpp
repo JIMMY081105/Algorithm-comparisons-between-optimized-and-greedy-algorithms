@@ -708,7 +708,7 @@ void DashboardUI::drawTrafficLegend() {
     const ImU32 jamColor    = IM_COL32(210, 40, 35, 240);
     const ImU32 snowColor   = IM_COL32(240, 245, 250, 240);
     const ImU32 floodColor  = IM_COL32(23, 71, 190, 240);
-    const ImU32 festColor   = IM_COL32(130, 72, 18, 240);
+    const ImU32 festColor   = IM_COL32(166, 46, 209, 240);
     const ImU32 borderColor = IM_COL32(40, 50, 60, 200);
 
     const float barHeight = 10.0f;
@@ -767,7 +767,7 @@ void DashboardUI::drawTrafficLegend() {
 
         ImGui::TextColored(ImVec4(0.30f, 0.56f, 1.0f, 1.0f), "Flood");
         ImGui::SameLine(half + 10.0f);
-        ImGui::TextColored(ImVec4(0.80f, 0.52f, 0.18f, 1.0f), "Festival");
+        ImGui::TextColored(ImVec4(0.65f, 0.18f, 0.82f, 1.0f), "Festival");
     }
 }
 

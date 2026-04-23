@@ -1565,17 +1565,17 @@ void CityThemeRenderer::drawTransitNetwork(
             centerLine = mixColor(centerLine, Color(0.92f, 0.96f, 1.0f, centerLine.a), 0.72f);
         }
 
-        // Road events override all other visual states — flood = dark blue, festival = dark brown.
+        // Road events override all other visual states — flood = dark blue, festival = purple.
         if (road.eventType == RoadEvent::FLOOD) {
             curbColor  = Color(0.02f, 0.05f, 0.25f, 0.96f);
             roadColor  = Color(0.09f, 0.28f, 0.75f, 1.0f);
             centerLine = withAlpha(Color(0.40f, 0.70f, 1.00f, 1.0f), 0.22f);
             glow       = Color(0.14f, 0.34f, 0.88f, 0.20f);
         } else if (road.eventType == RoadEvent::FESTIVAL) {
-            curbColor  = Color(0.16f, 0.06f, 0.01f, 0.96f);
-            roadColor  = Color(0.51f, 0.28f, 0.07f, 1.0f);
-            centerLine = withAlpha(Color(0.85f, 0.58f, 0.22f, 1.0f), 0.22f);
-            glow       = Color(0.55f, 0.30f, 0.08f, 0.20f);
+            curbColor  = Color(0.20f, 0.04f, 0.28f, 0.96f);
+            roadColor  = Color(0.50f, 0.10f, 0.65f, 1.0f);
+            centerLine = withAlpha(Color(0.80f, 0.50f, 0.95f, 1.0f), 0.22f);
+            glow       = Color(0.55f, 0.15f, 0.70f, 0.20f);
         }
 
         curbColor = attenuateToZone(
@@ -3609,10 +3609,10 @@ void CityThemeRenderer::drawRoadEventMarkers() const {
                          iso.y + textSize.y * 0.5f + kPadY);
         const ImU32 bg = (road.eventType == RoadEvent::FLOOD)
             ? IM_COL32(20, 60, 180, 245)
-            : IM_COL32(120, 70, 20, 245);
+            : IM_COL32(100, 25, 130, 245);
         const ImU32 border = (road.eventType == RoadEvent::FLOOD)
             ? IM_COL32(95, 155, 255, 230)
-            : IM_COL32(220, 150, 60, 230);
+            : IM_COL32(210, 120, 240, 230);
 
         fg->AddRectFilled(min, max, bg, 4.0f);
         fg->AddRect(min, max, border, 4.0f, 0, 1.0f);
