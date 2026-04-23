@@ -1,4 +1,4 @@
-﻿#include "DashboardUIInternal.h"
+﻿#include "visualization/DashboardUIInternal.h"
 
 DashboardUI::DashboardUI()
     : selectedAlgorithm(0),

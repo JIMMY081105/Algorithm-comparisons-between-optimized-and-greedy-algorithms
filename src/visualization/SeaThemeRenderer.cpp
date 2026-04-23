@@ -1,4 +1,4 @@
-﻿#include "SeaThemeRendererInternal.h"
+﻿#include "visualization/SeaThemeRendererInternal.h"
 
 SeaThemeRenderer::SeaThemeRenderer()
     : dashboardInfo{EnvironmentTheme::Sea, "Sea", "Harbour command",

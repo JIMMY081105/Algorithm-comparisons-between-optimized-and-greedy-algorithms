@@ -1,4 +1,4 @@
-﻿#include "CityThemeRendererInternal.h"
+﻿#include "visualization/CityThemeRendererInternal.h"
 
 void CityThemeRenderer::drawPresetEnvironment(IsometricRenderer& renderer,
                                                const PlacedEnvironment& placed,

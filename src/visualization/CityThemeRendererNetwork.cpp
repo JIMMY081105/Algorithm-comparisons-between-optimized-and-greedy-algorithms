@@ -1,4 +1,4 @@
-﻿#include "CityThemeRendererInternal.h"
+﻿#include "visualization/CityThemeRendererInternal.h"
 
 void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937& rng) {
     intersections.clear();

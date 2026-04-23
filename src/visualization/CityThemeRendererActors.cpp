@@ -1,4 +1,4 @@
-﻿#include "CityThemeRendererInternal.h"
+﻿#include "visualization/CityThemeRendererInternal.h"
 
 void CityThemeRenderer::drawWasteNode(IsometricRenderer& renderer,
                                       const WasteNode& node,

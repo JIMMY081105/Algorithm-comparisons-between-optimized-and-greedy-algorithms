@@ -1,4 +1,4 @@
-﻿#include "DashboardUIInternal.h"
+﻿#include "visualization/DashboardUIInternal.h"
 
 void DashboardUI::drawControlPanel(WasteSystem& system,
                                    AnimationController& animCtrl,

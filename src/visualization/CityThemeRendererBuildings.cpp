@@ -1,4 +1,4 @@
-﻿#include "CityThemeRendererInternal.h"
+﻿#include "visualization/CityThemeRendererInternal.h"
 
 void CityThemeRenderer::drawLandscapeFeature(IsometricRenderer& renderer,
                                              const LandscapeFeature& feature,

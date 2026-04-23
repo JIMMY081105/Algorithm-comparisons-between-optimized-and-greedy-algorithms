@@ -1,4 +1,4 @@
-﻿#include "SeaThemeRendererInternal.h"
+﻿#include "visualization/SeaThemeRendererInternal.h"
 
 void SeaThemeRenderer::drawWasteNode(IsometricRenderer& renderer,
                                       const WasteNode& node,

@@ -1,4 +1,4 @@
-﻿#include "SeaThemeRendererInternal.h"
+﻿#include "visualization/SeaThemeRendererInternal.h"
 
 void SeaThemeRenderer::drawDecorativeElements(IsometricRenderer& renderer,
                                                const MapGraph& graph,
