@@ -1,5 +1,6 @@
 #include "visualization/CityThemeRenderer.h"
 #include "visualization/CityAssetLibrary.h"
+#include "visualization/CityRenderUtils.h"
 
 #include "environment/MissionPresentationUtils.h"
 #include "environment/SeasonProfile.h"
@@ -22,6 +23,22 @@
 #ifdef max
 #undef max
 #endif
+
+using CityRenderUtils::ZoneVisibility;
+using CityRenderUtils::attenuateToZone;
+using CityRenderUtils::biasColor;
+using CityRenderUtils::clamp01;
+using CityRenderUtils::computeZoneVisibility;
+using CityRenderUtils::currentZoomFactor;
+using CityRenderUtils::desaturateColor;
+using CityRenderUtils::ellipseInfluence;
+using CityRenderUtils::mixColor;
+using CityRenderUtils::pointDistance;
+using CityRenderUtils::scaleColor;
+using CityRenderUtils::smoothRange;
+using CityRenderUtils::updateZoneBounds;
+using CityRenderUtils::withAlpha;
+using CityRenderUtils::zoneOutsideDistance;
 
 void StaticCityBatch::upload(const std::vector<float>& verts) {
     constexpr GLsizei kStrideFloats = 6;
@@ -130,12 +147,6 @@ constexpr unsigned int kNorthEdge = 1u;
 constexpr unsigned int kEastEdge = 2u;
 constexpr unsigned int kSouthEdge = 4u;
 constexpr unsigned int kWestEdge = 8u;
-float gZoneMinX = -1.0f;
-float gZoneMaxX = 1.0f;
-float gZoneMinY = -1.0f;
-float gZoneMaxY = 1.0f;
-float gZoneFalloffX = 4.0f;
-float gZoneFalloffY = 4.0f;
 std::vector<float>* gStaticBatchVerts = nullptr;
 
 bool isCapturingStaticBatch() {
@@ -320,166 +331,6 @@ void drawOrAppendDiamondOutline(IsometricRenderer& renderer,
         return;
     }
     renderer.drawDiamondOutline(cx, cy, w, h, color, width);
-}
-
-float clamp01(float value) {
-    return std::max(0.0f, std::min(1.0f, value));
-}
-
-float remap01(float value, float start, float end) {
-    if (std::abs(end - start) <= 0.0001f) {
-        return (value >= end) ? 1.0f : 0.0f;
-    }
-    return clamp01((value - start) / (end - start));
-}
-
-float smoothRange(float start, float end, float value) {
-    return RenderUtils::smoothstep(remap01(value, start, end));
-}
-
-float currentZoomFactor() {
-    return RenderUtils::getProjection().tileWidth / RenderUtils::BASE_TILE_WIDTH;
-}
-
-Color mixColor(const Color& from, const Color& to, float t) {
-    t = clamp01(t);
-    return Color(
-        RenderUtils::lerp(from.r, to.r, t),
-        RenderUtils::lerp(from.g, to.g, t),
-        RenderUtils::lerp(from.b, to.b, t),
-        RenderUtils::lerp(from.a, to.a, t));
-}
-
-Color withAlpha(const Color& color, float alpha) {
-    return Color(color.r, color.g, color.b, alpha);
-}
-
-Color scaleColor(const Color& color, float scale, float alphaScale = 1.0f) {
-    return Color(clamp01(color.r * scale),
-                 clamp01(color.g * scale),
-                 clamp01(color.b * scale),
-                 clamp01(color.a * alphaScale));
-}
-
-Color biasColor(const Color& color, float redShift, float greenShift, float blueShift) {
-    return Color(clamp01(color.r + redShift),
-                 clamp01(color.g + greenShift),
-                 clamp01(color.b + blueShift),
-                 color.a);
-}
-
-Color desaturateColor(const Color& color, float amount) {
-    const float grey =
-        color.r * 0.299f +
-        color.g * 0.587f +
-        color.b * 0.114f;
-    return mixColor(color, Color(grey, grey, grey, color.a), amount);
-}
-
-float pointDistance(float ax, float ay, float bx, float by) {
-    const float dx = bx - ax;
-    const float dy = by - ay;
-    return std::sqrt(dx * dx + dy * dy);
-}
-
-float ellipseInfluence(float x, float y,
-                       float centerX, float centerY,
-                       float radiusX, float radiusY) {
-    const float safeRadiusX = std::max(radiusX, 0.001f);
-    const float safeRadiusY = std::max(radiusY, 0.001f);
-    const float dx = (x - centerX) / safeRadiusX;
-    const float dy = (y - centerY) / safeRadiusY;
-    const float distance = std::sqrt(dx * dx + dy * dy);
-    return 1.0f - RenderUtils::smoothstep(clamp01(distance));
-}
-
-float ellipseDistance(float x, float y,
-                      float centerX, float centerY,
-                      float radiusX, float radiusY) {
-    const float safeRadiusX = std::max(radiusX, 0.001f);
-    const float safeRadiusY = std::max(radiusY, 0.001f);
-    const float dx = (x - centerX) / safeRadiusX;
-    const float dy = (y - centerY) / safeRadiusY;
-    return std::sqrt(dx * dx + dy * dy);
-}
-
-void updateZoneBounds(float minX, float maxX, float minY, float maxY) {
-    const float spanX = std::max(1.0f, maxX - minX);
-    const float spanY = std::max(1.0f, maxY - minY);
-    const float padX = std::max(0.35f, spanX * 0.04f);
-    const float padY = std::max(0.30f, spanY * 0.04f);
-
-    gZoneMinX = minX - padX;
-    gZoneMaxX = maxX + padX;
-    gZoneMinY = minY - padY;
-    gZoneMaxY = maxY + padY;
-    gZoneFalloffX = std::max(2.8f, spanX * 0.40f);
-    gZoneFalloffY = std::max(2.4f, spanY * 0.40f);
-}
-
-struct ZoneVisibility {
-    float focus = 0.0f;
-    float transition = 0.0f;
-    float brightness = 0.0f;
-    float detail = 0.0f;
-    float roadVisibility = 0.0f;
-    float routeVisibility = 0.0f;
-    float voidness = 0.0f;
-};
-
-ZoneVisibility computeZoneVisibility(float x, float y,
-                                     float centerX, float centerY,
-                                     float radiusX, float radiusY) {
-    (void)centerX;
-    (void)centerY;
-    (void)radiusX;
-    (void)radiusY;
-
-    const float dx = (x < gZoneMinX) ? (gZoneMinX - x)
-                   : (x > gZoneMaxX) ? (x - gZoneMaxX)
-                                     : 0.0f;
-    const float dy = (y < gZoneMinY) ? (gZoneMinY - y)
-                   : (y > gZoneMaxY) ? (y - gZoneMaxY)
-                                     : 0.0f;
-
-    if (dx <= 0.0001f && dy <= 0.0001f) {
-        return ZoneVisibility{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f};
-    }
-
-    const float outside = std::sqrt(
-        (dx / std::max(gZoneFalloffX, 0.001f)) * (dx / std::max(gZoneFalloffX, 0.001f)) +
-        (dy / std::max(gZoneFalloffY, 0.001f)) * (dy / std::max(gZoneFalloffY, 0.001f)));
-    const float focus = 1.0f - smoothRange(0.0f, 0.38f, outside);
-    const float transition = 1.0f - smoothRange(0.0f, 1.0f, outside);
-    const float brightness = clamp01(transition * 0.86f + focus * 0.14f);
-    const float detail = clamp01(0.02f + transition * 0.78f + focus * 0.20f);
-    const float roadVisibility = clamp01(std::max(0.20f, 0.26f + transition * 0.74f));
-    const float routeVisibility = clamp01(std::max(0.62f, 0.66f + transition * 0.34f));
-
-    return ZoneVisibility{
-        focus,
-        transition,
-        brightness,
-        detail,
-        roadVisibility,
-        routeVisibility,
-        1.0f - transition
-    };
-}
-
-Color attenuateToZone(const Color& color,
-                      const ZoneVisibility& zone,
-                      const Color& voidTint,
-                      float minBrightness,
-                      float desaturationStrength,
-                      float minAlpha = 0.0f) {
-    Color toned = desaturateColor(
-        color,
-        clamp01((1.0f - zone.focus) * desaturationStrength + zone.voidness * 0.22f));
-    toned = scaleColor(toned, std::max(minBrightness, zone.brightness));
-    toned = mixColor(withAlpha(voidTint, toned.a), toned, zone.transition);
-    toned.a = clamp01(std::max(minAlpha, toned.a * (0.06f + 0.94f * zone.transition)));
-    return toned;
 }
 
 void appendDistinctPoint(std::vector<PlaybackPoint>& points, const PlaybackPoint& point) {
@@ -4939,17 +4790,7 @@ void CityThemeRenderer::drawMountain(const MountainPeak& peak) const {
     // Instead of a hard cull that produces a visible black ring, we fade each
     // ring progressively into the void so distant mountains blend with the
     // background rather than popping off at a fixed radius.
-    const float dx = (peak.worldX < gZoneMinX) ? (gZoneMinX - peak.worldX)
-                   : (peak.worldX > gZoneMaxX) ? (peak.worldX - gZoneMaxX)
-                                               : 0.0f;
-    const float dy = (peak.worldY < gZoneMinY) ? (gZoneMinY - peak.worldY)
-                   : (peak.worldY > gZoneMaxY) ? (peak.worldY - gZoneMaxY)
-                                               : 0.0f;
-    const float mFalloffX = std::max(gZoneFalloffX * 6.0f, 40.0f);
-    const float mFalloffY = std::max(gZoneFalloffY * 6.0f, 34.0f);
-    const float outside = std::sqrt(
-        (dx / mFalloffX) * (dx / mFalloffX) +
-        (dy / mFalloffY) * (dy / mFalloffY));
+    const float outside = zoneOutsideDistance(peak.worldX, peak.worldY, 6.0f, 40.0f, 34.0f);
     // fade: 0 at city edge → 1 at the outer ring (fully void-tinted)
     const float fade = std::min(1.0f, smoothRange(0.0f, 1.0f, outside));
     const float transition = 1.0f - fade;

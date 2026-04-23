@@ -83,6 +83,7 @@ set(ALGORITHM_SOURCES
 
 set(VISUALIZATION_SOURCES
     src/visualization/RenderUtils.cpp
+    src/visualization/CityRenderUtils.cpp
     src/visualization/IsometricRenderer.cpp
     src/visualization/SeaThemeRenderer.cpp
     src/visualization/CityThemeRenderer.cpp
@@ -186,6 +187,7 @@ add_executable(EnvironmentCoreTests
     ${ALGORITHM_SOURCES}
     ${ENVIRONMENT_SOURCES}
     src/visualization/RenderUtils.cpp
+    src/visualization/CityRenderUtils.cpp
     src/visualization/IsometricRenderer.cpp
     src/visualization/SeaThemeRenderer.cpp
     src/visualization/CityThemeRenderer.cpp
