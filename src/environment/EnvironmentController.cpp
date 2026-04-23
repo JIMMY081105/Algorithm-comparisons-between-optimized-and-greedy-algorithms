@@ -6,6 +6,7 @@
 #include "visualization/SeaThemeRenderer.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
@@ -15,9 +16,28 @@ constexpr unsigned int kFnvOffsetBasis = 2166136261u;
 constexpr unsigned int kFnvPrime = 16777619u;
 constexpr float kCoordinateQuantizationScale = 1000.0f;
 
+// XOR masks that give sea and city renderers independent seed streams from the
+// same stable graph hash. Values are arbitrary non-zero constants chosen to
+// differ in several bit positions so the two streams are unlikely to correlate.
+constexpr unsigned int kSeaSceneSeedXor  = 0x52A913u;
+constexpr unsigned int kCitySceneSeedXor = 0x7A5C221u;
+
+// Transition flash alpha on theme switch vs minor scene refresh (season/traffic).
+constexpr float kThemeChangeAlpha  = 0.35f;
+constexpr float kSceneRefreshAlpha = 0.25f;
+// Rate at which the flash fades per second.
+constexpr float kTransitionFadeRate = 0.85f;
+
 void mixSeed(unsigned int& seed, unsigned int value) {
     seed ^= value;
     seed *= kFnvPrime;
+}
+
+// Safe downcast: cityTheme is always constructed as CityThemeRenderer. Placing
+// the cast in one helper means any future type change causes a single compile error.
+CityThemeRenderer& asCityRenderer(std::unique_ptr<IThemeRenderer>& ptr) {
+    assert(ptr != nullptr);
+    return static_cast<CityThemeRenderer&>(*ptr);
 }
 
 unsigned int stableVisualSeed(const MapGraph& graph) {
@@ -61,8 +81,8 @@ void EnvironmentController::rebuildScenes(const MapGraph& graph) {
     const unsigned int seed = stableVisualSeed(graph);
     seaTheme->setLayerToggles(layerToggles);
     cityTheme->setLayerToggles(layerToggles);
-    seaTheme->rebuildScene(graph, seed ^ 0x52A913u);
-    cityTheme->rebuildScene(graph, seed ^ 0x7A5C221u);
+    seaTheme->rebuildScene(graph, seed ^ kSeaSceneSeedXor);
+    cityTheme->rebuildScene(graph, seed ^ kCitySceneSeedXor);
 }
 
 bool EnvironmentController::setActiveTheme(EnvironmentTheme theme, MapGraph& graph) {
@@ -72,7 +92,7 @@ bool EnvironmentController::setActiveTheme(EnvironmentTheme theme, MapGraph& gra
 
     activeTheme = theme;
     applyActiveWeights(graph);
-    transitionAlpha = 0.35f;
+    transitionAlpha = kThemeChangeAlpha;
     return true;
 }
 
@@ -81,18 +101,18 @@ void EnvironmentController::applyActiveWeights(MapGraph& graph) {
 }
 
 void EnvironmentController::setCitySeason(CitySeason season, MapGraph& graph) {
-    static_cast<CityThemeRenderer&>(*cityTheme).setSeason(season);
+    asCityRenderer(cityTheme).setSeason(season);
     if (activeTheme == EnvironmentTheme::City) {
         applyActiveWeights(graph);
-        transitionAlpha = 0.25f;
+        transitionAlpha = kSceneRefreshAlpha;
     }
 }
 
 void EnvironmentController::randomizeCityTraffic(unsigned int seed, MapGraph& graph) {
-    static_cast<CityThemeRenderer&>(*cityTheme).randomizeTrafficConditions(seed);
+    asCityRenderer(cityTheme).randomizeTrafficConditions(seed);
     if (activeTheme == EnvironmentTheme::City) {
         applyActiveWeights(graph);
-        transitionAlpha = 0.25f;
+        transitionAlpha = kSceneRefreshAlpha;
     }
 }
 
@@ -100,14 +120,14 @@ void EnvironmentController::randomizeCityWeather(unsigned int seed, MapGraph& gr
     cityTheme->randomizeWeather(seed);
     if (activeTheme == EnvironmentTheme::City) {
         applyActiveWeights(graph);
-        transitionAlpha = 0.25f;
+        transitionAlpha = kSceneRefreshAlpha;
     }
 }
 
 void EnvironmentController::update(float deltaTime) {
     seaTheme->update(deltaTime);
     cityTheme->update(deltaTime);
-    transitionAlpha = std::max(0.0f, transitionAlpha - deltaTime * 0.85f);
+    transitionAlpha = std::max(0.0f, transitionAlpha - deltaTime * kTransitionFadeRate);
 }
 
 void EnvironmentController::setLayerToggles(const SceneLayerToggles& toggles) {

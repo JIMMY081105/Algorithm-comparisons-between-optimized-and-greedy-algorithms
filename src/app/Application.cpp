@@ -29,6 +29,18 @@ constexpr unsigned int kWeatherSeedDayMultiplier = 97u;
 constexpr unsigned int kTrafficSeedDayMultiplier = 131u;
 constexpr double kMillisecondsPerSecond = 1000.0;
 
+// The scene renderer uses a fixed-step delta so particle/animation rates stay
+// consistent regardless of the real frame rate. 60 Hz is the vsync target.
+constexpr float kSceneRenderDeltaTime = 1.0f / 60.0f;
+
+// Threshold below which the transition flash quad is skipped entirely.
+constexpr float kTransitionAlphaThreshold = 0.001f;
+
+// Flash quad alpha multipliers: bottom edge dims slightly vs top edge to give
+// a subtle gradient wipe during theme transitions.
+constexpr float kFlashAlphaBottom = 0.08f;
+constexpr float kFlashAlphaTop    = 0.14f;
+
 float clampFrameDelta(float deltaTime) {
     return (deltaTime > kMaxFrameDeltaTime) ? kMaxFrameDeltaTime : deltaTime;
 }
@@ -311,22 +323,21 @@ void Application::renderFrame() {
     glLoadIdentity();
 
     // Render the active environment scene.
-    float dt = 1.0f / 60.0f;
     renderer->render(environmentController->activeRenderer(),
                     wasteSystem->getGraph(),
                     animController->getTruck(),
                     currentMission.isValid() ? &currentMission : nullptr,
                     animController->getState(),
                     animController->getProgress(),
-                    dt);
+                    kSceneRenderDeltaTime);
 
-    if (environmentController->getTransitionAlpha() > 0.001f) {
+    if (environmentController->getTransitionAlpha() > kTransitionAlphaThreshold) {
         const float alpha = environmentController->getTransitionAlpha();
         glBegin(GL_QUADS);
-        glColor4f(0.96f, 0.98f, 1.0f, alpha * 0.08f);
+        glColor4f(0.96f, 0.98f, 1.0f, alpha * kFlashAlphaBottom);
         glVertex2f(0.0f, 0.0f);
         glVertex2f(static_cast<float>(windowWidth), 0.0f);
-        glColor4f(0.96f, 0.98f, 1.0f, alpha * 0.14f);
+        glColor4f(0.96f, 0.98f, 1.0f, alpha * kFlashAlphaTop);
         glVertex2f(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
         glVertex2f(0.0f, static_cast<float>(windowHeight));
         glEnd();
