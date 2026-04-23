@@ -379,7 +379,7 @@ void Application::refreshCityWeather() {
 
     environmentController.randomizeCityWeather(buildWeatherSeed(wasteSystem),
                                                wasteSystem.getGraph());
-    resetMissionSession();
+    refreshSessionAfterWeightChange();
     wasteSystem.getEventLog().addEvent("City weather refreshed");
 }
 
@@ -467,6 +467,14 @@ void Application::resetMissionSession() {
     wasteSystem.resetCollectionStatus();
 }
 
+void Application::refreshSessionAfterWeightChange() {
+    if (!comparisonManager.getResults().empty()) {
+        compareAllAlgorithms();
+    } else {
+        resetMissionSession();
+    }
+}
+
 void Application::loadMissionRoute(const RouteResult& result, bool autoPlay) {
     currentResult = result;
     currentMission = environmentController.buildMissionPresentation(
@@ -516,7 +524,7 @@ void Application::handleUIActions(const DashboardUI::UIActions& actions) {
 
     if (actions.roadEventsChanged) {
         environmentController.applyActiveWeights(wasteSystem.getGraph());
-        resetMissionSession();
+        refreshSessionAfterWeightChange();
     }
 
     if (actions.runSelectedAlgorithm && actions.algorithmToRun >= 0) {

@@ -61,6 +61,7 @@ private:
 
     // Mission/session helpers keep UI event handling declarative.
     void resetMissionSession();
+    void refreshSessionAfterWeightChange();
     void loadMissionRoute(const RouteResult& result, bool autoPlay);
     void replayCurrentMission();
     void logRuntimeError(const std::string& context, const std::exception& e);
