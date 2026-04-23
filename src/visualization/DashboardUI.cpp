@@ -83,7 +83,6 @@ DashboardUI::UIActions DashboardUI::render(WasteSystem& system,
     drawExportPanel(actions);
     drawFuelWagePanel(system, currentResult, environmentInfo);
     drawTollOverlays(system, currentResult, activeTheme);
-    drawRoadEventOverlays(system, activeTheme);
 
     return actions;
 }
@@ -317,7 +316,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
 
         const bool sameNode = (roadEventFromIdx == roadEventToIdx);
         if (sameNode) ImGui::BeginDisabled();
-        if (ImGui::Button("Apply & Re-run##re", ImVec2(-1.0f, 22.0f))) {
+        if (ImGui::Button("Apply##re", ImVec2(-1.0f, 22.0f))) {
             const int fromId = nodes[roadEventFromIdx].getId();
             const int toId   = nodes[roadEventToIdx].getId();
             const RoadEvent ev = static_cast<RoadEvent>(roadEventTypeIdx);
@@ -335,11 +334,10 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
                               nodeNames[roadEventToIdx].c_str());
             }
             system.getEventLog().addEvent(logMsg);
-            actions.runSelectedAlgorithm = true;
-            actions.algorithmToRun = selectedAlgorithm;
+            actions.roadEventsChanged = true;
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Sets the road condition and immediately re-runs\nthe selected algorithm to update the route.");
+            ImGui::SetTooltip("Applies the road condition. Use Run Selected to calculate a route under the new conditions.");
         }
         if (sameNode) {
             ImGui::EndDisabled();
@@ -373,11 +371,13 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
                     char logMsg[80];
                     std::snprintf(logMsg, sizeof(logMsg), "Cleared: %s <-> %s", na, nb);
                     system.getEventLog().addEvent(logMsg);
+                    actions.roadEventsChanged = true;
                 }
             }
             if (ImGui::SmallButton("Clear All Events##reAll")) {
                 system.getGraph().clearAllEvents();
                 system.getEventLog().addEvent("All road events cleared");
+                actions.roadEventsChanged = true;
             }
         }
     }
@@ -895,7 +895,6 @@ void DashboardUI::drawExportPanel(UIActions& actions) {
 int DashboardUI::getSelectedAlgorithm() const {
     return selectedAlgorithm;
 }
-
 // ---------------------------------------------------------------------------
 // Fuel & Wage Panel — shows today's live fuel price and the wage model
 // ---------------------------------------------------------------------------
@@ -1087,58 +1086,5 @@ void DashboardUI::drawTollOverlays(const WasteSystem& system,
                 ImVec2(sc.x - tSize.x * 0.5f, pillY + kPad * 0.5f),
                 IM_COL32(20, 14, 0, 255), label);
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Road event overlays — floating pill labels ("FLOOD" / "FEST") at the midpoint
-// between the two selected nodes. The road segment colour itself is applied in
-// CityThemeRenderer::drawTransitNetwork via applyRoadEvents(). City-only.
-// ---------------------------------------------------------------------------
-void DashboardUI::drawRoadEventOverlays(const WasteSystem& system,
-                                        EnvironmentTheme activeTheme) {
-    if (activeTheme != EnvironmentTheme::City) return;
-
-    const auto activeEvents = system.getGraph().getActiveEdgeEvents();
-    if (activeEvents.empty()) return;
-
-    const MapGraph& g = system.getGraph();
-    ImDrawList*    fg = ImGui::GetForegroundDrawList();
-
-    for (const auto& ev : activeEvents) {
-        if (ev.type == RoadEvent::NONE) continue;
-
-        const int idxA = g.findNodeIndex(ev.fromId);
-        const int idxB = g.findNodeIndex(ev.toId);
-        if (idxA < 0 || idxB < 0) continue;
-
-        const WasteNode& nA = g.getNode(idxA);
-        const WasteNode& nB = g.getNode(idxB);
-
-        const IsoCoord scA = RenderUtils::worldToIso(nA.getWorldX(), nA.getWorldY());
-        const IsoCoord scB = RenderUtils::worldToIso(nB.getWorldX(), nB.getWorldY());
-
-        // Road segment colour is applied in CityThemeRenderer::drawTransitNetwork.
-        // Here we only draw the floating pill label so the event name is visible.
-        const float dx = scB.x - scA.x;
-        const float dy = scB.y - scA.y;
-
-        // Midpoint pill label
-        const float mx = scA.x + dx * 0.5f;
-        const float my = scA.y + dy * 0.5f;
-
-        const ImU32 pillBg = (ev.type == RoadEvent::FLOOD)
-                             ? IM_COL32(20, 60, 180, 245)
-                             : IM_COL32(120, 70, 20, 245);
-
-        const char* label = roadEventLabel(ev.type);
-        const ImVec2 tSize = ImGui::CalcTextSize(label);
-        constexpr float kPad = 4.5f;
-        fg->AddRectFilled(
-            ImVec2(mx - tSize.x * 0.5f - kPad, my - tSize.y * 0.5f - kPad * 0.5f),
-            ImVec2(mx + tSize.x * 0.5f + kPad, my + tSize.y * 0.5f + kPad * 0.5f),
-            pillBg, 4.0f);
-        fg->AddText(ImVec2(mx - tSize.x * 0.5f, my - tSize.y * 0.5f),
-                    IM_COL32(255, 255, 255, 255), label);
     }
 }

@@ -6,6 +6,7 @@
 #include "visualization/IsometricRenderer.h"
 
 #include <glad/glad.h>
+#include <imgui.h>
 
 #include <algorithm>
 #include <array>
@@ -1035,7 +1036,9 @@ void CityThemeRenderer::update(float deltaTime) {
     }
 }
 
-void CityThemeRenderer::applyRouteWeights(MapGraph& graph) const {
+void CityThemeRenderer::applyRouteWeights(MapGraph& graph) {
+    refreshPairRoutes(graph);
+
     const int nodeCount = graph.getNodeCount();
     std::vector<std::vector<float>> matrix(
         nodeCount, std::vector<float>(nodeCount, 0.0f));
@@ -1612,6 +1615,8 @@ void CityThemeRenderer::drawTransitNetwork(
                                  0.12f,
                                  0.24f));
     }
+
+    drawRoadEventMarkers();
 
     if (transitBatch.dirty) {
         std::vector<float> verts;
@@ -2266,6 +2271,7 @@ void CityThemeRenderer::generateGridNetwork(const MapGraph& graph, std::mt19937&
             0.0f,
             arterial,
             false,
+            RoadEvent::NONE,
             VisualTier::Support
         });
         roadAdjacency[from].push_back(roadIndex);
@@ -3205,6 +3211,8 @@ void CityThemeRenderer::refreshSeasonalRoadState() {
 }
 
 void CityThemeRenderer::refreshPairRoutes(const MapGraph& graph) {
+    applyRoadEvents(graph);
+
     const int nodeCount = graph.getNodeCount();
     pairRoutes.assign(nodeCount, std::vector<PairRouteData>(nodeCount));
 
@@ -3297,7 +3305,8 @@ void CityThemeRenderer::refreshPairRoutes(const MapGraph& graph) {
 }
 
 std::vector<int> CityThemeRenderer::shortestPath(int startIntersection,
-                                                 int endIntersection) const {
+                                                 int endIntersection,
+                                                 bool avoidRoadEvents) const {
     if (startIntersection == endIntersection) {
         return {startIntersection};
     }
@@ -3324,7 +3333,8 @@ std::vector<int> CityThemeRenderer::shortestPath(int startIntersection,
 
         for (const int roadIndex : roadAdjacency[current]) {
             const RoadSegment& road = roads[roadIndex];
-            if (road.snowBlocked) {
+            if (road.snowBlocked ||
+                (avoidRoadEvents && road.eventType != RoadEvent::NONE)) {
                 continue;
             }
             const int next = (road.from == current) ? road.to : road.from;
@@ -3500,6 +3510,41 @@ int CityThemeRenderer::findRoadIndex(int fromIntersection, int toIntersection) c
     return -1;
 }
 
+int CityThemeRenderer::selectEventRoadIndex(const std::vector<int>& intersectionPath) const {
+    if (intersectionPath.size() < 2) {
+        return -1;
+    }
+
+    float totalLength = 0.0f;
+    std::vector<std::pair<int, float>> pathRoads;
+    pathRoads.reserve(intersectionPath.size() - 1);
+    for (std::size_t i = 1; i < intersectionPath.size(); ++i) {
+        const int roadIndex = findRoadIndex(intersectionPath[i - 1], intersectionPath[i]);
+        if (roadIndex < 0 || roadIndex >= static_cast<int>(roads.size())) {
+            continue;
+        }
+
+        const float length = roads[static_cast<std::size_t>(roadIndex)].baseLength;
+        pathRoads.push_back({roadIndex, length});
+        totalLength += length;
+    }
+
+    if (pathRoads.empty()) {
+        return -1;
+    }
+
+    const float target = totalLength * 0.5f;
+    float travelled = 0.0f;
+    for (const auto& [roadIndex, length] : pathRoads) {
+        travelled += length;
+        if (travelled >= target) {
+            return roadIndex;
+        }
+    }
+
+    return pathRoads.back().first;
+}
+
 void CityThemeRenderer::applyRoadEvents(const MapGraph& graph) {
     for (auto& road : roads) {
         road.eventType = RoadEvent::NONE;
@@ -3522,13 +3567,58 @@ void CityThemeRenderer::applyRoadEvents(const MapGraph& graph) {
         if (anchorB < 0 || anchorB >= static_cast<int>(intersections.size())) continue;
         if (anchorA == anchorB) continue;
 
-        const std::vector<int> path = shortestPath(anchorA, anchorB);
-        for (std::size_t k = 1; k < path.size(); ++k) {
-            const int roadIdx = findRoadIndex(path[k - 1], path[k]);
-            if (roadIdx >= 0 && roadIdx < static_cast<int>(roads.size())) {
-                roads[roadIdx].eventType = ev.type;
-            }
+        const std::vector<int> path = shortestPath(anchorA, anchorB, false);
+        const int roadIdx = selectEventRoadIndex(path);
+        if (roadIdx >= 0 && roadIdx < static_cast<int>(roads.size())) {
+            roads[static_cast<std::size_t>(roadIdx)].eventType = ev.type;
         }
+    }
+}
+
+void CityThemeRenderer::drawRoadEventMarkers() const {
+    ImDrawList* fg = ImGui::GetForegroundDrawList();
+    if (fg == nullptr) {
+        return;
+    }
+
+    for (const RoadSegment& road : roads) {
+        if (road.eventType == RoadEvent::NONE) {
+            continue;
+        }
+
+        const Intersection& from = intersections[road.from];
+        const Intersection& to = intersections[road.to];
+        const float midWorldX = (from.x + to.x) * 0.5f;
+        const float midWorldY = (from.y + to.y) * 0.5f;
+        const ZoneVisibility zone = computeZoneVisibility(
+            midWorldX, midWorldY,
+            operationalCenterX, operationalCenterY,
+            operationalRadiusX, operationalRadiusY);
+        if (zone.transition <= 0.08f) {
+            continue;
+        }
+
+        const IsoCoord iso = RenderUtils::worldToIso(midWorldX, midWorldY);
+        const char* label = roadEventLabel(road.eventType);
+        const ImVec2 textSize = ImGui::CalcTextSize(label);
+        constexpr float kPadX = 5.5f;
+        constexpr float kPadY = 3.5f;
+        const ImVec2 min(iso.x - textSize.x * 0.5f - kPadX,
+                         iso.y - textSize.y * 0.5f - kPadY);
+        const ImVec2 max(iso.x + textSize.x * 0.5f + kPadX,
+                         iso.y + textSize.y * 0.5f + kPadY);
+        const ImU32 bg = (road.eventType == RoadEvent::FLOOD)
+            ? IM_COL32(20, 60, 180, 245)
+            : IM_COL32(120, 70, 20, 245);
+        const ImU32 border = (road.eventType == RoadEvent::FLOOD)
+            ? IM_COL32(95, 155, 255, 230)
+            : IM_COL32(220, 150, 60, 230);
+
+        fg->AddRectFilled(min, max, bg, 4.0f);
+        fg->AddRect(min, max, border, 4.0f, 0, 1.0f);
+        fg->AddText(ImVec2(iso.x - textSize.x * 0.5f,
+                           iso.y - textSize.y * 0.5f),
+                    IM_COL32(255, 255, 255, 255), label);
     }
 }
 

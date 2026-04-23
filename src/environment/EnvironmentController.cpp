@@ -76,7 +76,7 @@ bool EnvironmentController::setActiveTheme(EnvironmentTheme theme, MapGraph& gra
     return true;
 }
 
-void EnvironmentController::applyActiveWeights(MapGraph& graph) const {
+void EnvironmentController::applyActiveWeights(MapGraph& graph) {
     rendererFor(activeTheme).applyRouteWeights(graph);
 }
 

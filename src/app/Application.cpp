@@ -514,6 +514,11 @@ void Application::handleUIActions(const DashboardUI::UIActions& actions) {
         generateNewDay();
     }
 
+    if (actions.roadEventsChanged) {
+        environmentController.applyActiveWeights(wasteSystem.getGraph());
+        resetMissionSession();
+    }
+
     if (actions.runSelectedAlgorithm && actions.algorithmToRun >= 0) {
         runSelectedAlgorithm(actions.algorithmToRun);
     }

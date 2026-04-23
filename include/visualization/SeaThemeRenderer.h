@@ -18,7 +18,7 @@ public:
     bool init() override;
     void rebuildScene(const MapGraph& graph, unsigned int seed) override;
     void update(float deltaTime) override;
-    void applyRouteWeights(MapGraph& graph) const override;
+    void applyRouteWeights(MapGraph& graph) override;
     MissionPresentation buildMissionPresentation(const RouteResult& route,
                                                  const MapGraph& graph) const override;
     ThemeDashboardInfo getDashboardInfo() const override;

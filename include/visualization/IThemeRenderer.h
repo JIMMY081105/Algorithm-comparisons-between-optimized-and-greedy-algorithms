@@ -21,7 +21,7 @@ public:
     virtual bool init() = 0;
     virtual void rebuildScene(const MapGraph& graph, unsigned int seed) = 0;
     virtual void update(float deltaTime) = 0;
-    virtual void applyRouteWeights(MapGraph& graph) const = 0;
+    virtual void applyRouteWeights(MapGraph& graph) = 0;
 
     virtual MissionPresentation buildMissionPresentation(
         const RouteResult& route,

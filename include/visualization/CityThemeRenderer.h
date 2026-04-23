@@ -29,7 +29,7 @@ public:
     bool init() override;
     void rebuildScene(const MapGraph& graph, unsigned int seed) override;
     void update(float deltaTime) override;
-    void applyRouteWeights(MapGraph& graph) const override;
+    void applyRouteWeights(MapGraph& graph) override;
     MissionPresentation buildMissionPresentation(const RouteResult& route,
                                                  const MapGraph& graph) const override;
     ThemeDashboardInfo getDashboardInfo() const override;
@@ -330,7 +330,10 @@ private:
     void applyTrafficConditions(std::mt19937& rng);
     void refreshSeasonalRoadState();
     void refreshPairRoutes(const MapGraph& graph);
-    std::vector<int> shortestPath(int startIntersection, int endIntersection) const;
+    std::vector<int> shortestPath(int startIntersection, int endIntersection,
+                                  bool avoidRoadEvents = true) const;
+    int selectEventRoadIndex(const std::vector<int>& intersectionPath) const;
+    void drawRoadEventMarkers() const;
     void markStaticBatchesDirty();
     void ensureStaticBatchProjectionCurrent();
 

@@ -19,6 +19,7 @@ public:
         bool replay = false;
         bool exportResults = false;
         bool exportComparison = false;
+        bool roadEventsChanged = false;
         bool changeTheme = false;
         bool changeSeason = false;
         bool randomizeWeather = false;
@@ -74,7 +75,6 @@ private:
     void drawTollOverlays(const WasteSystem& system,
                           const RouteResult& currentResult,
                           EnvironmentTheme activeTheme);
-    void drawRoadEventOverlays(const WasteSystem& system, EnvironmentTheme activeTheme);
 
 public:
     DashboardUI();

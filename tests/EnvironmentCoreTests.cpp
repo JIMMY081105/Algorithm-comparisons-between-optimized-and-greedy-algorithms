@@ -213,6 +213,7 @@ void testThemeWeightSwitchPreservesSimulationDay() {
     EnvironmentController controller;
     MapGraph weightedGraph = system.getGraph();
     controller.rebuildScenes(weightedGraph);
+    controller.setActiveTheme(EnvironmentTheme::Sea, weightedGraph);
     controller.applyActiveWeights(weightedGraph);
     const float seaDistance = weightedGraph.getDistance(0, 1);
 

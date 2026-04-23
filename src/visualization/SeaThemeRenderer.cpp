@@ -528,7 +528,7 @@ void SeaThemeRenderer::update(float deltaTime) {
     currentGarbageSinkProgress = clamp01(currentGarbageSinkProgress + deltaTime * 0.2f);
 }
 
-void SeaThemeRenderer::applyRouteWeights(MapGraph& graph) const {
+void SeaThemeRenderer::applyRouteWeights(MapGraph& graph) {
     graph.buildFullyConnectedGraph();
 }
 

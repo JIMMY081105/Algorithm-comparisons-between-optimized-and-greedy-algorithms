@@ -195,6 +195,7 @@ add_executable(EnvironmentCoreTests
 
 target_include_directories(EnvironmentCoreTests PRIVATE
     include
+    external/imgui
     external/glad/include
 )
 
@@ -202,6 +203,7 @@ target_link_libraries(EnvironmentCoreTests PRIVATE
     glfw
     OpenGL::GL
     glad
+    imgui
 )
 
 if(MINGW)
