@@ -84,14 +84,32 @@ set(ALGORITHM_SOURCES
 set(VISUALIZATION_SOURCES
     src/visualization/RenderUtils.cpp
     src/visualization/CityRenderUtils.cpp
+    src/visualization/CityBatchGeometry.cpp
+    src/visualization/CityShapeDrawing.cpp
     src/visualization/IsometricRenderer.cpp
     src/visualization/SeaThemeRenderer.cpp
+    src/visualization/SeaThemeRendererHelpers.cpp
+    src/visualization/SeaThemeRendererTransit.cpp
+    src/visualization/SeaThemeRendererGround.cpp
+    src/visualization/SeaThemeRendererNodes.cpp
+    src/visualization/SeaThemeRendererBoat.cpp
+    src/visualization/SeaThemeRendererDecor.cpp
     src/visualization/CityThemeRenderer.cpp
+    src/visualization/CityThemeRendererGround.cpp
+    src/visualization/CityThemeRendererTransit.cpp
+    src/visualization/CityThemeRendererActors.cpp
+    src/visualization/CityThemeRendererNetwork.cpp
+    src/visualization/CityThemeRendererAssets.cpp
+    src/visualization/CityThemeRendererTraffic.cpp
+    src/visualization/CityThemeRendererRoutes.cpp
+    src/visualization/CityThemeRendererBuildings.cpp
+    src/visualization/CityThemeRendererEnvironment.cpp
     src/visualization/CityAssetLibrary.cpp
     src/visualization/OceanShader.cpp
     src/visualization/AnimationController.cpp
     src/visualization/DashboardStyle.cpp
     src/visualization/DashboardUI.cpp
+    src/visualization/DashboardPanels.cpp
     src/visualization/ChatbotPanel.cpp
 )
 
@@ -188,9 +206,26 @@ add_executable(EnvironmentCoreTests
     ${ENVIRONMENT_SOURCES}
     src/visualization/RenderUtils.cpp
     src/visualization/CityRenderUtils.cpp
+    src/visualization/CityBatchGeometry.cpp
+    src/visualization/CityShapeDrawing.cpp
     src/visualization/IsometricRenderer.cpp
     src/visualization/SeaThemeRenderer.cpp
+    src/visualization/SeaThemeRendererHelpers.cpp
+    src/visualization/SeaThemeRendererTransit.cpp
+    src/visualization/SeaThemeRendererGround.cpp
+    src/visualization/SeaThemeRendererNodes.cpp
+    src/visualization/SeaThemeRendererBoat.cpp
+    src/visualization/SeaThemeRendererDecor.cpp
     src/visualization/CityThemeRenderer.cpp
+    src/visualization/CityThemeRendererGround.cpp
+    src/visualization/CityThemeRendererTransit.cpp
+    src/visualization/CityThemeRendererActors.cpp
+    src/visualization/CityThemeRendererNetwork.cpp
+    src/visualization/CityThemeRendererAssets.cpp
+    src/visualization/CityThemeRendererTraffic.cpp
+    src/visualization/CityThemeRendererRoutes.cpp
+    src/visualization/CityThemeRendererBuildings.cpp
+    src/visualization/CityThemeRendererEnvironment.cpp
     src/visualization/CityAssetLibrary.cpp
     src/visualization/OceanShader.cpp
 )

@@ -1,24 +1,12 @@
 #ifndef CITY_THEME_RENDERER_H
 #define CITY_THEME_RENDERER_H
 
+#include "visualization/CityBatchGeometry.h"
 #include "visualization/IThemeRenderer.h"
 #include "visualization/CityAssetLibrary.h"
 
-#include <glad/glad.h>
-
 #include <random>
 #include <vector>
-
-struct StaticCityBatch {
-    GLuint vao = 0;
-    GLuint vbo = 0;
-    GLsizei vertexCount = 0;
-    bool dirty = true;
-
-    void upload(const std::vector<float>& verts);
-    void draw() const;
-    void destroy();
-};
 
 class CityThemeRenderer : public IThemeRenderer {
 public:
