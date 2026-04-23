@@ -10,6 +10,7 @@
 #include "visualization/CityThemeRenderer.h"
 #include "visualization/SeaThemeRenderer.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -38,6 +39,29 @@ RouteResult buildDeterministicRoute(const MapGraph& graph) {
         graph.getHQNode().getId(),
     };
     return route;
+}
+
+void assertRouteVisitsEligibleNodesExactlyOnce(const RouteResult& result,
+                                               const std::vector<int>& eligible,
+                                               int hqId) {
+    assert(result.isValid());
+    assert(!result.visitOrder.empty());
+    assert(result.visitOrder.front() == hqId);
+    assert(result.visitOrder.back() == hqId);
+
+    std::vector<int> visitedNodes;
+    visitedNodes.reserve(result.visitOrder.size());
+    for (std::size_t i = 1; i + 1 < result.visitOrder.size(); ++i) {
+        assert(result.visitOrder[i] != hqId);
+        visitedNodes.push_back(result.visitOrder[i]);
+    }
+
+    std::vector<int> sortedVisitedNodes = visitedNodes;
+    std::sort(sortedVisitedNodes.begin(), sortedVisitedNodes.end());
+
+    std::vector<int> sortedEligibleNodes = eligible;
+    std::sort(sortedEligibleNodes.begin(), sortedEligibleNodes.end());
+    assert(sortedVisitedNodes == sortedEligibleNodes);
 }
 
 void assertMatricesMatch(const MapGraph& lhs, const MapGraph& rhs) {
@@ -204,6 +228,38 @@ void testCostModelEfficiencyBonusTiers() {
     assert(nearlyEqual(costModel.calculateEfficiencyBonus(250.0f), 0.0f));
 }
 
+void testEligibleNodesRespectThreshold() {
+    WasteSystem system;
+    system.initializeMap();
+    system.setCollectionThreshold(50.0f);
+
+    MapGraph& graph = system.getGraph();
+    for (int i = 0; i < graph.getNodeCount(); ++i) {
+        WasteNode& node = graph.getNodeMutable(i);
+        if (!node.getIsHQ()) {
+            node.setWasteLevel(0.0f);
+        }
+    }
+
+    graph.getNodeMutable(1).setWasteLevel(49.0f);
+    graph.getNodeMutable(2).setWasteLevel(50.0f);
+    graph.getNodeMutable(3).setWasteLevel(95.0f);
+
+    const std::vector<int> defaultEligible = system.getEligibleNodes();
+    assert(defaultEligible.size() == 2);
+    assert(std::find(defaultEligible.begin(), defaultEligible.end(), 2) !=
+           defaultEligible.end());
+    assert(std::find(defaultEligible.begin(), defaultEligible.end(), 3) !=
+           defaultEligible.end());
+    assert(std::find(defaultEligible.begin(), defaultEligible.end(), 1) ==
+           defaultEligible.end());
+    assert(std::find(defaultEligible.begin(), defaultEligible.end(), 0) ==
+           defaultEligible.end());
+
+    const std::vector<int> overrideEligible = system.getEligibleNodes(96.0f);
+    assert(overrideEligible.empty());
+}
+
 void testCityPresentationUsesExpandedStreetPath() {
     WasteSystem system;
     system.initializeMap();
@@ -297,6 +353,55 @@ void testAlgorithmsReturnClosedTours() {
             assert(result.visitOrder.back() == hqId);
         }
     }
+}
+
+void testAlgorithmsVisitEveryEligibleNodeExactlyOnce() {
+    WasteSystem system;
+    system.initializeMap();
+    system.generateNewDayWithSeed(77u);
+
+    SeaThemeRenderer sea;
+    sea.rebuildScene(system.getGraph(), system.getCurrentSeed());
+    sea.applyRouteWeights(system.getGraph());
+
+    ComparisonManager comparisonManager;
+    comparisonManager.initializeAlgorithms();
+    comparisonManager.runAllAlgorithms(system);
+
+    const std::vector<int> eligibleNodes = system.getEligibleNodes();
+    const int hqId = system.getGraph().getHQNode().getId();
+    assert(comparisonManager.getResults().size() ==
+           static_cast<std::size_t>(comparisonManager.getAlgorithmCount()));
+
+    for (const RouteResult& result : comparisonManager.getResults()) {
+        assertRouteVisitsEligibleNodesExactlyOnce(result, eligibleNodes, hqId);
+    }
+}
+
+void testComparisonManagerRejectsInvalidIndices() {
+    WasteSystem system;
+    system.initializeMap();
+    system.generateNewDayWithSeed(77u);
+
+    ComparisonManager comparisonManager;
+    comparisonManager.initializeAlgorithms();
+
+    bool threwLow = false;
+    try {
+        comparisonManager.runSingleAlgorithm(-1, system);
+    } catch (const std::out_of_range&) {
+        threwLow = true;
+    }
+    assert(threwLow);
+
+    bool threwHigh = false;
+    try {
+        comparisonManager.runSingleAlgorithm(comparisonManager.getAlgorithmCount(),
+                                             system);
+    } catch (const std::out_of_range&) {
+        threwHigh = true;
+    }
+    assert(threwHigh);
 }
 
 void testThemeWeightSwitchPreservesSimulationDay() {
@@ -449,10 +554,13 @@ int main() {
     testTollStationEncapsulationAndValidation();
     testRoadEventRules();
     testCostModelEfficiencyBonusTiers();
+    testEligibleNodesRespectThreshold();
     testCityPresentationUsesExpandedStreetPath();
     testCityStartsStormyOnFirstBuild();
     testWeatherPenaltiesStayNonNegative();
     testAlgorithmsReturnClosedTours();
+    testAlgorithmsVisitEveryEligibleNodeExactlyOnce();
+    testComparisonManagerRejectsInvalidIndices();
     testThemeWeightSwitchPreservesSimulationDay();
     testEnvironmentSceneIsStableAcrossDaySeeds();
     testCityTrafficChangesAcrossNewDaysWhenWeatherNormalized();

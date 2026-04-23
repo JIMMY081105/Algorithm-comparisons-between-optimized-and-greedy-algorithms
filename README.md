@@ -10,9 +10,11 @@ Key features:
 
 - Fixed map of marine cleanup waypoints around a central command anchorage
 - Daily waste generation with reproducible seed support
-- Four route-planning algorithms: Regular, Greedy, MST, and TSP
+- Seven route-planning algorithms: Regular, Greedy, MST, TSP, Dijkstra,
+  Bellman-Ford, and Floyd-Warshall
 - Animated route playback on an isometric map
 - Side-by-side algorithm comparison with cost metrics
+- Optional AI assistant panel for simulation Q&A and route suggestions
 - TXT and CSV export for summaries and comparison results
 
 ## Architectural Layout
@@ -40,6 +42,8 @@ src/
 - `Application` coordinates the window, render loop, UI actions, and mission state.
 - `WasteSystem` owns the fixed map, current-day waste levels, threshold logic, and event log.
 - `ComparisonManager` runs algorithms through one shared comparison workflow.
+- `ChatbotService` is an optional asynchronous AI adapter; recommended routes are
+  validated against the current eligible-node set before they can be animated.
 - `DashboardUI` renders the control panels, while `DashboardStyle` owns reusable layout and theme rules.
 - `FileExporter` handles file output only; `ResultLogger` sits one layer above it for application-facing export actions.
 
@@ -51,6 +55,9 @@ src/
 | Greedy    | Nearest-neighbour heuristic for local cost reduction |
 | MST       | Tree-based route approximation |
 | TSP       | Exact bitmask dynamic-programming solver for small node counts |
+| Dijkstra  | All-pairs shortest-leg strategy over the weighted graph |
+| Bellman-Ford | Relaxation-based shortest-path variant for comparison |
+| Floyd-Warshall | Dense-graph shortest-path baseline using full matrix precomputation |
 
 ## Build Requirements
 
@@ -66,6 +73,12 @@ Everything else ships with the repository:
 - GLFW is **downloaded and built automatically** the first time CMake configures — no vcpkg, no system install needed.
 
 ## Build & Run — one-time setup
+
+### Optional AI assistant
+
+- The dashboard can load an API key from `ai_key.txt`, but the file is ignored by Git.
+- The current AI transport uses WinINet, so live requests are only supported on Windows builds.
+- Suggested routes are rejected unless they start and end at HQ and cover every currently eligible node exactly once.
 
 After cloning the repository, open a terminal in the project folder and run:
 

@@ -9,7 +9,8 @@
 #include <thread>
 #include <vector>
 
-// Async Gemini 2.5 Flash client.
+// Async external AI client.
+// The current implementation targets Gemini 2.5 Flash over WinINet on Windows.
 // ChatbotService owns a single worker thread that serializes one request at a
 // time. The UI layer submits prompts + a project snapshot and polls for the
 // response on the render thread. The service knows nothing about ImGui or the

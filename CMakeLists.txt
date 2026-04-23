@@ -130,6 +130,8 @@ set(PERSISTENCE_SOURCES
 
 set(APP_SOURCES
     src/app/Application.cpp
+    src/app/ApplicationActions.cpp
+    src/app/ApplicationChatbot.cpp
     src/main.cpp
 )
 
