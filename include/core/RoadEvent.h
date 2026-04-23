@@ -1,6 +1,8 @@
 #ifndef ROAD_EVENT_H
 #define ROAD_EVENT_H
 
+#include <array>
+
 enum class RoadEvent {
     NONE,
     FLOOD,
@@ -23,32 +25,41 @@ inline constexpr float kDefaultFuelMultiplier = 1.0f;
 // route summaries, debug output, or cost calculations.
 inline constexpr float kImpassablePenalty = 9999.0f;
 
+struct Profile {
+    RoadEvent event;
+    float distanceMultiplier;
+    float speedFraction;
+    const char* label;
+    const char* fullName;
+};
+
+inline constexpr std::array<Profile, 3> kProfiles{{
+    {RoadEvent::NONE, kNormalDistanceMultiplier, kNormalSpeedFraction, "", "None"},
+    {RoadEvent::FLOOD, kImpassablePenalty, kBlockedSpeedFraction, "FLOOD", "Flood"},
+    {RoadEvent::FESTIVAL, kImpassablePenalty, kBlockedSpeedFraction, "FEST", "Festival"},
+}};
+
+inline constexpr const Profile& profile(RoadEvent event) {
+    for (const Profile& candidate : kProfiles) {
+        if (candidate.event == event) {
+            return candidate;
+        }
+    }
+    return kProfiles[0];
+}
+
 inline bool isBlocking(RoadEvent event) {
-    return event == RoadEvent::FLOOD || event == RoadEvent::FESTIVAL;
+    return profile(event).speedFraction == kBlockedSpeedFraction;
 }
 
 // Both FLOOD and FESTIVAL are fully impassable: algorithms route around them.
 inline float distanceMultiplier(RoadEvent event) {
-    switch (event) {
-        case RoadEvent::FLOOD:
-        case RoadEvent::FESTIVAL:
-            return kImpassablePenalty;
-        case RoadEvent::NONE:
-        default:
-            return kNormalDistanceMultiplier;
-    }
+    return profile(event).distanceMultiplier;
 }
 
 // Speed fraction for cost reporting. Blocked segments should not appear in routes.
 inline float speedFraction(RoadEvent event) {
-    switch (event) {
-        case RoadEvent::FLOOD:
-        case RoadEvent::FESTIVAL:
-            return kBlockedSpeedFraction;
-        case RoadEvent::NONE:
-        default:
-            return kNormalSpeedFraction;
-    }
+    return profile(event).speedFraction;
 }
 
 // Current road events block routing, so all reachable segments use this default.
@@ -57,19 +68,11 @@ inline float fuelMultiplier() {
 }
 
 inline const char* label(RoadEvent event) {
-    switch (event) {
-        case RoadEvent::FLOOD:    return "FLOOD";
-        case RoadEvent::FESTIVAL: return "FEST";
-        default:                  return "";
-    }
+    return profile(event).label;
 }
 
 inline const char* fullName(RoadEvent event) {
-    switch (event) {
-        case RoadEvent::FLOOD:    return "Flood";
-        case RoadEvent::FESTIVAL: return "Festival";
-        default:                  return "None";
-    }
+    return profile(event).fullName;
 }
 
 } // namespace RoadEventRules

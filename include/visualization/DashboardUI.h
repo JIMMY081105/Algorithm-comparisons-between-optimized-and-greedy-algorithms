@@ -3,33 +3,16 @@
 
 #include "algorithms/ComparisonManager.h"
 #include "core/WasteSystem.h"
-#include "environment/EnvironmentTypes.h"
 #include "environment/MissionPresentation.h"
 #include "visualization/AnimationController.h"
+#include "visualization/DashboardActions.h"
 
 // Renders the gameplay dashboard layered over the isometric scene.
 // The class owns UI state such as active panel visibility, while the
 // Application layer remains responsible for carrying out the requested actions.
 class DashboardUI {
 public:
-    struct UIActions {
-        bool generateNewDay = false;
-        bool runSelectedAlgorithm = false;
-        bool compareAll = false;
-        bool replay = false;
-        bool exportResults = false;
-        bool exportComparison = false;
-        bool roadEventsChanged = false;
-        bool changeTheme = false;
-        bool changeSeason = false;
-        bool randomizeWeather = false;
-        bool layerTogglesChanged = false;
-        int algorithmToRun = -1;
-        bool playPause = false;
-        EnvironmentTheme selectedTheme = EnvironmentTheme::Sea;
-        CitySeason selectedSeason = CitySeason::Spring;
-        SceneLayerToggles layerToggles;
-    };
+    using UIActions = DashboardUIActions;
 
 private:
     int selectedAlgorithm;

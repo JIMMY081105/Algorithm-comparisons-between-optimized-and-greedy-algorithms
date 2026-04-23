@@ -65,6 +65,13 @@ unsigned int makeTimeSeed() {
 std::string buildMapInitializedMessage(int nodeCount) {
     return "Map initialized with " + std::to_string(nodeCount) + " locations";
 }
+
+template <typename Callback>
+void forEachRouteLeg(const std::vector<int>& route, Callback callback) {
+    for (std::size_t i = 0; i + 1 < route.size(); ++i) {
+        callback(route[i], route[i + 1]);
+    }
+}
 } // namespace
 
 WasteSystem::WasteSystem()
@@ -157,26 +164,26 @@ float WasteSystem::getDailyFuelPricePerLitre() const    { return dailyFuelPriceP
 
 float WasteSystem::calculateTollCost(const std::vector<int>& route) const {
     float total = 0.0f;
-    for (int i = 0; i + 1 < static_cast<int>(route.size()); ++i) {
+    forEachRouteLeg(route, [&](int fromId, int toId) {
         for (const TollStation& toll : tollStations) {
-            if (toll.isCrossedBy(route[i], route[i + 1])) {
+            if (toll.isCrossedBy(fromId, toId)) {
                 total += toll.fee();
             }
         }
-    }
+    });
     return total;
 }
 
 std::vector<std::string> WasteSystem::getTollNamesCrossed(
     const std::vector<int>& route) const {
     std::vector<std::string> names;
-    for (int i = 0; i + 1 < static_cast<int>(route.size()); ++i) {
+    forEachRouteLeg(route, [&](int fromId, int toId) {
         for (const TollStation& toll : tollStations) {
-            if (toll.isCrossedBy(route[i], route[i + 1])) {
+            if (toll.isCrossedBy(fromId, toId)) {
                 names.push_back(toll.name());
             }
         }
-    }
+    });
     return names;
 }
 
@@ -231,15 +238,13 @@ void WasteSystem::populateCosts(RouteResult& result) const {
     const float normalSpeed  = costModel.getTruckSpeedKmh();
     const float litresPerKm  = costModel.getLitresPerKm();
     const float pricePerLitre = costModel.getDailyFuelPricePerLitre();
-    for (std::size_t i = 0; i + 1 < result.visitOrder.size(); ++i) {
-        const int fromId = result.visitOrder[i];
-        const int toId   = result.visitOrder[i + 1];
+    forEachRouteLeg(result.visitOrder, [&](int fromId, int toId) {
         const float segKm    = graph.getDistance(fromId, toId);
         const RoadEvent ev   = graph.getEdgeEvent(fromId, toId);
         const float segSpeed = normalSpeed * RoadEventRules::speedFraction(ev);
         travelTime += (segSpeed > 0.0f) ? segKm / segSpeed : 0.0f;
         fuelCost   += litresPerKm * RoadEventRules::fuelMultiplier() * pricePerLitre * segKm;
-    }
+    });
     result.travelTime = travelTime;
     result.fuelCost   = fuelCost;
 

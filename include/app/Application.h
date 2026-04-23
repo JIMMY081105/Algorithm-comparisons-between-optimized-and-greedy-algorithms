@@ -1,21 +1,27 @@
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
-#include "ai/ChatbotService.h"
-#include "algorithms/ComparisonManager.h"
-#include "core/WasteSystem.h"
-#include "environment/EnvironmentController.h"
-#include "persistence/ResultLogger.h"
-#include "visualization/AnimationController.h"
-#include "visualization/ChatbotPanel.h"
-#include "visualization/DashboardUI.h"
-#include "visualization/IsometricRenderer.h"
+#include "core/RouteResult.h"
+#include "environment/EnvironmentTypes.h"
+#include "environment/MissionPresentation.h"
+#include "visualization/DashboardActions.h"
 
 #include <exception>
 #include <memory>
 #include <string>
+#include <vector>
 
 struct GLFWwindow;
+
+class AnimationController;
+class ChatbotPanel;
+class ChatbotService;
+class ComparisonManager;
+class DashboardUI;
+class EnvironmentController;
+class IsometricRenderer;
+class ResultLogger;
+class WasteSystem;
 
 struct GlfwWindowDeleter {
     void operator()(GLFWwindow* window) const noexcept;
@@ -30,15 +36,15 @@ private:
     int windowWidth;
     int windowHeight;
 
-    WasteSystem wasteSystem;
-    ComparisonManager comparisonManager;
-    IsometricRenderer renderer;
-    AnimationController animController;
-    DashboardUI dashboardUI;
-    ResultLogger resultLogger;
-    EnvironmentController environmentController;
-    ChatbotService chatbotService;
-    ChatbotPanel chatbotPanel;
+    std::unique_ptr<WasteSystem> wasteSystem;
+    std::unique_ptr<ComparisonManager> comparisonManager;
+    std::unique_ptr<IsometricRenderer> renderer;
+    std::unique_ptr<AnimationController> animController;
+    std::unique_ptr<DashboardUI> dashboardUI;
+    std::unique_ptr<ResultLogger> resultLogger;
+    std::unique_ptr<EnvironmentController> environmentController;
+    std::unique_ptr<ChatbotService> chatbotService;
+    std::unique_ptr<ChatbotPanel> chatbotPanel;
 
     RouteResult currentResult;
     MissionPresentation currentMission;
@@ -70,7 +76,7 @@ private:
     void loadMissionRoute(const RouteResult& result, bool autoPlay);
     void replayCurrentMission();
     void logRuntimeError(const std::string& context, const std::exception& e);
-    void handleUIActions(const DashboardUI::UIActions& actions);
+    void handleUIActions(const DashboardUIActions& actions);
 
     void beginImGuiFrame();
     void endImGuiFrame();

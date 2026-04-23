@@ -1,5 +1,15 @@
 #include "app/Application.h"
+
+#include "ai/ChatbotService.h"
+#include "algorithms/ComparisonManager.h"
+#include "core/WasteSystem.h"
+#include "environment/EnvironmentController.h"
 #include "environment/SeasonProfile.h"
+#include "persistence/ResultLogger.h"
+#include "visualization/AnimationController.h"
+#include "visualization/ChatbotPanel.h"
+#include "visualization/DashboardUI.h"
+#include "visualization/IsometricRenderer.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -9,6 +19,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 
@@ -48,7 +59,18 @@ void GlfwWindowDeleter::operator()(GLFWwindow* window) const noexcept {
 }
 
 Application::Application()
-    : window(nullptr), windowWidth(1280), windowHeight(850),
+    : window(nullptr),
+      windowWidth(1280),
+      windowHeight(850),
+      wasteSystem(std::make_unique<WasteSystem>()),
+      comparisonManager(std::make_unique<ComparisonManager>()),
+      renderer(std::make_unique<IsometricRenderer>()),
+      animController(std::make_unique<AnimationController>()),
+      dashboardUI(std::make_unique<DashboardUI>()),
+      resultLogger(std::make_unique<ResultLogger>()),
+      environmentController(std::make_unique<EnvironmentController>()),
+      chatbotService(std::make_unique<ChatbotService>()),
+      chatbotPanel(std::make_unique<ChatbotPanel>()),
       lastFrameTime(0.0f), initialized(false) {}
 
 Application::~Application() {
@@ -215,21 +237,21 @@ void Application::initImGui() {
 }
 
 void Application::initSimulation() {
-    wasteSystem.initializeMap();
-    comparisonManager.initializeAlgorithms();
-    if (!environmentController.init()) {
+    wasteSystem->initializeMap();
+    comparisonManager->initializeAlgorithms();
+    if (!environmentController->init()) {
         throw std::runtime_error("Failed to initialize environment themes");
     }
 
-    environmentController.rebuildScenes(wasteSystem.getGraph());
-    wasteSystem.generateNewDay();
-    environmentController.randomizeCityTraffic(buildTrafficSeed(wasteSystem),
-                                               wasteSystem.getGraph());
-    environmentController.randomizeCityWeather(buildWeatherSeed(wasteSystem),
-                                               wasteSystem.getGraph());
-    environmentController.applyActiveWeights(wasteSystem.getGraph());
+    environmentController->rebuildScenes(wasteSystem->getGraph());
+    wasteSystem->generateNewDay();
+    environmentController->randomizeCityTraffic(buildTrafficSeed(*wasteSystem),
+                                               wasteSystem->getGraph());
+    environmentController->randomizeCityWeather(buildWeatherSeed(*wasteSystem),
+                                               wasteSystem->getGraph());
+    environmentController->applyActiveWeights(wasteSystem->getGraph());
 
-    chatbotService.loadKeyFromFile();
+    chatbotService->loadKeyFromFile();
 
     lastFrameTime = static_cast<float>(glfwGetTime());
 }
@@ -259,9 +281,9 @@ void Application::run() {
 }
 
 void Application::update(float deltaTime) {
-    environmentController.update(deltaTime);
+    environmentController->update(deltaTime);
 
-    const int collectedNodeId = animController.update(deltaTime);
+    const int collectedNodeId = animController->update(deltaTime);
     if (collectedNodeId >= 0) {
         handleCollectedNode(collectedNodeId);
     }
@@ -274,7 +296,7 @@ void Application::renderFrame() {
     handleZoomInput();
     RenderUtils::updateProjection(static_cast<float>(windowWidth),
                                   static_cast<float>(windowHeight),
-                                  wasteSystem.getGraph());
+                                  wasteSystem->getGraph());
 
     // Clear with dark background
     auto bg = RenderUtils::getBackgroundColor();
@@ -290,16 +312,16 @@ void Application::renderFrame() {
 
     // Render the active environment scene.
     float dt = 1.0f / 60.0f;
-    renderer.render(environmentController.activeRenderer(),
-                    wasteSystem.getGraph(),
-                    animController.getTruck(),
+    renderer->render(environmentController->activeRenderer(),
+                    wasteSystem->getGraph(),
+                    animController->getTruck(),
                     currentMission.isValid() ? &currentMission : nullptr,
-                    animController.getState(),
-                    animController.getProgress(),
+                    animController->getState(),
+                    animController->getProgress(),
                     dt);
 
-    if (environmentController.getTransitionAlpha() > 0.001f) {
-        const float alpha = environmentController.getTransitionAlpha();
+    if (environmentController->getTransitionAlpha() > 0.001f) {
+        const float alpha = environmentController->getTransitionAlpha();
         glBegin(GL_QUADS);
         glColor4f(0.96f, 0.98f, 1.0f, alpha * 0.08f);
         glVertex2f(0.0f, 0.0f);
@@ -311,12 +333,12 @@ void Application::renderFrame() {
     }
 
     // Render ImGui dashboard on top
-    auto actions = dashboardUI.render(wasteSystem, comparisonManager,
-                                      animController, currentResult,
+    auto actions = dashboardUI->render(*wasteSystem, *comparisonManager,
+                                      *animController, currentResult,
                                       currentMission,
-                                      environmentController.getDashboardInfo(),
-                                      environmentController.getLayerToggles(),
-                                      environmentController.getActiveTheme());
+                                      environmentController->getDashboardInfo(),
+                                      environmentController->getLayerToggles(),
+                                      environmentController->getActiveTheme());
 
     // Process all UI actions
     handleUIActions(actions);
@@ -352,62 +374,62 @@ void Application::handleZoomInput() {
 }
 
 void Application::handleCollectedNode(int collectedNodeId) {
-    wasteSystem.markNodeCollected(collectedNodeId);
+    wasteSystem->markNodeCollected(collectedNodeId);
 
-    const int nodeIndex = wasteSystem.getGraph().findNodeIndex(collectedNodeId);
+    const int nodeIndex = wasteSystem->getGraph().findNodeIndex(collectedNodeId);
     if (nodeIndex < 0) {
         return;
     }
 
-    const WasteNode& node = wasteSystem.getGraph().getNode(nodeIndex);
+    const WasteNode& node = wasteSystem->getGraph().getNode(nodeIndex);
     if (!node.getIsHQ()) {
-        wasteSystem.getEventLog().addEvent(
+        wasteSystem->getEventLog().addEvent(
             "Cleaned up garbage at " + node.getName());
     }
 }
 
 void Application::handleThemeChange(EnvironmentTheme theme) {
-    if (!environmentController.setActiveTheme(theme, wasteSystem.getGraph())) {
+    if (!environmentController->setActiveTheme(theme, wasteSystem->getGraph())) {
         return;
     }
 
     resetMissionSession();
-    wasteSystem.getEventLog().addEvent(
+    wasteSystem->getEventLog().addEvent(
         std::string("Environment switched to ") + toDisplayString(theme));
 }
 
 void Application::handleCitySeasonChange(CitySeason season) {
-    environmentController.setCitySeason(season, wasteSystem.getGraph());
+    environmentController->setCitySeason(season, wasteSystem->getGraph());
     resetMissionSession();
-    wasteSystem.getEventLog().addEvent(
+    wasteSystem->getEventLog().addEvent(
         std::string("City season set to ") + toDisplayString(season));
 }
 
 void Application::refreshCityWeather() {
-    if (environmentController.getActiveTheme() != EnvironmentTheme::City) {
+    if (environmentController->getActiveTheme() != EnvironmentTheme::City) {
         return;
     }
 
-    environmentController.randomizeCityWeather(buildWeatherSeed(wasteSystem),
-                                               wasteSystem.getGraph());
+    environmentController->randomizeCityWeather(buildWeatherSeed(*wasteSystem),
+                                               wasteSystem->getGraph());
     refreshSessionAfterWeightChange();
-    wasteSystem.getEventLog().addEvent("City weather refreshed");
+    wasteSystem->getEventLog().addEvent("City weather refreshed");
 }
 
 void Application::generateNewDay() {
-    wasteSystem.generateNewDay();
-    environmentController.randomizeCityTraffic(buildTrafficSeed(wasteSystem),
-                                               wasteSystem.getGraph());
-    environmentController.randomizeCityWeather(buildWeatherSeed(wasteSystem),
-                                               wasteSystem.getGraph());
-    environmentController.applyActiveWeights(wasteSystem.getGraph());
+    wasteSystem->generateNewDay();
+    environmentController->randomizeCityTraffic(buildTrafficSeed(*wasteSystem),
+                                               wasteSystem->getGraph());
+    environmentController->randomizeCityWeather(buildWeatherSeed(*wasteSystem),
+                                               wasteSystem->getGraph());
+    environmentController->applyActiveWeights(wasteSystem->getGraph());
     resetMissionSession();
 }
 
 void Application::runSelectedAlgorithm(int algorithmIndex) {
     try {
         loadMissionRoute(
-            comparisonManager.runSingleAlgorithm(algorithmIndex, wasteSystem),
+            comparisonManager->runSingleAlgorithm(algorithmIndex, *wasteSystem),
             true);
     } catch (const std::exception& e) {
         logRuntimeError("Error: ", e);
@@ -416,14 +438,14 @@ void Application::runSelectedAlgorithm(int algorithmIndex) {
 
 void Application::compareAllAlgorithms() {
     try {
-        comparisonManager.runAllAlgorithms(wasteSystem);
+        comparisonManager->runAllAlgorithms(*wasteSystem);
 
-        const int bestIndex = comparisonManager.getBestAlgorithmIndex();
+        const int bestIndex = comparisonManager->getBestAlgorithmIndex();
         if (bestIndex < 0) {
             return;
         }
 
-        loadMissionRoute(comparisonManager.getResults()[bestIndex], false);
+        loadMissionRoute(comparisonManager->getResults()[bestIndex], false);
     } catch (const std::exception& e) {
         logRuntimeError("Comparison error: ", e);
     }
@@ -434,13 +456,13 @@ void Application::playOrRestartMission() {
         return;
     }
 
-    if (animController.isFinished()) {
+    if (animController->isFinished()) {
         replayCurrentMission();
         return;
     }
 
-    wasteSystem.resetCollectionStatus();
-    animController.play();
+    wasteSystem->resetCollectionStatus();
+    animController->play();
 }
 
 void Application::exportCurrentResult() {
@@ -450,8 +472,8 @@ void Application::exportCurrentResult() {
 
     try {
         const std::string filename =
-            resultLogger.logCurrentResult(currentResult, wasteSystem);
-        wasteSystem.getEventLog().addEvent("Saved: " + filename);
+            resultLogger->logCurrentResult(currentResult, *wasteSystem);
+        wasteSystem->getEventLog().addEvent("Saved: " + filename);
     } catch (const std::exception& e) {
         logRuntimeError("Export error: ", e);
     }
@@ -460,9 +482,9 @@ void Application::exportCurrentResult() {
 void Application::exportComparisonResults() {
     try {
         const std::string filename =
-            resultLogger.logComparison(comparisonManager, wasteSystem);
+            resultLogger->logComparison(*comparisonManager, *wasteSystem);
         if (!filename.empty()) {
-            wasteSystem.getEventLog().addEvent("Saved: " + filename);
+            wasteSystem->getEventLog().addEvent("Saved: " + filename);
         }
     } catch (const std::exception& e) {
         logRuntimeError("Export error: ", e);
@@ -472,14 +494,14 @@ void Application::exportComparisonResults() {
 void Application::resetMissionSession() {
     currentResult = RouteResult();
     currentMission = MissionPresentation();
-    animController.stop();
-    renderer.resetAnimation();
-    comparisonManager.clearResults();
-    wasteSystem.resetCollectionStatus();
+    animController->stop();
+    renderer->resetAnimation();
+    comparisonManager->clearResults();
+    wasteSystem->resetCollectionStatus();
 }
 
 void Application::refreshSessionAfterWeightChange() {
-    if (!comparisonManager.getResults().empty()) {
+    if (!comparisonManager->getResults().empty()) {
         compareAllAlgorithms();
     } else {
         resetMissionSession();
@@ -488,13 +510,13 @@ void Application::refreshSessionAfterWeightChange() {
 
 void Application::loadMissionRoute(const RouteResult& result, bool autoPlay) {
     currentResult = result;
-    currentMission = environmentController.buildMissionPresentation(
-        currentResult, wasteSystem.getGraph());
-    animController.loadRoute(currentMission);
-    wasteSystem.resetCollectionStatus();
+    currentMission = environmentController->buildMissionPresentation(
+        currentResult, wasteSystem->getGraph());
+    animController->loadRoute(currentMission);
+    wasteSystem->resetCollectionStatus();
 
     if (autoPlay) {
-        animController.play();
+        animController->play();
     }
 }
 
@@ -503,18 +525,18 @@ void Application::replayCurrentMission() {
         return;
     }
 
-    wasteSystem.resetCollectionStatus();
-    animController.replay();
+    wasteSystem->resetCollectionStatus();
+    animController->replay();
 }
 
 void Application::logRuntimeError(const std::string& context,
                                   const std::exception& e) {
-    wasteSystem.getEventLog().addEvent(context + e.what());
+    wasteSystem->getEventLog().addEvent(context + e.what());
 }
 
-void Application::handleUIActions(const DashboardUI::UIActions& actions) {
+void Application::handleUIActions(const DashboardUIActions& actions) {
     if (actions.layerTogglesChanged) {
-        environmentController.setLayerToggles(actions.layerToggles);
+        environmentController->setLayerToggles(actions.layerToggles);
     }
 
     if (actions.changeTheme) {
@@ -534,7 +556,7 @@ void Application::handleUIActions(const DashboardUI::UIActions& actions) {
     }
 
     if (actions.roadEventsChanged) {
-        environmentController.applyActiveWeights(wasteSystem.getGraph());
+        environmentController->applyActiveWeights(wasteSystem->getGraph());
         refreshSessionAfterWeightChange();
     }
 
@@ -579,8 +601,8 @@ void Application::shutdown() {
         return;
     }
 
-    renderer.cleanup();
-    environmentController.cleanup();
+    renderer->cleanup();
+    environmentController->cleanup();
 
     if (ImGui::GetCurrentContext() != nullptr) {
         ImGui_ImplOpenGL3_Shutdown();
@@ -598,8 +620,8 @@ std::string Application::buildChatbotContext() const {
     // Give Gemini a compact, authoritative view of the current day so it can
     // reason about the map without hallucinating coordinates or waste levels.
     std::ostringstream out;
-    const ThemeDashboardInfo info = environmentController.getDashboardInfo();
-    const MapGraph& graph = wasteSystem.getGraph();
+    const ThemeDashboardInfo info = environmentController->getDashboardInfo();
+    const MapGraph& graph = wasteSystem->getGraph();
 
     out << "You are the in-game AI assistant for the EcoRoute Smart Waste "
            "Clearance simulation. Only answer questions about this simulation "
@@ -616,10 +638,10 @@ std::string Application::buildChatbotContext() const {
     out << "Atmosphere: " << info.atmosphereLabel << "\n";
     out << "Congestion: " << info.congestionLevel
         << "  Incidents: " << info.incidentCount << "\n";
-    out << "Day: " << wasteSystem.getDayNumber()
-        << "  Seed: " << wasteSystem.getCurrentSeed() << "\n";
+    out << "Day: " << wasteSystem->getDayNumber()
+        << "  Seed: " << wasteSystem->getCurrentSeed() << "\n";
     out << "Collection threshold (percent): "
-        << wasteSystem.getCollectionThreshold() << "\n";
+        << wasteSystem->getCollectionThreshold() << "\n";
     out << "HQ node id: " << graph.getHQNode().getId()
         << " (" << graph.getHQNode().getName() << ")\n\n";
 
@@ -638,7 +660,7 @@ std::string Application::buildChatbotContext() const {
         out << "\n";
     }
 
-    const std::vector<int> eligible = wasteSystem.getEligibleNodes();
+    const std::vector<int> eligible = wasteSystem->getEligibleNodes();
     out << "\nELIGIBLE NODE IDS (waste >= threshold): ";
     for (std::size_t i = 0; i < eligible.size(); ++i) {
         if (i > 0) out << ",";
@@ -646,7 +668,7 @@ std::string Application::buildChatbotContext() const {
     }
     out << "\n";
 
-    const auto& results = comparisonManager.getResults();
+    const auto& results = comparisonManager->getResults();
     if (!results.empty()) {
         out << "\nRECENT ALGORITHM RESULTS\n";
         for (const RouteResult& r : results) {
@@ -682,10 +704,10 @@ std::string Application::buildChatbotContext() const {
 
 void Application::renderChatbotPanel() {
     const std::string context = buildChatbotContext();
-    ChatbotPanel::Actions actions = chatbotPanel.render(chatbotService, context);
+    ChatbotPanel::Actions actions = chatbotPanel->render(*chatbotService, context);
 
     if (actions.submitQuestion && !actions.prompt.empty()) {
-        chatbotService.submit(actions.prompt, context, false);
+        chatbotService->submit(actions.prompt, context, false);
     } else if (actions.requestBestRoute) {
         const std::string prompt =
             "Recommend the optimal pickup route for today. The route MUST "
@@ -694,27 +716,27 @@ void Application::renderChatbotPanel() {
             "Explain briefly why this ordering is good given the weather "
             "and node positions. End with the ROUTE: line containing every "
             "eligible node ID.";
-        chatbotService.submit(prompt, context, true);
+        chatbotService->submit(prompt, context, true);
     }
 }
 
 void Application::pollChatbotResponse() {
     ChatbotService::Response response;
-    if (!chatbotService.tryConsumeResponse(response)) {
+    if (!chatbotService->tryConsumeResponse(response)) {
         return;
     }
 
-    chatbotPanel.setLastReply(response.text);
+    chatbotPanel->setLastReply(response.text);
 
     if (response.isRecommendation && !response.recommendedRoute.empty()) {
         applyRecommendedRoute(response.recommendedRoute);
     } else if (!response.isRecommendation) {
-        chatbotPanel.setLastRecommendationSummary("");
+        chatbotPanel->setLastRecommendationSummary("");
     }
 }
 
 void Application::applyRecommendedRoute(const std::vector<int>& order) {
-    const MapGraph& graph = wasteSystem.getGraph();
+    const MapGraph& graph = wasteSystem->getGraph();
     std::vector<int> sanitized;
     sanitized.reserve(order.size());
     for (int nodeId : order) {
@@ -723,7 +745,7 @@ void Application::applyRecommendedRoute(const std::vector<int>& order) {
         }
     }
     if (sanitized.size() < 2) {
-        chatbotPanel.setLastRecommendationSummary("route ignored (invalid ids)");
+        chatbotPanel->setLastRecommendationSummary("route ignored (invalid ids)");
         return;
     }
 
@@ -731,17 +753,17 @@ void Application::applyRecommendedRoute(const std::vector<int>& order) {
     aiResult.algorithmName = "AI (Gemini)";
     aiResult.visitOrder = sanitized;
     aiResult.totalDistance = graph.calculateRouteDistance(sanitized);
-    aiResult.wasteCollected = wasteSystem.computeWasteCollected(sanitized);
+    aiResult.wasteCollected = wasteSystem->computeWasteCollected(sanitized);
     aiResult.runtimeMs = 0.0;
-    wasteSystem.populateCosts(aiResult);
+    wasteSystem->populateCosts(aiResult);
 
     std::ostringstream summary;
     summary << (sanitized.size() - 1) << " stops, "
             << aiResult.totalDistance << " km, RM "
             << aiResult.totalCost;
-    chatbotPanel.setLastRecommendationSummary(summary.str());
+    chatbotPanel->setLastRecommendationSummary(summary.str());
 
-    wasteSystem.getEventLog().addEvent(
+    wasteSystem->getEventLog().addEvent(
         "AI recommended route applied: " + summary.str());
 
     loadMissionRoute(aiResult, true);

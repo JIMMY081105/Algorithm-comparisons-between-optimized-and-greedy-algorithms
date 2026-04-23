@@ -15,6 +15,14 @@ int checkedNodeIndex(int index, std::size_t nodeCount, const char* functionName)
     return index;
 }
 
+int requireNodeIdIndex(const MapGraph& graph, int nodeId, const char* functionName) {
+    const int index = graph.findNodeIndex(nodeId);
+    if (index < 0) {
+        throw std::invalid_argument(std::string(functionName) + " - invalid node ID");
+    }
+    return index;
+}
+
 void validateWeightedMatrixShape(const std::vector<std::vector<float>>& matrix,
                                  std::size_t expectedNodeCount) {
     if (matrix.size() != expectedNodeCount) {
@@ -93,11 +101,8 @@ WasteNode& MapGraph::getNodeMutable(int index) {
 }
 
 float MapGraph::getDistance(int fromId, int toId) const {
-    const int fi = findNodeIndex(fromId);
-    const int ti = findNodeIndex(toId);
-    if (fi < 0 || ti < 0) {
-        throw std::invalid_argument("MapGraph::getDistance - invalid node ID");
-    }
+    const int fi = requireNodeIdIndex(*this, fromId, "MapGraph::getDistance");
+    const int ti = requireNodeIdIndex(*this, toId, "MapGraph::getDistance");
     return adjacencyMatrix[fi][ti];
 }
 
@@ -137,19 +142,18 @@ std::vector<std::pair<int, float>> MapGraph::getNeighbors(int nodeId) const {
 }
 
 float MapGraph::getEffectiveDistance(int fromId, int toId) const {
-    const float base = getDistance(fromId, toId);
+    const int fi = requireNodeIdIndex(*this, fromId, "MapGraph::getEffectiveDistance");
+    const int ti = requireNodeIdIndex(*this, toId, "MapGraph::getEffectiveDistance");
+    const float base = adjacencyMatrix[fi][ti];
     if (base <= 0.0f || edgeEvents.empty()) return base;
-    const int fi = findNodeIndex(fromId);
-    const int ti = findNodeIndex(toId);
-    if (fi < 0 || ti < 0) return base;
     return base * RoadEventRules::distanceMultiplier(edgeEvents[fi][ti]);
 }
 
 float MapGraph::getShortestPathDistance(int fromId, int toId) const {
     const int n = static_cast<int>(nodes.size());
-    const int startIdx = findNodeIndex(fromId);
-    const int endIdx   = findNodeIndex(toId);
-    if (startIdx < 0 || endIdx < 0 || n == 0) return getEffectiveDistance(fromId, toId);
+    const int startIdx = requireNodeIdIndex(*this, fromId, "MapGraph::getShortestPathDistance");
+    const int endIdx = requireNodeIdIndex(*this, toId, "MapGraph::getShortestPathDistance");
+    if (n == 0) return getEffectiveDistance(fromId, toId);
     if (startIdx == endIdx) return 0.0f;
 
     const float kInf = std::numeric_limits<float>::max() / 2.0f;
