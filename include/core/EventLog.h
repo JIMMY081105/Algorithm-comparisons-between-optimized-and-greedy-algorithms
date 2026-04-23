@@ -1,6 +1,7 @@
 #ifndef EVENT_LOG_H
 #define EVENT_LOG_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -11,9 +12,10 @@
 struct EventEntry {
     std::string timestamp;   // formatted time string
     std::string message;     // description of what happened
-    EventEntry* next;        // pointer to next event in the chain
+    std::unique_ptr<EventEntry> next; // owning pointer to next event in the chain
 
     EventEntry(const std::string& ts, const std::string& msg);
+    const EventEntry* nextEntry() const;
 };
 
 // Linked list-based event log that records simulation activities.
@@ -23,7 +25,7 @@ struct EventEntry {
 // linked list data structures with pointer manipulation.
 class EventLog {
 private:
-    EventEntry* head;
+    std::unique_ptr<EventEntry> head;
     EventEntry* tail;
     int count;
 

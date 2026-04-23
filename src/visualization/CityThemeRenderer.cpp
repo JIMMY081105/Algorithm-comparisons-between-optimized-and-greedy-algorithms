@@ -3599,7 +3599,7 @@ void CityThemeRenderer::drawRoadEventMarkers() const {
         }
 
         const IsoCoord iso = RenderUtils::worldToIso(midWorldX, midWorldY);
-        const char* label = roadEventLabel(road.eventType);
+        const char* label = RoadEventRules::label(road.eventType);
         const ImVec2 textSize = ImGui::CalcTextSize(label);
         constexpr float kPadX = 5.5f;
         constexpr float kPadY = 3.5f;

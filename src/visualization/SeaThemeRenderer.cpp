@@ -21,15 +21,12 @@
 #undef max
 #endif
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
 // =====================================================================
 //  Anonymous helper utilities (shared with sea theme only)
 // =====================================================================
 namespace {
 
+constexpr float kPi = 3.14159265358979323846f;
 constexpr float kFieldPadding = 3.4f;
 constexpr float kWaterSampleSpacing = 1.55f;
 constexpr float kDepotClearRadius = 0.68f;
@@ -214,7 +211,7 @@ void drawOrganicWorldPatch(float centerWorldX, float centerWorldY,
     glVertex2f(centerIso.x, centerIso.y);
 
     for (int i = 0; i <= segments; i++) {
-        const float angle = 2.0f * static_cast<float>(M_PI) * static_cast<float>(i) /
+        const float angle = 2.0f * kPi * static_cast<float>(i) /
                             static_cast<float>(segments);
         const float radiusNoiseX =
             1.0f + irregularity *
@@ -262,10 +259,10 @@ void drawWorldWaveRibbon(float startWorldX, float startWorldY,
         const float baseX = RenderUtils::lerp(startWorldX, endWorldX, t);
         const float baseY = RenderUtils::lerp(startWorldY, endWorldY, t);
         const float waveOffset =
-            std::sin(t * frequency * 2.0f * static_cast<float>(M_PI) + phase) * amplitudeWorld +
-            std::sin(t * frequency * 4.0f * static_cast<float>(M_PI) - phase * 0.62f) *
+            std::sin(t * frequency * 2.0f * kPi + phase) * amplitudeWorld +
+            std::sin(t * frequency * 4.0f * kPi - phase * 0.62f) *
                 amplitudeWorld * 0.35f;
-        const float widthScale = 0.62f + 0.38f * std::sin(t * static_cast<float>(M_PI));
+        const float widthScale = 0.62f + 0.38f * std::sin(t * kPi);
         const float px = baseX + perpX * waveOffset;
         const float py = baseY + perpY * waveOffset;
         const IsoCoord left = RenderUtils::worldToIso(px - perpX * halfWidthWorld * widthScale,
@@ -919,7 +916,7 @@ void SeaThemeRenderer::drawGroundPlane(IsometricRenderer& renderer,
         const float tide = std::sin(animationTime * (0.52f + capacityNorm * 0.18f) +
                                     node.getWorldX() * 0.22f - node.getWorldY() * 0.15f);
         const float rotation = pseudoRandom01(node.getId(), 3, 881) * 2.0f *
-                               static_cast<float>(M_PI);
+                               kPi;
         const float shelfX = node.getIsHQ() ? 6.2f : 2.2f + capacityNorm * 0.95f;
         const float shelfY = node.getIsHQ() ? 4.6f : 1.6f + capacityNorm * 0.70f;
         const float driftX = tide * (node.getIsHQ() ? 0.26f : 0.12f);

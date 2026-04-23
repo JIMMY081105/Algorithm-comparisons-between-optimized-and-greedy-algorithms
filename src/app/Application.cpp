@@ -41,30 +41,41 @@ static void glfwErrorCallback(int error, const char* description) {
     std::cerr << "GLFW Error " << error << ": " << description << std::endl;
 }
 
+void GlfwWindowDeleter::operator()(GLFWwindow* window) const noexcept {
+    if (window != nullptr) {
+        glfwDestroyWindow(window);
+    }
+}
+
 Application::Application()
     : window(nullptr), windowWidth(1280), windowHeight(850),
       lastFrameTime(0.0f), initialized(false) {}
 
 Application::~Application() {
-    if (initialized) {
-        shutdown();
-    }
+    shutdown();
 }
 
 bool Application::init() {
     try {
-        if (!initWindow()) return false;
-        if (!initOpenGL()) return false;
+        if (!initWindow()) {
+            shutdown();
+            return false;
+        }
+        if (!initOpenGL()) {
+            shutdown();
+            return false;
+        }
         initImGui();
         initSimulation();
         renderFrame();
-        glfwSwapBuffers(window);
-        glfwShowWindow(window);
-        glfwFocusWindow(window);
+        glfwSwapBuffers(window.get());
+        glfwShowWindow(window.get());
+        glfwFocusWindow(window.get());
         initialized = true;
         return true;
     } catch (const std::exception& e) {
         std::cerr << "Initialization failed: " << e.what() << std::endl;
+        shutdown();
         return false;
     }
 }
@@ -101,14 +112,14 @@ bool Application::initWindow() {
     }
 
     const char* title = "EcoRoute Solutions - Dual Environment Simulation Dashboard";
-    window = glfwCreateWindow(windowWidth, windowHeight, title, nullptr, nullptr);
+    window.reset(glfwCreateWindow(windowWidth, windowHeight, title, nullptr, nullptr));
     if (!window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return false;
     }
 
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(window.get());
     glfwSwapInterval(1);  // enable vsync for smooth animation
 
     return true;
@@ -199,7 +210,7 @@ void Application::initImGui() {
     colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.18f, 0.32f, 0.48f, 1.00f);
     colors[ImGuiCol_PlotHistogram]       = ImVec4(0.14f, 0.52f, 0.74f, 0.88f);
 
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplGlfw_InitForOpenGL(window.get(), true);
     ImGui_ImplOpenGL3_Init("#version 130");
 }
 
@@ -229,7 +240,7 @@ void Application::run() {
         return;
     }
 
-    while (!glfwWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(window.get())) {
         glfwPollEvents();
 
         // Delta time for frame-rate independent animation
@@ -243,7 +254,7 @@ void Application::run() {
         update(deltaTime);
         renderFrame();
 
-        glfwSwapBuffers(window);
+        glfwSwapBuffers(window.get());
     }
 }
 
@@ -257,7 +268,7 @@ void Application::update(float deltaTime) {
 }
 
 void Application::renderFrame() {
-    glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
+    glfwGetFramebufferSize(window.get(), &windowWidth, &windowHeight);
     glViewport(0, 0, windowWidth, windowHeight);
     beginImGuiFrame();
     handleZoomInput();
@@ -564,19 +575,20 @@ void Application::endImGuiFrame() {
 }
 
 void Application::shutdown() {
-    if (!initialized) return;
+    if (!initialized && window == nullptr && ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
 
     renderer.cleanup();
     environmentController.cleanup();
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-
-    if (window) {
-        glfwDestroyWindow(window);
-        window = nullptr;
+    if (ImGui::GetCurrentContext() != nullptr) {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
     }
+
+    window.reset();
     glfwTerminate();
 
     initialized = false;

@@ -12,16 +12,21 @@
 #include "visualization/IsometricRenderer.h"
 
 #include <exception>
+#include <memory>
 #include <string>
 
 struct GLFWwindow;
+
+struct GlfwWindowDeleter {
+    void operator()(GLFWwindow* window) const noexcept;
+};
 
 // Top-level coordinator for the coursework application.
 // Application owns the major subsystems and translates UI actions into changes
 // to simulation state, playback state, and exported results.
 class Application {
 private:
-    GLFWwindow* window;
+    std::unique_ptr<GLFWwindow, GlfwWindowDeleter> window;
     int windowWidth;
     int windowHeight;
 

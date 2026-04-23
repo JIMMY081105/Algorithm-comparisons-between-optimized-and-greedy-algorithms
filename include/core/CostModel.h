@@ -1,6 +1,14 @@
 #ifndef COST_MODEL_H
 #define COST_MODEL_H
 
+#include <array>
+#include <cstddef>
+
+struct EfficiencyBonusTier {
+    float distanceLimitKm;
+    float bonusRm;
+};
+
 // Encapsulates the operating assumptions used to turn route distance into
 // travel time and cost.
 //
@@ -12,6 +20,11 @@
 //   Fuel cost = litresPerKm * dailyFuelPricePerLitre * distanceKm
 //   The daily fuel price is randomized each simulation day (RM 2.00–3.80/L).
 class CostModel {
+public:
+    static constexpr std::size_t kEfficiencyBonusTierCount = 4;
+    using EfficiencyBonusTiers =
+        std::array<EfficiencyBonusTier, kEfficiencyBonusTierCount>;
+
 private:
     float litresPerKm;                // fuel consumption rate (L/km)
     float dailyFuelPricePerLitre;     // RM/litre — set fresh each day
@@ -24,6 +37,8 @@ private:
 
 public:
     CostModel();
+
+    static const EfficiencyBonusTiers& getEfficiencyBonusTiers();
 
     // --- Setters ---
     void setLitresPerKm(float rate);

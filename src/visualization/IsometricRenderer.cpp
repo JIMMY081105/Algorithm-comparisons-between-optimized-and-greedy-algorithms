@@ -4,9 +4,9 @@
 
 #include <cmath>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+namespace {
+constexpr float kPi = 3.14159265358979323846f;
+}
 
 IsometricRenderer::IsometricRenderer()
     : animationTime(0.0f), lastDeltaTime(0.0f) {}
@@ -55,7 +55,7 @@ void IsometricRenderer::drawFilledCircle(float cx, float cy, float radius,
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(cx, cy);
     for (int i = 0; i <= kSegments; ++i) {
-        const float angle = 2.0f * static_cast<float>(M_PI) * i / kSegments;
+        const float angle = 2.0f * kPi * i / kSegments;
         glVertex2f(cx + radius * std::cos(angle),
                    cy + radius * std::sin(angle));
     }
@@ -69,7 +69,7 @@ void IsometricRenderer::drawRing(float cx, float cy, float radius,
     glColor4f(color.r, color.g, color.b, color.a);
     glBegin(GL_LINE_LOOP);
     for (int i = 0; i < kSegments; ++i) {
-        const float angle = 2.0f * static_cast<float>(M_PI) * i / kSegments;
+        const float angle = 2.0f * kPi * i / kSegments;
         glVertex2f(cx + radius * std::cos(angle),
                    cy + radius * std::sin(angle));
     }

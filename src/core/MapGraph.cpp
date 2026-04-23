@@ -142,7 +142,7 @@ float MapGraph::getEffectiveDistance(int fromId, int toId) const {
     const int fi = findNodeIndex(fromId);
     const int ti = findNodeIndex(toId);
     if (fi < 0 || ti < 0) return base;
-    return base * roadEventDistanceMultiplier(edgeEvents[fi][ti]);
+    return base * RoadEventRules::distanceMultiplier(edgeEvents[fi][ti]);
 }
 
 float MapGraph::getShortestPathDistance(int fromId, int toId) const {

@@ -3,6 +3,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace {
@@ -15,6 +16,19 @@ constexpr float kBubbleMaxWidth = 340.0f;
 constexpr float kBubblePadding  = 8.0f;
 constexpr float kBubbleRounding = 10.0f;
 constexpr float kBubbleSpacing  = 6.0f;
+
+struct StatusPresentation {
+    ChatbotService::Status status;
+    const char* label;
+    ImVec4 color;
+};
+
+const std::array<StatusPresentation, 4> kStatusPresentations{{
+    {ChatbotService::Status::Idle,    "Idle",        ImVec4(0.55f, 0.60f, 0.68f, 1.0f)},
+    {ChatbotService::Status::Working, "Thinking...", ImVec4(0.90f, 0.78f, 0.28f, 1.0f)},
+    {ChatbotService::Status::Ready,   "Ready",       ImVec4(0.44f, 0.88f, 0.58f, 1.0f)},
+    {ChatbotService::Status::Error,   "Error",       ImVec4(0.94f, 0.42f, 0.38f, 1.0f)},
+}};
 
 // Icon sits bottom-left, raised by kIconBottomOffset.
 ImVec2 computeIconPos() {
@@ -31,23 +45,43 @@ ImVec2 computePanelPos() {
                   icon.y - kPanelHeight - kPanelMargin);
 }
 
-const char* statusLabel(ChatbotService::Status s) {
-    switch (s) {
-        case ChatbotService::Status::Idle:    return "Idle";
-        case ChatbotService::Status::Working: return "Thinking...";
-        case ChatbotService::Status::Ready:   return "Ready";
-        case ChatbotService::Status::Error:   return "Error";
-    }
-    return "Idle";
+const StatusPresentation& statusPresentation(ChatbotService::Status status) {
+    const auto it = std::find_if(
+        kStatusPresentations.begin(), kStatusPresentations.end(),
+        [status](const StatusPresentation& entry) {
+            return entry.status == status;
+        });
+    return it != kStatusPresentations.end()
+        ? *it
+        : kStatusPresentations.front();
 }
 
-ImVec4 statusColor(ChatbotService::Status s) {
-    switch (s) {
-        case ChatbotService::Status::Working: return ImVec4(0.90f, 0.78f, 0.28f, 1.0f);
-        case ChatbotService::Status::Ready:   return ImVec4(0.44f, 0.88f, 0.58f, 1.0f);
-        case ChatbotService::Status::Error:   return ImVec4(0.94f, 0.42f, 0.38f, 1.0f);
-        default:                              return ImVec4(0.55f, 0.60f, 0.68f, 1.0f);
+const char* statusLabel(ChatbotService::Status status) {
+    return statusPresentation(status).label;
+}
+
+ImVec4 statusColor(ChatbotService::Status status) {
+    return statusPresentation(status).color;
+}
+
+int inputTextResizeCallback(ImGuiInputTextCallbackData* data) {
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+        auto* value = static_cast<std::string*>(data->UserData);
+        value->resize(static_cast<std::size_t>(data->BufTextLen));
+        data->Buf = value->data();
     }
+    return 0;
+}
+
+bool inputTextStdString(const char* label, std::string& value,
+                        ImGuiInputTextFlags flags) {
+    flags |= ImGuiInputTextFlags_CallbackResize;
+    return ImGui::InputText(label,
+                            value.data(),
+                            value.capacity() + 1,
+                            flags,
+                            inputTextResizeCallback,
+                            &value);
 }
 
 ImU32 toU32(const ImVec4& c) { return ImGui::ColorConvertFloat4ToU32(c); }
@@ -109,9 +143,7 @@ float drawBubble(ImDrawList* dl, const std::string& text, bool isUser,
 
 // ---- ChatbotPanel implementation ----
 
-ChatbotPanel::ChatbotPanel() : expanded(false), scrollToBottom(false) {
-    inputBuffer[0] = '\0';
-}
+ChatbotPanel::ChatbotPanel() : expanded(false), scrollToBottom(false) {}
 
 void ChatbotPanel::setLastReply(const std::string& text) {
     if (!text.empty()) {
@@ -234,21 +266,21 @@ void ChatbotPanel::drawChatPanel(ChatbotService& service, Actions& actions) {
 
     // ---- Input bar ----
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    const bool entered = ImGui::InputText("##chatInput", inputBuffer,
-                                          sizeof(inputBuffer),
-                                          ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool entered = inputTextStdString(
+        "##chatInput", inputText, ImGuiInputTextFlags_EnterReturnsTrue);
 
     const bool busy = status == ChatbotService::Status::Working;
-    ImGui::BeginDisabled(busy || !service.hasApiKey());
+    const bool canSubmit = !busy && service.hasApiKey();
+    ImGui::BeginDisabled(!canSubmit);
 
     const bool sendClicked = ImGui::Button("Ask", ImVec2(80, 24));
-    if (sendClicked || entered) {
-        if (inputBuffer[0] != '\0') {
+    if ((sendClicked || entered) && canSubmit) {
+        if (!inputText.empty()) {
             actions.submitQuestion = true;
-            actions.prompt = inputBuffer;
-            messages.push_back({inputBuffer, true});
+            actions.prompt = inputText;
+            messages.push_back({inputText, true});
             scrollToBottom = true;
-            inputBuffer[0] = '\0';
+            inputText.clear();
         }
     }
     ImGui::SameLine();

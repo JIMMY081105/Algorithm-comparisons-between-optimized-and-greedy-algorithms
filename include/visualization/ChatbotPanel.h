@@ -27,7 +27,7 @@ private:
         bool isUser; // true = user bubble (right), false = AI bubble (left)
     };
 
-    char inputBuffer[512];
+    std::string inputText;
     std::string lastRecommendation;
     std::vector<ChatMessage> messages;
     bool expanded;

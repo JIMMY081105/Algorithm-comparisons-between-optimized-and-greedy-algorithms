@@ -160,7 +160,7 @@ float WasteSystem::calculateTollCost(const std::vector<int>& route) const {
     for (int i = 0; i + 1 < static_cast<int>(route.size()); ++i) {
         for (const TollStation& toll : tollStations) {
             if (toll.isCrossedBy(route[i], route[i + 1])) {
-                total += toll.fee;
+                total += toll.fee();
             }
         }
     }
@@ -173,7 +173,7 @@ std::vector<std::string> WasteSystem::getTollNamesCrossed(
     for (int i = 0; i + 1 < static_cast<int>(route.size()); ++i) {
         for (const TollStation& toll : tollStations) {
             if (toll.isCrossedBy(route[i], route[i + 1])) {
-                names.push_back(toll.name);
+                names.push_back(toll.name());
             }
         }
     }
@@ -236,9 +236,9 @@ void WasteSystem::populateCosts(RouteResult& result) const {
         const int toId   = result.visitOrder[i + 1];
         const float segKm    = graph.getDistance(fromId, toId);
         const RoadEvent ev   = graph.getEdgeEvent(fromId, toId);
-        const float segSpeed = normalSpeed * roadEventSpeedFraction(ev);
+        const float segSpeed = normalSpeed * RoadEventRules::speedFraction(ev);
         travelTime += (segSpeed > 0.0f) ? segKm / segSpeed : 0.0f;
-        fuelCost   += litresPerKm * roadEventFuelMultiplier(ev) * pricePerLitre * segKm;
+        fuelCost   += litresPerKm * RoadEventRules::fuelMultiplier(ev) * pricePerLitre * segKm;
     }
     result.travelTime = travelTime;
     result.fuelCost   = fuelCost;

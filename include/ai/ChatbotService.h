@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -72,12 +73,12 @@ private:
     std::string apiKey;
     std::string errorMessage;
 
-    bool hasPendingRequest;
-    bool hasPendingResponse;
+    std::atomic<bool> hasPendingRequest;
+    std::atomic<bool> hasPendingResponse;
     Request pendingRequest;
     Response pendingResponse;
 
-    std::thread worker;
+    std::unique_ptr<std::thread> worker;
 
     void workerLoop();
     void processRequest(const Request& request);

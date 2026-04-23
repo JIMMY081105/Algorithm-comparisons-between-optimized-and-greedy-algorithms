@@ -1,11 +1,24 @@
 #include "core/CostModel.h"
 
+namespace {
+constexpr CostModel::EfficiencyBonusTiers kEfficiencyBonusTiers{{
+    {80.0f, 25.0f},
+    {120.0f, 15.0f},
+    {180.0f, 8.0f},
+    {250.0f, 3.0f},
+}};
+} // namespace
+
 CostModel::CostModel()
     : litresPerKm(0.40f),
       dailyFuelPricePerLitre(2.50f),
       baseWagePerShift(40.0f),
       wagePerKmBonus(0.50f),
       truckSpeedKmh(60.0f) {}
+
+const CostModel::EfficiencyBonusTiers& CostModel::getEfficiencyBonusTiers() {
+    return kEfficiencyBonusTiers;
+}
 
 void CostModel::setLitresPerKm(float rate)               { litresPerKm = rate; }
 void CostModel::setDailyFuelPricePerLitre(float p)       { dailyFuelPricePerLitre = p; }
@@ -40,10 +53,11 @@ float CostModel::calculatePerKmBonus(float distanceKm) const {
 // Tiered efficiency bonus — shorter routes earn more.
 // This incentivises algorithms that minimise total travel distance.
 float CostModel::efficiencyBonusForDistance(float distanceKm) const {
-    if (distanceKm < 80.0f)  return 25.0f;
-    if (distanceKm < 120.0f) return 15.0f;
-    if (distanceKm < 180.0f) return 8.0f;
-    if (distanceKm < 250.0f) return 3.0f;
+    for (const EfficiencyBonusTier& tier : getEfficiencyBonusTiers()) {
+        if (distanceKm < tier.distanceLimitKm) {
+            return tier.bonusRm;
+        }
+    }
     return 0.0f;
 }
 

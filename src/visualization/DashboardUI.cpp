@@ -329,7 +329,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
                               nodeNames[roadEventToIdx].c_str());
             } else {
                 std::snprintf(logMsg, sizeof(logMsg), "%s: %s <-> %s",
-                              roadEventFullName(ev),
+                              RoadEventRules::fullName(ev),
                               nodeNames[roadEventFromIdx].c_str(),
                               nodeNames[roadEventToIdx].c_str());
             }
@@ -360,7 +360,7 @@ void DashboardUI::drawControlPanel(WasteSystem& system,
                         ? ImVec4(0.22f, 0.48f, 0.95f, 1.0f)   // dark blue
                         : ImVec4(0.72f, 0.48f, 0.20f, 1.0f);  // brown
 
-                ImGui::TextColored(col, "[%s]", roadEventLabel(ev.type));
+                ImGui::TextColored(col, "[%s]", RoadEventRules::label(ev.type));
                 ImGui::SameLine();
                 ImGui::TextColored(kTextSoft, "%s-%s", na, nb);
                 ImGui::SameLine();
@@ -957,18 +957,18 @@ void DashboardUI::drawFuelWagePanel(const WasteSystem& system,
         // Check if this toll was crossed in the current route
         bool crossed = false;
         for (const auto& name : currentResult.tollsCrossed) {
-            if (name == t.name) { crossed = true; break; }
+            if (name == t.name()) { crossed = true; break; }
         }
         if (crossed) {
             ImGui::TextColored(ImVec4(0.99f, 0.75f, 0.20f, 1.0f),
-                               "%s", t.name.c_str());
+                               "%s", t.name().c_str());
             ImGui::NextColumn();
             ImGui::TextColored(ImVec4(0.99f, 0.75f, 0.20f, 1.0f),
-                               "+RM %.2f", t.fee);
+                               "+RM %.2f", t.fee());
         } else {
-            ImGui::TextColored(kTextSoft, "%s", t.name.c_str());
+            ImGui::TextColored(kTextSoft, "%s", t.name().c_str());
             ImGui::NextColumn();
-            ImGui::TextColored(kTextSoft, "RM %.2f", t.fee);
+            ImGui::TextColored(kTextSoft, "RM %.2f", t.fee());
         }
         ImGui::NextColumn();
     }
@@ -989,11 +989,20 @@ void DashboardUI::drawFuelWagePanel(const WasteSystem& system,
     ImGui::TextColored(kTextSoft, "Base shift pay:  RM %.2f", cm.getBaseWagePerShift());
     ImGui::TextColored(kTextSoft, "Per-km bonus:    RM %.2f/km", cm.getWagePerKmBonus());
     ImGui::TextDisabled("Efficiency bonus tiers:");
-    ImGui::TextColored(ImVec4(0.30f, 0.90f, 0.50f, 1.0f), " <80 km  -> +RM 25.00");
-    ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.40f, 1.0f), " <120 km -> +RM 15.00");
-    ImGui::TextColored(ImVec4(0.80f, 0.80f, 0.30f, 1.0f), " <180 km -> +RM  8.00");
-    ImGui::TextColored(ImVec4(0.85f, 0.55f, 0.25f, 1.0f), " <250 km -> +RM  3.00");
-    ImGui::TextColored(kTextSoft,                          " >=250 km-> +RM  0.00");
+    const ImVec4 tierColors[] = {
+        ImVec4(0.30f, 0.90f, 0.50f, 1.0f),
+        ImVec4(0.55f, 0.85f, 0.40f, 1.0f),
+        ImVec4(0.80f, 0.80f, 0.30f, 1.0f),
+        ImVec4(0.85f, 0.55f, 0.25f, 1.0f),
+    };
+    const auto& bonusTiers = CostModel::getEfficiencyBonusTiers();
+    for (std::size_t i = 0; i < bonusTiers.size(); ++i) {
+        ImGui::TextColored(tierColors[i], " <%3.0f km -> +RM %5.2f",
+                           bonusTiers[i].distanceLimitKm,
+                           bonusTiers[i].bonusRm);
+    }
+    ImGui::TextColored(kTextSoft, " >=%.0f km-> +RM  0.00",
+                       bonusTiers.back().distanceLimitKm);
 
     ImGui::End();
 }
@@ -1012,8 +1021,8 @@ void DashboardUI::drawTollOverlays(const WasteSystem& system,
     ImDrawList* fg    = ImGui::GetForegroundDrawList();
 
     for (const auto& toll : tolls) {
-        const int idxA = g.findNodeIndex(toll.nodeA);
-        const int idxB = g.findNodeIndex(toll.nodeB);
+        const int idxA = g.findNodeIndex(toll.fromNodeId());
+        const int idxB = g.findNodeIndex(toll.toNodeId());
         if (idxA < 0 || idxB < 0) continue;
 
         const WasteNode& nA = g.getNode(idxA);
@@ -1025,7 +1034,7 @@ void DashboardUI::drawTollOverlays(const WasteSystem& system,
 
         bool crossed = false;
         for (const auto& name : currentResult.tollsCrossed) {
-            if (name == toll.name) { crossed = true; break; }
+            if (name == toll.name()) { crossed = true; break; }
         }
 
         // Barrier gate: two dark pillars + striped horizontal arm
@@ -1070,7 +1079,7 @@ void DashboardUI::drawTollOverlays(const WasteSystem& system,
         // "+RM X.XX" price pill — always visible; bright gold when crossed, dim when not
         {
             char label[24];
-            std::snprintf(label, sizeof(label), "+RM %.2f", toll.fee);
+            std::snprintf(label, sizeof(label), "+RM %.2f", toll.fee());
             const ImVec2 tSize = ImGui::CalcTextSize(label);
             constexpr float kPad = 5.0f;
             const float pillY = sc.y - kPillarH * 0.5f - tSize.y - kPad * 2.0f - 4.0f;

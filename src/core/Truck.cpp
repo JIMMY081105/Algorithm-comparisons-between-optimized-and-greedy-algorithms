@@ -1,5 +1,11 @@
 #include "core/Truck.h"
 
+namespace {
+constexpr float kMinimumSpeedMultiplier = 0.1f;
+constexpr float kMaximumSpeedMultiplier = 5.0f;
+constexpr float kBaseSegmentProgressPerSecond = 0.8f;
+}
+
 Truck::Truck()
     : posX(0.0f), posY(0.0f), speed(1.0f),
       currentSegment(0), segmentProgress(0.0f), moving(false) {}
@@ -11,8 +17,8 @@ void Truck::setPosition(float x, float y) { posX = x; posY = y; }
 float Truck::getSpeed() const { return speed; }
 void Truck::setSpeed(float s) {
     // Keep speed within a reasonable range for the animation
-    if (s < 0.1f) s = 0.1f;
-    if (s > 5.0f) s = 5.0f;
+    if (s < kMinimumSpeedMultiplier) s = kMinimumSpeedMultiplier;
+    if (s > kMaximumSpeedMultiplier) s = kMaximumSpeedMultiplier;
     speed = s;
 }
 
@@ -37,7 +43,7 @@ bool Truck::advanceProgress(float deltaTime) {
 
     // The rate at which we traverse each segment depends on speed.
     // A base rate of 0.8 per second at speed=1 feels visually smooth.
-    float advanceRate = 0.8f * speed;
+    float advanceRate = kBaseSegmentProgressPerSecond * speed;
     segmentProgress += advanceRate * deltaTime;
 
     if (segmentProgress >= 1.0f) {

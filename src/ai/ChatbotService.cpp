@@ -4,6 +4,7 @@
 #include <cctype>
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -100,17 +101,17 @@ ChatbotService::ChatbotService()
       currentStatus(Status::Idle),
       hasPendingRequest(false),
       hasPendingResponse(false) {
-    worker = std::thread(&ChatbotService::workerLoop, this);
+    worker = std::make_unique<std::thread>(&ChatbotService::workerLoop, this);
 }
 
 ChatbotService::~ChatbotService() {
     {
         std::lock_guard<std::mutex> lock(mutex);
-        shuttingDown = true;
+        shuttingDown.store(true);
     }
     cv.notify_all();
-    if (worker.joinable()) {
-        worker.join();
+    if (worker && worker->joinable()) {
+        worker->join();
     }
 }
 
@@ -157,8 +158,8 @@ void ChatbotService::submit(const std::string& prompt,
         pendingRequest.prompt = prompt;
         pendingRequest.context = context;
         pendingRequest.isRecommendation = isRecommendation;
-        hasPendingRequest = true;
-        hasPendingResponse = false;
+        hasPendingRequest.store(true);
+        hasPendingResponse.store(false);
         errorMessage.clear();
         currentStatus = Status::Working;
     }
@@ -176,9 +177,9 @@ std::string ChatbotService::lastError() const {
 
 bool ChatbotService::tryConsumeResponse(Response& out) {
     std::lock_guard<std::mutex> lock(mutex);
-    if (!hasPendingResponse) return false;
+    if (!hasPendingResponse.load()) return false;
     out = pendingResponse;
-    hasPendingResponse = false;
+    hasPendingResponse.store(false);
     pendingResponse = Response{};
     return true;
 }
@@ -189,11 +190,11 @@ void ChatbotService::workerLoop() {
         {
             std::unique_lock<std::mutex> lock(mutex);
             cv.wait(lock, [this] {
-                return shuttingDown || hasPendingRequest;
+                return shuttingDown.load() || hasPendingRequest.load();
             });
-            if (shuttingDown) return;
+            if (shuttingDown.load()) return;
             request = pendingRequest;
-            hasPendingRequest = false;
+            hasPendingRequest.store(false);
         }
         processRequest(request);
     }
@@ -241,7 +242,7 @@ void ChatbotService::processRequest(const Request& request) {
     {
         std::lock_guard<std::mutex> lock(mutex);
         pendingResponse = response;
-        hasPendingResponse = true;
+        hasPendingResponse.store(true);
         currentStatus = Status::Ready;
     }
 }
@@ -371,10 +372,11 @@ bool ChatbotService::httpsPost(const std::string& host,
     }
 
     const std::string headers = "Content-Type: application/json\r\n";
+    std::vector<char> requestBody(body.begin(), body.end());
     BOOL sent = HttpSendRequestA(request,
                                  headers.c_str(),
                                  static_cast<DWORD>(headers.size()),
-                                 const_cast<char*>(body.data()),
+                                 requestBody.empty() ? nullptr : requestBody.data(),
                                  static_cast<DWORD>(body.size()));
     if (!sent) {
         errorOut = "HttpSendRequest failed (code " +

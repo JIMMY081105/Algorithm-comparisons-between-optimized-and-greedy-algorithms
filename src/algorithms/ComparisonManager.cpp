@@ -8,6 +8,7 @@
 #include "algorithms/BellmanFordRoute.h"
 #include "algorithms/FloydWarshallRoute.h"
 
+#include <array>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -17,6 +18,46 @@ struct RouteRequestContext {
     std::vector<int> eligibleNodeIds;
     int depotNodeId = -1;
 };
+
+using AlgorithmFactory = std::unique_ptr<RouteAlgorithm>(*)();
+
+std::unique_ptr<RouteAlgorithm> makeRegularRoute() {
+    return std::make_unique<RegularRouteAlgorithm>();
+}
+
+std::unique_ptr<RouteAlgorithm> makeGreedyRoute() {
+    return std::make_unique<GreedyRouteAlgorithm>();
+}
+
+std::unique_ptr<RouteAlgorithm> makeMstRoute() {
+    return std::make_unique<MSTRouteAlgorithm>();
+}
+
+std::unique_ptr<RouteAlgorithm> makeTspRoute() {
+    return std::make_unique<TSPRouteAlgorithm>();
+}
+
+std::unique_ptr<RouteAlgorithm> makeDijkstraRoute() {
+    return std::make_unique<DijkstraRouteAlgorithm>();
+}
+
+std::unique_ptr<RouteAlgorithm> makeBellmanFordRoute() {
+    return std::make_unique<BellmanFordRouteAlgorithm>();
+}
+
+std::unique_ptr<RouteAlgorithm> makeFloydWarshallRoute() {
+    return std::make_unique<FloydWarshallRouteAlgorithm>();
+}
+
+const std::array<AlgorithmFactory, 7> kDefaultAlgorithmFactories{{
+    makeRegularRoute,
+    makeGreedyRoute,
+    makeMstRoute,
+    makeTspRoute,
+    makeDijkstraRoute,
+    makeBellmanFordRoute,
+    makeFloydWarshallRoute,
+}};
 
 RouteRequestContext buildRouteRequestContext(const WasteSystem& system) {
     return RouteRequestContext{
@@ -28,16 +69,10 @@ RouteRequestContext buildRouteRequestContext(const WasteSystem& system) {
 void registerDefaultAlgorithms(
     std::vector<std::unique_ptr<RouteAlgorithm>>& algorithms) {
     algorithms.clear();
-
-    // Keep registration centralized so the dashboard, comparison table, and
-    // execution order all rely on the same algorithm list.
-    algorithms.push_back(std::make_unique<RegularRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<GreedyRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<MSTRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<TSPRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<DijkstraRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<BellmanFordRouteAlgorithm>());
-    algorithms.push_back(std::make_unique<FloydWarshallRouteAlgorithm>());
+    algorithms.reserve(kDefaultAlgorithmFactories.size());
+    for (AlgorithmFactory createAlgorithm : kDefaultAlgorithmFactories) {
+        algorithms.push_back(createAlgorithm());
+    }
 }
 
 bool isValidAlgorithmIndex(

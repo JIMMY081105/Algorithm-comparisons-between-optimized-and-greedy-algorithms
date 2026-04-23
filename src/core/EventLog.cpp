@@ -20,6 +20,10 @@ std::tm buildLocalTimestamp(std::time_t now) {
 EventEntry::EventEntry(const std::string& ts, const std::string& msg)
     : timestamp(ts), message(msg), next(nullptr) {}
 
+const EventEntry* EventEntry::nextEntry() const {
+    return next.get();
+}
+
 EventLog::EventLog() : head(nullptr), tail(nullptr), count(0) {}
 
 EventLog::~EventLog() {
@@ -35,22 +39,22 @@ void EventLog::addEvent(const std::string& message) {
 void EventLog::addEventWithTime(const std::string& timestamp, const std::string& message) {
     // Allocate a new node and append it to the tail of the list.
     // Maintaining a tail pointer makes this O(1) instead of O(n).
-    EventEntry* newEntry = new EventEntry(timestamp, message);
+    auto newEntry = std::make_unique<EventEntry>(timestamp, message);
+    EventEntry* newTail = newEntry.get();
 
     if (tail == nullptr) {
         // First entry — both head and tail point to it
-        head = newEntry;
-        tail = newEntry;
+        head = std::move(newEntry);
     } else {
         // Link the current tail to the new node, then advance tail
-        tail->next = newEntry;
-        tail = newEntry;
+        tail->next = std::move(newEntry);
     }
+    tail = newTail;
     count++;
 }
 
 const EventEntry* EventLog::getHead() const {
-    return head;
+    return head.get();
 }
 
 int EventLog::getCount() const {
@@ -68,14 +72,14 @@ std::vector<const EventEntry*> EventLog::getRecentEvents(int maxCount) const {
     std::vector<const EventEntry*> recent;
     recent.reserve(retainedCount);
 
-    const EventEntry* current = head;
+    const EventEntry* current = head.get();
     for (int skipped = 0; skipped < skipCount && current != nullptr; ++skipped) {
-        current = current->next;
+        current = current->nextEntry();
     }
 
     while (current != nullptr) {
         recent.push_back(current);
-        current = current->next;
+        current = current->nextEntry();
     }
 
     std::reverse(recent.begin(), recent.end());
@@ -83,13 +87,7 @@ std::vector<const EventEntry*> EventLog::getRecentEvents(int maxCount) const {
 }
 
 void EventLog::clear() {
-    EventEntry* current = head;
-    while (current != nullptr) {
-        EventEntry* next = current->next;
-        delete current;
-        current = next;
-    }
-    head = nullptr;
+    head.reset();
     tail = nullptr;
     count = 0;
 }

@@ -1,5 +1,9 @@
 #include "algorithms/ComparisonManager.h"
+#include "core/CostModel.h"
+#include "core/EventLog.h"
 #include "core/MapGraph.h"
+#include "core/RoadEvent.h"
+#include "core/TollStation.h"
 #include "core/WasteNode.h"
 #include "core/WasteSystem.h"
 #include "environment/EnvironmentController.h"
@@ -9,6 +13,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 
 namespace {
 
@@ -106,6 +111,97 @@ void testWeightedMatrixInstall() {
     });
 
     assert(nearlyEqual(graph.calculateRouteDistance({0, 1, 2, 0}), 10.0f));
+}
+
+void testEventLogUniqueOwnershipBehavior() {
+    EventLog log;
+    log.addEventWithTime("10:00:00", "first");
+    log.addEventWithTime("10:01:00", "second");
+    log.addEventWithTime("10:02:00", "third");
+
+    assert(log.getCount() == 3);
+    assert(log.getHead() != nullptr);
+    assert(log.getHead()->message == "first");
+    assert(log.getHead()->nextEntry() != nullptr);
+    assert(log.getHead()->nextEntry()->message == "second");
+
+    const auto recent = log.getRecentEvents(2);
+    assert(recent.size() == 2);
+    assert(recent[0]->message == "third");
+    assert(recent[1]->message == "second");
+
+    log.clear();
+    assert(log.getCount() == 0);
+    assert(log.getHead() == nullptr);
+    assert(log.getRecentEvents(5).empty());
+}
+
+void testTollStationEncapsulationAndValidation() {
+    const TollStation toll(1, 2, 3.50f, "Gate");
+    assert(toll.fromNodeId() == 1);
+    assert(toll.toNodeId() == 2);
+    assert(nearlyEqual(toll.fee(), 3.50f));
+    assert(toll.name() == "Gate");
+    assert(toll.isCrossedBy(1, 2));
+    assert(toll.isCrossedBy(2, 1));
+    assert(!toll.isCrossedBy(1, 3));
+
+    bool threw = false;
+    try {
+        TollStation invalid(1, 1, 1.0f, "Bad");
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    assert(threw);
+
+    threw = false;
+    try {
+        TollStation invalid(1, 2, -1.0f, "Bad");
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    assert(threw);
+
+    threw = false;
+    try {
+        TollStation invalid(1, 2, 1.0f, "");
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    assert(threw);
+}
+
+void testRoadEventRules() {
+    assert(!RoadEventRules::isBlocking(RoadEvent::NONE));
+    assert(RoadEventRules::isBlocking(RoadEvent::FLOOD));
+    assert(RoadEventRules::isBlocking(RoadEvent::FESTIVAL));
+    assert(nearlyEqual(RoadEventRules::distanceMultiplier(RoadEvent::NONE),
+                       RoadEventRules::kNormalDistanceMultiplier));
+    assert(nearlyEqual(RoadEventRules::distanceMultiplier(RoadEvent::FLOOD),
+                       RoadEventRules::kImpassableDistanceMultiplier));
+    assert(nearlyEqual(RoadEventRules::speedFraction(RoadEvent::FESTIVAL),
+                       RoadEventRules::kBlockedSpeedFraction));
+    assert(nearlyEqual(RoadEventRules::fuelMultiplier(RoadEvent::FLOOD),
+                       RoadEventRules::kDefaultFuelMultiplier));
+    assert(std::string(RoadEventRules::label(RoadEvent::FLOOD)) == "FLOOD");
+    assert(std::string(RoadEventRules::fullName(RoadEvent::FESTIVAL)) == "Festival");
+}
+
+void testCostModelEfficiencyBonusTiers() {
+    const auto& tiers = CostModel::getEfficiencyBonusTiers();
+    assert(tiers.size() == CostModel::kEfficiencyBonusTierCount);
+    assert(nearlyEqual(tiers[0].distanceLimitKm, 80.0f));
+    assert(nearlyEqual(tiers[0].bonusRm, 25.0f));
+
+    CostModel costModel;
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(79.99f), 25.0f));
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(80.0f), 15.0f));
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(119.99f), 15.0f));
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(120.0f), 8.0f));
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(179.99f), 8.0f));
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(180.0f), 3.0f));
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(249.99f), 3.0f));
+    assert(nearlyEqual(costModel.calculateEfficiencyBonus(250.0f), 0.0f));
 }
 
 void testCityPresentationUsesExpandedStreetPath() {
@@ -349,6 +445,10 @@ void testCitySceneIsDeterministicForSeed() {
 
 int main() {
     testWeightedMatrixInstall();
+    testEventLogUniqueOwnershipBehavior();
+    testTollStationEncapsulationAndValidation();
+    testRoadEventRules();
+    testCostModelEfficiencyBonusTiers();
     testCityPresentationUsesExpandedStreetPath();
     testCityStartsStormyOnFirstBuild();
     testWeatherPenaltiesStayNonNegative();
