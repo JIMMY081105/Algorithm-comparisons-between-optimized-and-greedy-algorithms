@@ -1067,24 +1067,38 @@ void DashboardUI::drawTollOverlays(const WasteSystem& system,
             ImVec2(sc.x + kArmLen * 0.5f, sc.y + kArmH * 0.5f),
             IM_COL32(70, 70, 80, 200), 0.0f, 0, 1.0f);
 
-        // "+RM X.XX" notification pill — only when crossed
-        if (crossed) {
+        // "+RM X.XX" price pill — always visible; bright gold when crossed, dim when not
+        {
             char label[24];
             std::snprintf(label, sizeof(label), "+RM %.2f", toll.fee);
             const ImVec2 tSize = ImGui::CalcTextSize(label);
             constexpr float kPad = 5.0f;
             const float pillY = sc.y - kPillarH * 0.5f - tSize.y - kPad * 2.0f - 4.0f;
-            fg->AddRectFilled(
-                ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
-                ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
-                IM_COL32(255, 200, 20, 245), 5.0f);
-            fg->AddRect(
-                ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
-                ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
-                IM_COL32(210, 155, 0, 200), 5.0f, 0, 1.0f);
-            fg->AddText(
-                ImVec2(sc.x - tSize.x * 0.5f, pillY + kPad * 0.5f),
-                IM_COL32(20, 14, 0, 255), label);
+            if (crossed) {
+                fg->AddRectFilled(
+                    ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
+                    ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
+                    IM_COL32(255, 200, 20, 245), 5.0f);
+                fg->AddRect(
+                    ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
+                    ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
+                    IM_COL32(210, 155, 0, 200), 5.0f, 0, 1.0f);
+                fg->AddText(
+                    ImVec2(sc.x - tSize.x * 0.5f, pillY + kPad * 0.5f),
+                    IM_COL32(20, 14, 0, 255), label);
+            } else {
+                fg->AddRectFilled(
+                    ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
+                    ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
+                    IM_COL32(60, 55, 30, 160), 5.0f);
+                fg->AddRect(
+                    ImVec2(sc.x - tSize.x * 0.5f - kPad, pillY),
+                    ImVec2(sc.x + tSize.x * 0.5f + kPad, pillY + tSize.y + kPad * 1.2f),
+                    IM_COL32(140, 110, 30, 140), 5.0f, 0, 1.0f);
+                fg->AddText(
+                    ImVec2(sc.x - tSize.x * 0.5f, pillY + kPad * 0.5f),
+                    IM_COL32(200, 175, 80, 180), label);
+            }
         }
     }
 }
