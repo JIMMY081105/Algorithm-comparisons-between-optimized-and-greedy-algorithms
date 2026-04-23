@@ -178,10 +178,10 @@ void testRoadEventRules() {
     assert(nearlyEqual(RoadEventRules::distanceMultiplier(RoadEvent::NONE),
                        RoadEventRules::kNormalDistanceMultiplier));
     assert(nearlyEqual(RoadEventRules::distanceMultiplier(RoadEvent::FLOOD),
-                       RoadEventRules::kImpassableDistanceMultiplier));
+                       RoadEventRules::kImpassablePenalty));
     assert(nearlyEqual(RoadEventRules::speedFraction(RoadEvent::FESTIVAL),
                        RoadEventRules::kBlockedSpeedFraction));
-    assert(nearlyEqual(RoadEventRules::fuelMultiplier(RoadEvent::FLOOD),
+    assert(nearlyEqual(RoadEventRules::fuelMultiplier(),
                        RoadEventRules::kDefaultFuelMultiplier));
     assert(std::string(RoadEventRules::label(RoadEvent::FLOOD)) == "FLOOD");
     assert(std::string(RoadEventRules::fullName(RoadEvent::FESTIVAL)) == "Festival");

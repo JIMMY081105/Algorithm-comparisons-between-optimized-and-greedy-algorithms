@@ -238,7 +238,7 @@ void WasteSystem::populateCosts(RouteResult& result) const {
         const RoadEvent ev   = graph.getEdgeEvent(fromId, toId);
         const float segSpeed = normalSpeed * RoadEventRules::speedFraction(ev);
         travelTime += (segSpeed > 0.0f) ? segKm / segSpeed : 0.0f;
-        fuelCost   += litresPerKm * RoadEventRules::fuelMultiplier(ev) * pricePerLitre * segKm;
+        fuelCost   += litresPerKm * RoadEventRules::fuelMultiplier() * pricePerLitre * segKm;
     }
     result.travelTime = travelTime;
     result.fuelCost   = fuelCost;

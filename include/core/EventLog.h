@@ -33,7 +33,7 @@ public:
     EventLog();
     ~EventLog();
 
-    // Prevent copying to avoid double-free issues with raw pointers
+    // EventLog has unique ownership of its linked entries and is not copyable.
     EventLog(const EventLog&) = delete;
     EventLog& operator=(const EventLog&) = delete;
 

@@ -16,10 +16,12 @@ struct ActiveEdgeEvent {
 namespace RoadEventRules {
 
 inline constexpr float kNormalDistanceMultiplier = 1.0f;
-inline constexpr float kImpassableDistanceMultiplier = 9999.0f;
 inline constexpr float kNormalSpeedFraction = 1.0f;
 inline constexpr float kBlockedSpeedFraction = 0.0f;
 inline constexpr float kDefaultFuelMultiplier = 1.0f;
+// Large but finite so blocked edges are avoided without infinities/overflow in
+// route summaries, debug output, or cost calculations.
+inline constexpr float kImpassablePenalty = 9999.0f;
 
 inline bool isBlocking(RoadEvent event) {
     return event == RoadEvent::FLOOD || event == RoadEvent::FESTIVAL;
@@ -30,7 +32,7 @@ inline float distanceMultiplier(RoadEvent event) {
     switch (event) {
         case RoadEvent::FLOOD:
         case RoadEvent::FESTIVAL:
-            return kImpassableDistanceMultiplier;
+            return kImpassablePenalty;
         case RoadEvent::NONE:
         default:
             return kNormalDistanceMultiplier;
@@ -50,14 +52,8 @@ inline float speedFraction(RoadEvent event) {
 }
 
 // Current road events block routing, so all reachable segments use this default.
-inline float fuelMultiplier(RoadEvent event) {
-    switch (event) {
-        case RoadEvent::FLOOD:
-        case RoadEvent::FESTIVAL:
-        case RoadEvent::NONE:
-        default:
-            return kDefaultFuelMultiplier;
-    }
+inline float fuelMultiplier() {
+    return kDefaultFuelMultiplier;
 }
 
 inline const char* label(RoadEvent event) {
