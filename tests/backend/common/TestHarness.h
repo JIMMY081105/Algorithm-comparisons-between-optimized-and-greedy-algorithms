@@ -1,5 +1,5 @@
-#ifndef TEST_HARNESS_H
-#define TEST_HARNESS_H
+#ifndef BACKEND_TEST_HARNESS_H
+#define BACKEND_TEST_HARNESS_H
 
 #include <cmath>
 #include <exception>
@@ -114,4 +114,4 @@ inline int runAllTests() {
     return failed == 0 ? 0 : 1;
 }
 
-#endif // TEST_HARNESS_H
+#endif // BACKEND_TEST_HARNESS_H

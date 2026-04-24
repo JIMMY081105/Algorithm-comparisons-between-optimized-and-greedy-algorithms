@@ -251,11 +251,18 @@ endif()
 
 add_test(NAME EnvironmentCoreTests COMMAND EnvironmentCoreTests)
 
+file(GLOB_RECURSE BACKEND_TEST_CASE_SOURCES CONFIGURE_DEPENDS
+    tests/backend/algorithms/*.cpp
+    tests/backend/comparison/*.cpp
+    tests/backend/core/*.cpp
+    tests/backend/graph/*.cpp
+    tests/backend/integration/*.cpp
+    tests/backend/persistence/*.cpp
+)
+
 add_executable(BackendLogicTests
-    tests/BackendLogicTestMain.cpp
-    tests/CoreLogicTests.cpp
-    tests/GraphAlgorithmTests.cpp
-    tests/PersistenceIntegrationTests.cpp
+    tests/backend/BackendLogicTestMain.cpp
+    ${BACKEND_TEST_CASE_SOURCES}
     ${CORE_SOURCES}
     ${ALGORITHM_SOURCES}
     ${PERSISTENCE_SOURCES}
@@ -263,6 +270,7 @@ add_executable(BackendLogicTests
 
 target_include_directories(BackendLogicTests PRIVATE
     include
+    tests/backend/common
 )
 
 if(MINGW)
