@@ -251,6 +251,26 @@ endif()
 
 add_test(NAME EnvironmentCoreTests COMMAND EnvironmentCoreTests)
 
+add_executable(BackendLogicTests
+    tests/BackendLogicTestMain.cpp
+    tests/CoreLogicTests.cpp
+    tests/GraphAlgorithmTests.cpp
+    tests/PersistenceIntegrationTests.cpp
+    ${CORE_SOURCES}
+    ${ALGORITHM_SOURCES}
+    ${PERSISTENCE_SOURCES}
+)
+
+target_include_directories(BackendLogicTests PRIVATE
+    include
+)
+
+if(MINGW)
+    copy_mingw_runtime_dlls(BackendLogicTests)
+endif()
+
+add_test(NAME BackendLogicTests COMMAND BackendLogicTests)
+
 add_custom_target(smoke_dashboard
-    DEPENDS SmartWasteClearance EnvironmentCoreTests
+    DEPENDS SmartWasteClearance EnvironmentCoreTests BackendLogicTests
 )
