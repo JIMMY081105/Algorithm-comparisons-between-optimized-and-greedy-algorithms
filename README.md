@@ -1,151 +1,230 @@
-# Cleanup System
+# SmartWasteClearance
 
-**EcoRoute Solutions** is a C++ coursework project that simulates route planning for marine waste collection across a fixed Indian Ocean cleanup sector. The application combines an isometric visual map, animated route playback, algorithm comparison, and exportable summary reports.
+SmartWasteClearance is a C++17 coursework application for planning and comparing waste-collection routes across a fixed cleanup map. It combines backend route optimisation, daily simulation data, an OpenGL/ImGui dashboard, animated route playback, optional AI route advice, and exportable reports.
 
-## Overview
+## One-Line Run
 
-The system models a central command depot and a set of offshore cleanup locations. Each simulation day assigns new waste levels to the non-HQ nodes, then compares multiple routing strategies against the same scenario.
+Open a terminal in this project folder and run one command.
 
-Key features:
+### Windows
 
-- Fixed map of marine cleanup waypoints around a central command anchorage
-- Daily waste generation with reproducible seed support
-- Seven route-planning algorithms: Regular, Greedy, MST, TSP, Dijkstra,
-  Bellman-Ford, and Floyd-Warshall
-- Animated route playback on an isometric map
-- Side-by-side algorithm comparison with cost metrics
-- Optional AI assistant panel for simulation Q&A and route suggestions
-- TXT and CSV export for summaries and comparison results
+```bat
+run.bat
+```
 
-## Architectural Layout
+### Linux or macOS
 
-The refactored codebase is organised by responsibility:
+```bash
+./run.sh
+```
+
+The run script configures CMake, downloads/builds GLFW automatically through CMake, builds the Release executable, and launches the application. No manual Visual Studio project setup, vcpkg setup, or separate GLFW installation is required.
+
+## Required Tools
+
+The machine running the project must have:
+
+- CMake 3.16 or newer
+- A C++17 compiler
+  - Windows: MinGW-w64, MSVC Build Tools, or Visual Studio
+  - Linux: GCC or Clang
+  - macOS: Apple Clang/Xcode command line tools
+- OpenGL-capable graphics drivers
+- Internet access on the first configure step so CMake can download GLFW 3.3.9
+
+The project already includes the required Dear ImGui and GLAD source files under `external/`. If those files are accidentally deleted, run:
+
+```bat
+setup_dependencies.bat
+```
+
+or on Linux/macOS:
+
+```bash
+./setup_dependencies.sh
+```
+
+Then run the normal one-line command again.
+
+## What the Application Does
+
+The system simulates a smart waste-clearance operation. A headquarters node acts as the route depot, and surrounding nodes represent collection locations. Each generated day assigns new waste levels, then the dashboard allows the user to run one routing algorithm or compare all available algorithms under the same scenario.
+
+Main capabilities:
+
+- Fixed cleanup map with a central HQ/depot and multiple waste nodes
+- Daily scenario generation with repeatable simulation behaviour
+- Waste-level thresholds for deciding which nodes are eligible for collection
+- Route planning through seven algorithms
+- Cost calculation including route distance, collection amount, travel time, fuel usage, tolls, and total cost
+- Animated route playback in an isometric OpenGL dashboard
+- Event log for simulation actions
+- TXT and CSV export for summaries, route details, and algorithm comparisons
+- Optional AI chatbot panel for route discussion and suggestions
+
+## Routing Algorithms
+
+| Algorithm | Purpose |
+|-----------|---------|
+| Regular | Baseline route using the default eligible-node order |
+| Greedy | Nearest-neighbour heuristic based on current position |
+| MST | Minimum-spanning-tree-inspired coverage route |
+| TSP | Exact dynamic-programming solution for small eligible-node sets |
+| Dijkstra | Shortest-path ordering based on weighted graph distances |
+| Bellman-Ford | Relaxation-based shortest-path comparison strategy |
+| Floyd-Warshall | All-pairs shortest-path comparison strategy |
+
+Each algorithm returns a route result that is passed through shared cost-population and comparison logic so the dashboard can compare metrics consistently.
+
+## Project Structure
 
 ```text
 include/
-  algorithms/     RouteAlgorithm hierarchy and ComparisonManager
-  app/            Top-level application lifecycle and orchestration
-  core/           Simulation state, graph model, costs, nodes, event log
-  persistence/    Export and reporting helpers
-  visualization/  Rendering, animation, dashboard UI, styling
+  ai/              Chatbot service interface
+  algorithms/      RouteAlgorithm hierarchy and algorithm headers
+  app/             Application lifecycle and top-level orchestration
+  core/            Waste nodes, trucks, graph, costs, events, system state
+  environment/     Season and mission presentation helpers
+  persistence/     Export and result logging interfaces
+  visualization/   Renderer, dashboard, style, animation, theme headers
 
 src/
-  algorithms/     Routing algorithm implementations
-  app/            Application loop and subsystem coordination
-  core/           Domain and simulation logic
-  persistence/    TXT / CSV output generation
-  visualization/  OpenGL map rendering and Dear ImGui dashboard
+  ai/              Chatbot service implementation
+  algorithms/      Route algorithm implementations
+  app/             Application loop, actions, and chatbot integration
+  core/            Simulation and domain implementation
+  environment/     Environment and mission presentation implementation
+  persistence/     TXT/CSV export implementation
+  visualization/   OpenGL, ImGui, city/sea theme rendering, animation
+
+tests/
+  backend/         Backend unit and integration tests
+  EnvironmentCoreTests.cpp
+
+external/
+  glad/            Vendored OpenGL loader source
+  imgui/           Vendored Dear ImGui source and GLFW/OpenGL backends
 ```
 
-### Separation of Concerns
+## Build Details
 
-- `Application` coordinates the window, render loop, UI actions, and mission state.
-- `WasteSystem` owns the fixed map, current-day waste levels, threshold logic, and event log.
-- `ComparisonManager` runs algorithms through one shared comparison workflow.
-- `ChatbotService` is an optional asynchronous AI adapter; recommended routes are
-  validated against the current eligible-node set before they can be animated.
-- `DashboardUI` renders the control panels, while `DashboardStyle` owns reusable layout and theme rules.
-- `FileExporter` handles file output only; `ResultLogger` sits one layer above it for application-facing export actions.
+The build is managed by `CMakeLists.txt`.
 
-## Algorithms
+Important implementation details:
 
-| Algorithm | Role in the coursework |
-|-----------|------------------------|
-| Regular   | Baseline route using the default visit order |
-| Greedy    | Nearest-neighbour heuristic for local cost reduction |
-| MST       | Tree-based route approximation |
-| TSP       | Exact bitmask dynamic-programming solver for small node counts |
-| Dijkstra  | All-pairs shortest-leg strategy over the weighted graph |
-| Bellman-Ford | Relaxation-based shortest-path variant for comparison |
-| Floyd-Warshall | Dense-graph shortest-path baseline using full matrix precomputation |
+- C++ standard: C++17
+- GUI: Dear ImGui
+- Window/input layer: GLFW 3.3.9, fetched by CMake from the official GitHub release archive
+- OpenGL loader: GLAD, vendored in `external/glad`
+- Rendering backend: OpenGL 3
+- Windows networking for the optional chatbot: WinINet
 
-## Build Requirements
+The generated executable is named:
 
-- C++17 compiler (MinGW-w64, MSVC, GCC, or Clang)
-- CMake 3.16 or newer
-- Git (used by CMake to fetch GLFW the first time you configure)
-- OpenGL drivers (already installed on any modern system)
-
-Everything else ships with the repository:
-
-- Dear ImGui sources and backends in [external/imgui/](external/imgui/)
-- GLAD OpenGL loader in [external/glad/](external/glad/)
-- GLFW is **downloaded and built automatically** the first time CMake configures — no vcpkg, no system install needed.
-
-## Build & Run — one-time setup
-
-### Optional AI assistant
-
-- The dashboard can load an API key from `ai_key.txt`, but the file is ignored by Git.
-- The current AI transport uses WinINet, so live requests are only supported on Windows builds.
-- Suggested routes are rejected unless they start and end at HQ and cover every currently eligible node exactly once.
-
-After cloning the repository, open a terminal in the project folder and run:
-
-```powershell
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
+```text
+SmartWasteClearance
 ```
 
-The first `cmake ..` takes a little longer because it downloads GLFW 3.3.9 from GitHub and builds it as part of the project. All following builds are incremental.
+On Windows it is:
 
-Then launch the app from the build directory:
-
-```powershell
-.\SmartWasteClearance.exe
+```text
+SmartWasteClearance.exe
 ```
 
-Or, on MinGW/Makefile generators, the executable is directly in `build/`:
+The one-line runner searches both common CMake output layouts:
+
+- `build/SmartWasteClearance.exe`
+- `build/Release/SmartWasteClearance.exe`
+
+## Manual Build Commands
+
+The one-line runner is preferred, but the project can also be built manually.
 
 ```bash
-./SmartWasteClearance
+cmake -S . -B build
+cmake --build build --config Release
 ```
 
-### Choosing a CMake generator
+Run the executable from the build directory after compilation.
 
-If CMake picks an unexpected generator, you can be explicit:
+## Running Tests
 
-```powershell
-# MinGW (MSYS2)
-cmake .. -G "MinGW Makefiles"
+After building, run:
 
-# Visual Studio 2022
-cmake .. -G "Visual Studio 17 2022"
-
-# Linux / macOS
-cmake .. -G "Unix Makefiles"
+```bash
+ctest --test-dir build --output-on-failure
 ```
 
-## Using the Simulation
+Current test targets:
 
-1. Generate a new day to produce waste levels for all non-HQ nodes.
-2. Choose a routing algorithm or compare all algorithms.
-3. Play or replay the animated route.
-4. Review metrics, mission route order, and event log entries.
-5. Export the current route summary or the full comparison table.
+- `EnvironmentCoreTests`
+- `BackendLogicTests`
 
-## Refactor Highlights
+The backend tests cover route algorithms, comparison management, graph behaviour, core simulation logic, persistence exports, and full backend pipeline scenarios.
 
-The current codebase has been reorganised to improve maintainability without changing the coursework scope:
+## Using the Dashboard
 
-- Dashboard styling and layout rules were extracted from the main UI implementation.
-- Mission-session control in the application layer was split into focused helper methods.
-- Algorithm comparison now follows one shared execution path for clearer, fairer orchestration.
-- Fixed map data and daily waste generation logic were separated inside `WasteSystem`.
-- Export code now uses clearer helper functions and consistent project terminology.
+Typical workflow:
 
-## Output
+1. Generate a new day/scenario.
+2. Set or review the waste eligibility threshold.
+3. Select one algorithm or run all algorithms for comparison.
+4. Play or replay the route animation.
+5. Inspect distance, time, cost, fuel, toll, and waste-collected metrics.
+6. Export the current route summary, route details, or comparison table.
 
-Runtime exports are written to:
+Exports are written to:
 
 ```text
 output/
 ```
 
-Generated files include:
+Generated output examples:
 
 - `summary_*.txt`
-- `comparison_*.csv`
 - `route_detail_*.txt`
+- `comparison_*.csv`
+
+## Optional AI Assistant
+
+The dashboard can optionally use an API key from:
+
+```text
+ai_key.txt
+```
+
+This file is intentionally ignored by Git because it may contain a private key. The project still builds and runs without it. On Windows, live AI requests use WinINet. Suggested AI routes are validated before use: they must start at HQ, end at HQ, and cover the currently eligible nodes exactly once.
+
+## Troubleshooting
+
+If `run.bat` says CMake is missing, install CMake and make sure it is available on `PATH`.
+
+If CMake cannot find a compiler, install one of:
+
+- Visual Studio with C++ desktop development tools
+- Microsoft Build Tools for C++
+- MinGW-w64/MSYS2
+- GCC or Clang on Linux
+- Xcode command line tools on macOS
+
+If the first configure step fails while downloading GLFW, check internet access and run `run.bat` or `./run.sh` again.
+
+If ImGui or GLAD files are missing from `external/`, restore them with `setup_dependencies.bat` or `./setup_dependencies.sh`.
+
+If the app opens but the window is blank or fails to create an OpenGL context, update the graphics driver and confirm the machine supports OpenGL.
+
+## Notes for Marking
+
+For the simplest marking flow on Windows:
+
+```bat
+run.bat
+```
+
+For Linux/macOS:
+
+```bash
+./run.sh
+```
+
+That single command is intended to build and launch the submitted project from a clean checkout, provided the required compiler, CMake, graphics driver, and first-run internet access are available.

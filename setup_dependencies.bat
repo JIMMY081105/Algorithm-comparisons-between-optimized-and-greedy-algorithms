@@ -1,94 +1,64 @@
 @echo off
-REM Smart Waste Clearance System - Dependency Setup Script
-REM Run this ONCE before building the project.
+setlocal EnableExtensions
+
+cd /d "%~dp0"
 
 echo ============================================
-echo  Setting up external dependencies...
+echo  SmartWasteClearance dependency restore
 echo ============================================
+echo.
+echo This script restores the vendored source files used by the project.
+echo GLFW is downloaded automatically by CMake when run.bat configures the build.
+echo.
 
-REM Create directories
+where curl >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: curl was not found on PATH.
+    echo Install curl or use a recent Windows version that includes it.
+    exit /b 1
+)
+
 if not exist "external\imgui" mkdir "external\imgui"
 if not exist "external\glad\include\glad" mkdir "external\glad\include\glad"
 if not exist "external\glad\include\KHR" mkdir "external\glad\include\KHR"
 if not exist "external\glad\src" mkdir "external\glad\src"
 
-echo.
-echo [Step 1] Downloading Dear ImGui v1.90.4...
-echo.
+echo [1/2] Downloading Dear ImGui v1.90.4 source files...
+set "IMGUI_BASE=https://raw.githubusercontent.com/ocornut/imgui/v1.90.4"
 
-REM Download ImGui core files from the official repository
-set IMGUI_BASE=https://raw.githubusercontent.com/ocornut/imgui/v1.90.4
+for %%F in (
+    imgui.h
+    imgui.cpp
+    imgui_internal.h
+    imgui_draw.cpp
+    imgui_tables.cpp
+    imgui_widgets.cpp
+    imgui_demo.cpp
+    imconfig.h
+    imstb_rectpack.h
+    imstb_textedit.h
+    imstb_truetype.h
+) do (
+    curl -fL "%IMGUI_BASE%/%%F" -o "external\imgui\%%F" || exit /b 1
+)
 
-curl -sL "%IMGUI_BASE%/imgui.h" -o "external/imgui/imgui.h"
-curl -sL "%IMGUI_BASE%/imgui.cpp" -o "external/imgui/imgui.cpp"
-curl -sL "%IMGUI_BASE%/imgui_internal.h" -o "external/imgui/imgui_internal.h"
-curl -sL "%IMGUI_BASE%/imgui_draw.cpp" -o "external/imgui/imgui_draw.cpp"
-curl -sL "%IMGUI_BASE%/imgui_tables.cpp" -o "external/imgui/imgui_tables.cpp"
-curl -sL "%IMGUI_BASE%/imgui_widgets.cpp" -o "external/imgui/imgui_widgets.cpp"
-curl -sL "%IMGUI_BASE%/imgui_demo.cpp" -o "external/imgui/imgui_demo.cpp"
-curl -sL "%IMGUI_BASE%/imconfig.h" -o "external/imgui/imconfig.h"
-curl -sL "%IMGUI_BASE%/imstb_rectpack.h" -o "external/imgui/imstb_rectpack.h"
-curl -sL "%IMGUI_BASE%/imstb_textedit.h" -o "external/imgui/imstb_textedit.h"
-curl -sL "%IMGUI_BASE%/imstb_truetype.h" -o "external/imgui/imstb_truetype.h"
-
-REM Download ImGui backend files for GLFW + OpenGL3
-curl -sL "%IMGUI_BASE%/backends/imgui_impl_glfw.h" -o "external/imgui/imgui_impl_glfw.h"
-curl -sL "%IMGUI_BASE%/backends/imgui_impl_glfw.cpp" -o "external/imgui/imgui_impl_glfw.cpp"
-curl -sL "%IMGUI_BASE%/backends/imgui_impl_opengl3.h" -o "external/imgui/imgui_impl_opengl3.h"
-curl -sL "%IMGUI_BASE%/backends/imgui_impl_opengl3.cpp" -o "external/imgui/imgui_impl_opengl3.cpp"
-curl -sL "%IMGUI_BASE%/backends/imgui_impl_opengl3_loader.h" -o "external/imgui/imgui_impl_opengl3_loader.h"
-
-echo ImGui downloaded successfully.
-
-echo.
-echo [Step 2] Downloading GLAD (OpenGL 3.3 Compatibility)...
-echo.
-
-REM Download GLAD from a known good source
-REM Using the webservice: https://glad.davemorris.io/#language=c&specification=gl&api=gl%3D3.3&api=gles1%3Dnone&api=gles2%3Dnone&api=glsc2%3Dnone&profile=compatibility&loader=on
-set GLAD_BASE=https://raw.githubusercontent.com/Dav1dde/glad/glad2/include
-
-REM For simplicity, we use a pre-built glad for GL 3.3 compat
-REM If the download fails, generate manually at https://glad.davemorris.io/
-curl -sL "https://raw.githubusercontent.com/Dav1dde/glad/v0.1.36/include/glad/glad.h" -o "external/glad/include/glad/glad.h" 2>nul
-curl -sL "https://raw.githubusercontent.com/Dav1dde/glad/v0.1.36/include/KHR/khrplatform.h" -o "external/glad/include/KHR/khrplatform.h" 2>nul
-curl -sL "https://raw.githubusercontent.com/Dav1dde/glad/v0.1.36/src/glad.c" -o "external/glad/src/glad.c" 2>nul
-
-REM Check if files were downloaded successfully
-if not exist "external\glad\include\glad\glad.h" (
-    echo.
-    echo WARNING: GLAD automatic download may have failed.
-    echo Please generate GLAD manually:
-    echo   1. Go to https://glad.davemorris.io/
-    echo   2. Select: Language=C/C++, API gl=3.3, Profile=Compatibility, Loader=Yes
-    echo   3. Click Generate and download
-    echo   4. Place glad.h in external/glad/include/glad/
-    echo   5. Place khrplatform.h in external/glad/include/KHR/
-    echo   6. Place glad.c in external/glad/src/
-    echo.
-) else (
-    echo GLAD downloaded successfully.
+for %%F in (
+    imgui_impl_glfw.h
+    imgui_impl_glfw.cpp
+    imgui_impl_opengl3.h
+    imgui_impl_opengl3.cpp
+    imgui_impl_opengl3_loader.h
+) do (
+    curl -fL "%IMGUI_BASE%/backends/%%F" -o "external\imgui\%%F" || exit /b 1
 )
 
 echo.
-echo [Step 3] GLFW Setup
-echo.
-echo GLFW must be installed separately. Options:
-echo   A) Using vcpkg (recommended):
-echo      vcpkg install glfw3:x64-windows
-echo      Then configure CMake with: -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake
-echo.
-echo   B) Manual installation:
-echo      1. Download from https://www.glfw.org/download
-echo      2. Extract to a known location
-echo      3. Set GLFW3_DIR environment variable or pass -DGLFW3_DIR=path to CMake
-echo.
-echo ============================================
-echo  Setup complete! Now build with CMake:
-echo    mkdir build
-echo    cd build
-echo    cmake ..
-echo    cmake --build . --config Release
-echo ============================================
+echo [2/2] Downloading GLAD OpenGL loader source files...
+curl -fL "https://raw.githubusercontent.com/Dav1dde/glad/v0.1.36/include/glad/glad.h" -o "external\glad\include\glad\glad.h" || exit /b 1
+curl -fL "https://raw.githubusercontent.com/Dav1dde/glad/v0.1.36/include/KHR/khrplatform.h" -o "external\glad\include\KHR\khrplatform.h" || exit /b 1
+curl -fL "https://raw.githubusercontent.com/Dav1dde/glad/v0.1.36/src/glad.c" -o "external\glad\src\glad.c" || exit /b 1
 
-pause
+echo.
+echo Dependency source files are ready.
+echo Run the project with:
+echo   run.bat

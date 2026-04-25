@@ -4,6 +4,10 @@ project(SmartWasteClearance VERSION 1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 # ========================================
 # GLFW — fetched automatically from GitHub
 # ========================================
@@ -14,9 +18,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     glfw
-    GIT_REPOSITORY https://github.com/glfw/glfw.git
-    GIT_TAG        3.3.9
-    GIT_SHALLOW    TRUE
+    URL https://github.com/glfw/glfw/archive/refs/tags/3.3.9.zip
 )
 FetchContent_MakeAvailable(glfw)
 
