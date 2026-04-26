@@ -18,7 +18,7 @@ run.bat
 ./run.sh
 ```
 
-The run script configures CMake, downloads/builds GLFW automatically through CMake, builds the Release executable, and launches the application. No manual Visual Studio project setup, vcpkg setup, or separate GLFW installation is required.
+The run script configures CMake, builds the bundled dependencies, builds the Release executable, and launches the application. No manual Visual Studio project setup, vcpkg setup, MSYS setup, or separate GLFW installation is required.
 
 ## Required Tools
 
@@ -30,9 +30,9 @@ The machine running the project must have:
   - Linux: GCC or Clang
   - macOS: Apple Clang/Xcode command line tools
 - OpenGL-capable graphics drivers
-- Internet access on the first configure step so CMake can download GLFW 3.3.9
+- No extra dependency downloads are needed when the submitted `external/` folder is included.
 
-The project already includes the required Dear ImGui and GLAD source files under `external/`. If those files are accidentally deleted, run:
+The project already includes the required GLFW, Dear ImGui, and GLAD source files under `external/`. If the ImGui or GLAD files are accidentally deleted, run:
 
 ```bat
 setup_dependencies.bat
@@ -114,7 +114,7 @@ Important implementation details:
 
 - C++ standard: C++17
 - GUI: Dear ImGui
-- Window/input layer: GLFW 3.3.9, fetched by CMake from the official GitHub release archive
+- Window/input layer: GLFW 3.3.9, bundled under `external/glfw`
 - OpenGL loader: GLAD, vendored in `external/glad`
 - Rendering backend: OpenGL 3
 - Windows networking for the optional chatbot: WinINet
@@ -207,7 +207,7 @@ If CMake cannot find a compiler, install one of:
 - GCC or Clang on Linux
 - Xcode command line tools on macOS
 
-If the first configure step fails while downloading GLFW, check internet access and run `run.bat` or `./run.sh` again.
+If the first configure step cannot find GLFW, make sure `external/glfw` is included in the submitted project folder.
 
 If ImGui or GLAD files are missing from `external/`, restore them with `setup_dependencies.bat` or `./setup_dependencies.sh`.
 
@@ -227,4 +227,4 @@ For Linux/macOS:
 ./run.sh
 ```
 
-That single command is intended to build and launch the submitted project from a clean checkout, provided the required compiler, CMake, graphics driver, and first-run internet access are available.
+That single command is intended to build and launch the submitted project from a clean checkout, provided the required compiler, CMake, and graphics driver are available.

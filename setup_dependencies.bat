@@ -8,7 +8,7 @@ echo  SmartWasteClearance dependency restore
 echo ============================================
 echo.
 echo This script restores the vendored source files used by the project.
-echo GLFW is downloaded automatically by CMake when run.bat configures the build.
+echo GLFW is bundled in external\glfw and is used directly by CMake.
 echo.
 
 where curl >nul 2>nul

@@ -9,18 +9,23 @@ if(POLICY CMP0135)
 endif()
 
 # ========================================
-# GLFW — fetched automatically from GitHub
+# GLFW - bundled source, with download fallback
 # ========================================
-include(FetchContent)
 set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-    glfw
-    URL https://github.com/glfw/glfw/archive/refs/tags/3.3.9.zip
-)
-FetchContent_MakeAvailable(glfw)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/glfw/CMakeLists.txt")
+    add_subdirectory(external/glfw)
+else()
+    include(FetchContent)
+    FetchContent_Declare(
+        glfw
+        URL https://github.com/glfw/glfw/archive/refs/tags/3.3.9.zip
+    )
+    FetchContent_MakeAvailable(glfw)
+endif()
 
 # ========================================
 # Find OpenGL
@@ -38,7 +43,7 @@ target_include_directories(glad PUBLIC
 )
 
 # ========================================
-# Dear ImGui — immediate mode GUI library
+# Dear ImGui - immediate mode GUI library
 # ========================================
 add_library(imgui STATIC
     external/imgui/imgui.cpp
